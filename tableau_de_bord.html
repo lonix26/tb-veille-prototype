@@ -15,6 +15,15 @@
      couverture complète : c'est exactement la surdéclaration que le travail
      s'interdit.
 
+  3. LA LECTURE EST CALCULÉE, JAMAIS RÉDIGÉE. La couche de lecture ajoutée le
+     10.08.2026 — phrase de synthèse par onglet, position au seuil de matérialité,
+     franchissements diffusables au sens de RI5 — est composée par gabarit à partir
+     des métriques déterministes de v_metriques. Aucun énoncé de cette page n'est
+     produit par un modèle de langage. Une restitution qui n'affiche que des mesures
+     laisse son destinataire sans lecture ; une restitution qui fait interpréter un
+     modèle sans traçabilité réintroduit la surdéclaration. La sortie est de faire
+     dire à la page ce que le calcul établit, et rien de plus.
+
   Aucune dépendance externe : les graphiques sont dessinés en SVG dans la page.
   Le dispositif doit rester reproductible par une PME, y compris hors ligne.
 -->
@@ -38,8 +47,31 @@
   header{background:var(--encre);color:#fff;padding:18px 24px}
   header h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.2px}
   header .meta{margin-top:5px;font-size:12px;color:#A9B3BD}
-  .bandeau{display:flex;gap:22px;flex-wrap:wrap;padding:14px 24px;background:var(--blanc);
-           border-bottom:1px solid var(--filet)}
+  .bandeau{padding:13px 24px;background:var(--blanc);border-bottom:1px solid var(--filet)}
+  .b-signal{font-size:13.5px;line-height:1.55;max-width:920px}
+  .b-kpis{display:flex;gap:22px;flex-wrap:wrap;margin-top:11px;padding-top:10px;
+          border-top:1px solid var(--filet)}
+  .b-kpis .l-sec{flex-basis:100%;font-size:10.5px;color:var(--gris-clair);
+                 text-transform:uppercase;letter-spacing:.4px;margin-bottom:-2px}
+  .signaux{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .sig{font-size:12px;padding:5px 9px;border-radius:3px;line-height:1.4}
+  .sig.diffusable{background:var(--rouge-fond);color:var(--rouge)}
+  .sig.retenu{background:var(--ambre-fond);color:var(--ambre)}
+  .sig.calme{background:var(--vert-fond);color:var(--vert)}
+  .sig.inconnu{background:#ECEEF0;color:var(--gris)}
+  .lecture{background:var(--blanc);border:1px solid var(--filet);border-left:3px solid var(--encre);
+           border-radius:0 4px 4px 0;padding:12px 15px;margin:0 0 18px;max-width:920px}
+  .l-txt{font-size:13.5px;line-height:1.55}
+  .l-org{font-size:10.5px;color:var(--gris-clair);margin-top:8px;font-style:italic;line-height:1.45}
+  .c-seuil{font-size:11px;color:var(--gris);margin-top:8px;line-height:1.45}
+  .c-seuil b{color:var(--encre)}
+  .c-legende{font-size:10.5px;color:var(--gris-clair);margin-top:3px}
+  details.prov{margin-top:8px}
+  details.prov summary{font-size:11px;color:var(--gris);cursor:pointer;list-style:none;outline:none}
+  details.prov summary::-webkit-details-marker{display:none}
+  details.prov summary::before{content:"▸ ";color:var(--gris-clair)}
+  details.prov[open] summary::before{content:"▾ "}
+  details.prov .p-corps{font-size:11.5px;color:var(--gris);margin-top:5px;line-height:1.55}
   .kpi{min-width:110px}
   .kpi .v{font-size:22px;font-weight:600;line-height:1.1}
   .kpi .l{font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
@@ -134,26 +166,56 @@ const SECTEURS = [
 let D = null, onglet = "transversal";
 
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const nb = (v, d = 1) => v === null || v === undefined || v === "" || isNaN(v)
-  ? "—" : Number(v).toLocaleString("fr-CH", {minimumFractionDigits: d, maximumFractionDigits: d});
 const pct = v => v === null || v === undefined || isNaN(v) ? "—"
   : (v > 0 ? "+" : "") + Number(v).toLocaleString("fr-CH", {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " %";
 const signe = v => v === null || v === undefined || isNaN(v) ? "" : (v > 0 ? "hausse" : v < 0 ? "baisse" : "");
 
+// PRÉCISION D'AFFICHAGE SUIVANT L'ORDRE DE GRANDEUR. Un arrondi fixe détruit
+// l'information qu'il est censé porter : un taux de change à 0,93 arrondi à
+// l'entier s'affiche « 1 », ce qui n'est pas une valeur imprécise mais une
+// valeur fausse pour son lecteur. À l'inverse, trois décimales sur un flux
+// commercial en USD encombrent sans rien apporter.
+const nbAuto = v => {
+  if (v === null || v === undefined || v === "" || isNaN(v)) return "—";
+  const a = Math.abs(Number(v));
+  const d = a === 0 ? 0 : a < 10 ? 3 : a < 1000 ? 1 : 0;
+  return Number(v).toLocaleString("fr-CH", {minimumFractionDigits: d, maximumFractionDigits: d});
+};
+
+// UNITÉ ADDITIVE OU NON. Une part de panier ne se calcule que sur une grandeur
+// extensive : additionner des exportations a un sens, additionner deux taux de
+// change ou deux indices n'en a aucun. La distinction commande la forme de
+// restitution des indicateurs multi-zones — sans elle, le dispositif produit
+// une « part » d'apparence normale répondant à une question que personne n'a posée.
+const estAdditive = unit => !/indice|taux|pourcentage|qualitatif/i.test(String(unit ?? ""));
+
 // Courbe en SVG, sans dépendance externe : le dispositif doit rester
 // reproductible par une PME, y compris hors ligne.
-function spark(serie, L = 300, H = 42) {
+//
+// LIGNE DE RÉFÉRENCE. Une courbe sans repère ne se lit pas : elle montre une
+// forme, pas une position. Le repère tracé est la moyenne mobile annuelle,
+// parce qu'elle est CALCULÉE par v_metriques et non supposée. Un niveau de
+// référence propre à l'indicateur — 100 pour un indice de tendance, par
+// exemple — serait une meilleure lecture encore, mais il relève d'un attribut
+// du référentiel à saisir source par source, pas d'une convention devinée
+// dans la page. Limite énoncée, non contournée.
+function spark(serie, ref = null, L = 300, H = 42) {
   if (!serie || serie.length < 2) return "";
   const v = serie.map(p => p.value);
-  const min = Math.min(...v), max = Math.max(...v), amp = (max - min) || 1;
-  const pts = serie.map((p, i) => [
-    (i / (serie.length - 1)) * (L - 2) + 1,
-    H - 4 - ((p.value - min) / amp) * (H - 8)
-  ]);
+  const refValide = ref !== null && ref !== undefined && !isNaN(ref);
+  const bornes = refValide ? v.concat([Number(ref)]) : v;
+  const min = Math.min(...bornes), max = Math.max(...bornes), amp = (max - min) || 1;
+  const y = val => H - 4 - ((val - min) / amp) * (H - 8);
+  const pts = serie.map((p, i) => [(i / (serie.length - 1)) * (L - 2) + 1, y(p.value)]);
   const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
   const dernier = pts[pts.length - 1];
+  const ligneRef = refValide
+    ? `<line x1="1" x2="${L - 1}" y1="${y(Number(ref)).toFixed(1)}" y2="${y(Number(ref)).toFixed(1)}"
+             stroke="#8A9199" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`
+    : "";
   return `<svg class="spark" width="100%" height="${H}" viewBox="0 0 ${L} ${H}" preserveAspectRatio="none"
     role="img" aria-label="Évolution sur ${serie.length} périodes, de ${esc(serie[0].period)} à ${esc(serie[serie.length-1].period)}">
+    ${ligneRef}
     <path d="${d}" fill="none" stroke="#1C2733" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
     <circle cx="${dernier[0].toFixed(1)}" cy="${dernier[1].toFixed(1)}" r="2.6" fill="#1C2733"/>
   </svg>`;
@@ -209,13 +271,36 @@ function blocMetriques(met, serie) {
   const gl = met.glissement_annuel_pct;
   const vp = met.variation_periode_pct;
   const mm = met.moyenne_mobile_annuelle;
-  const franchi = String(met.franchissement || "").startsWith("franchi");
   return `<div class="c-metr">
       <div>${infra ? "glissement annuel" : "variation annuelle"}<b class="${signe(gl ?? vp)}">${pct(gl ?? vp)}</b></div>
       ${infra ? `<div>période précédente<b class="${signe(vp)}">${pct(vp)}</b></div>` : ""}
-      ${infra && mm !== null && mm !== undefined ? `<div>moyenne mobile<b>${nb(mm)}</b></div>` : ""}
-      ${franchi ? `<div>seuil<b class="baisse">franchi</b></div>` : ""}
-    </div>`;
+      ${infra && mm !== null && mm !== undefined ? `<div>moyenne mobile<b>${nbAuto(mm)}</b></div>` : ""}
+    </div>
+    ${ligneSeuil(met)}`;
+}
+
+// POSITION AU SEUIL, TOUJOURS AFFICHÉE. La version précédente ne mentionnait le
+// seuil de matérialité qu'une fois franchi : le lecteur ne savait jamais à
+// quelle distance il se trouvait, c'est-à-dire précisément ce qu'un seuil sert
+// à dire. Les trois cas où la position est indéterminable sont énoncés plutôt
+// que masqués — RI0 : signaler, ne pas conclure.
+function ligneSeuil(met) {
+  const seuil = met.seuil_materialite_pct;
+  const ref = met.glissement_annuel_pct ?? met.variation_periode_pct;
+  if (seuil === null || seuil === undefined || isNaN(seuil)) {
+    return `<div class="c-seuil">Seuil de matérialité <b>non configuré</b> — aucun franchissement
+      n'est calculable pour cet indicateur (RI4 inapplicable).</div>`;
+  }
+  if (ref === null || ref === undefined || isNaN(ref)) {
+    return `<div class="c-seuil">Seuil de matérialité <b>${nbAuto(seuil)} %</b> — variation
+      indisponible, position au seuil indéterminable.</div>`;
+  }
+  const ecart = Math.abs(Number(ref)) - Number(seuil);
+  return ecart >= 0
+    ? `<div class="c-seuil">Seuil de matérialité ${nbAuto(seuil)} % — <b class="baisse">franchi</b>,
+       ${nbAuto(Math.abs(ref))} % en valeur absolue.</div>`
+    : `<div class="c-seuil">Seuil de matérialité ${nbAuto(seuil)} % — <b>sous le seuil</b>,
+       à ${nbAuto(-ecart)} point(s) de son franchissement.</div>`;
 }
 
 // Classement multi-zones : barres horizontales triées, part du panier,
@@ -277,7 +362,7 @@ function classementZones(ind, zones) {
     return `<div class="z-ligne">
       <span class="z-nom">${esc(z.geo)}</span>
       <span class="z-barre"><i style="width:${largeur.toFixed(1)}%"></i></span>
-      <span class="z-val">${nb(z.valeur, 0)}</span>
+      <span class="z-val">${nbAuto(z.valeur)}</span>
       <span class="z-part">${part.toFixed(1)} %</span>
       <span class="z-var ${signe(z.varPct)}">${pct(z.varPct)}</span>
     </div>`;
@@ -308,6 +393,70 @@ function classementZones(ind, zones) {
   </div>`;
 }
 
+// COMPARAISON DE NIVEAUX — indicateur multi-zones à unité NON additive.
+//
+// Le classement par part de panier suppose une grandeur extensive. Appliqué à
+// T2 (taux de change CHF/USD et CHF/EUR), il produisait « part 53,3 % » : la
+// part d'un panier de devises ne signifie rien, et l'arrondi à l'entier
+// affichait un taux de 0,93 comme « 1 ». Deux défauts de restitution, aucun de
+// collecte — la donnée en base était juste. C'est le cas d'école du § 12.5 :
+// une convention d'affichage suffit à fabriquer un signal faux.
+//
+// La forme retenue compare des niveaux côte à côte, sans barre proportionnelle
+// et sans part, et énonce pourquoi.
+function comparaisonNiveaux(ind, zones) {
+  const zonesReelles = zones.filter(g => g !== "WORLD" && g !== "W00");
+  if (!zonesReelles.length) return "";
+
+  const parZone = zonesReelles.map(g => {
+    const s = serieDe(ind, g);
+    const derniere = s[s.length - 1];
+    const homologue = derniere ? s.filter(p => p.period < derniere.period).pop() : null;
+    const varPct = (derniere && homologue && homologue.value !== 0)
+      ? (derniere.value - homologue.value) / homologue.value * 100 : null;
+    return {geo: g, periode: derniere ? derniere.period : null,
+            valeur: derniere ? derniere.value : null, varPct};
+  }).filter(z => z.valeur !== null).sort((a, b) => String(a.geo).localeCompare(String(b.geo)));
+
+  if (!parZone.length) return "";
+
+  const lignes = parZone.map(z => `<div class="z-ligne">
+      <span class="z-nom">${esc(z.geo)}</span>
+      <span class="z-part" style="text-align:left">${esc(ind.unit)}</span>
+      <span class="z-val">${nbAuto(z.valeur)}</span>
+      <span class="z-part">${esc(z.periode)}</span>
+      <span class="z-var ${signe(z.varPct)}">${pct(z.varPct)}</span>
+    </div>`).join("");
+
+  return `<div class="z-classement">
+    <div class="z-refper">Niveaux à la dernière période de chaque série,
+      variation contre la période précédente</div>
+    <div class="z-entete"><span></span><span style="text-align:left">unité</span>
+      <span>niveau</span><span>période</span><span>var.</span></div>
+    ${lignes}
+    <div class="z-note">Unité non additive (${esc(ind.unit)}) : aucune part de panier n'est calculée.
+      Additionner des séries de cette nature produirait un total sans référent, et une part qui en
+      découlerait serait un nombre d'apparence normale sans signification.</div>
+  </div>`;
+}
+
+// MENTION D'EXÉCUTION. L'outil vivant se démontre par l'écart entre exécutions ;
+// afficher le seul numéro de run ne dit rien de cet écart. Les trois formulations
+// correspondent à trois états distincts du dossier et ne doivent pas être
+// confondues : une révision constatée, une absence de révision constatée sur
+// comparaison effective, et une absence de comparaison — ce dernier cas n'étant
+// pas un résultat mais une absence de résultat.
+function mentionRun(ind) {
+  const rev = (D.revisions || []).filter(e => e.indicator_id === ind.indicator_id);
+  if (rev.length) {
+    const d = rev[rev.length - 1];
+    return `run ${esc(ind.dernier_run)} · révision constatée : ${esc(d.period)} ${pct(d.ecart_pct)} au run ${esc(d.run_id)}`;
+  }
+  return Number(D.comparaisons_runs || 0) > 0
+    ? `run ${esc(ind.dernier_run)} · aucune révision constatée`
+    : `run ${esc(ind.dernier_run)} · aucune comparaison entre exécutions à ce jour`;
+}
+
 function carte(ind) {
   const zones = zonesDe(ind);
   const multiZones = zones.filter(g => g !== "WORLD" && g !== "W00").length > 1;
@@ -336,18 +485,33 @@ function carte(ind) {
 
   const met = (D.metriques || []).find(m => m.indicator_id === ind.indicator_id);
 
-  // --- Indicateur multi-zones : classement, jamais de valeur unique ---
+  // Provenance et volumétrie repliées. Elles doivent rester accessibles — c'est
+  // la thèse du travail — sans occuper au premier plan plus de surface que le
+  // signal qu'elles documentent. Le statut de validation et la source restent
+  // visibles en permanence : ce sont eux qui conditionnent la lecture.
+  const provenance = `<details class="prov"><summary>provenance et fraîcheur</summary>
+      <div class="p-corps">
+        ${ind.observations} observation${ind.observations > 1 ? "s" : ""} au registre,
+        de ${esc(ind.p_min)} à ${esc(ind.p_max)} · fréquence ${esc(ind.frequency)} ·
+        unité : ${esc(ind.unit)}.<br>
+        Qualification de la source : ${esc(ind.qualification_status ?? "non renseignée")} ·
+        dernière exécution ayant écrit cet indicateur : run ${esc(ind.dernier_run)}.
+      </div></details>`;
+
+  // --- Indicateur multi-zones : classement ou comparaison de niveaux, jamais
+  //     de valeur unique. La forme dépend du caractère additif de l'unité. ---
   if (multiZones) {
     const periodes = [...new Set(serieDe(ind).map(p => p.period))].sort();
+    const additive = estAdditive(ind.unit);
     return `<div class="carte carte-large">${tete}
-      <div class="c-per">${esc(periodes[periodes.length - 1])} ·
-        ${ind.observations} observation${ind.observations > 1 ? "s" : ""} au registre ·
-        ${esc(ind.p_min)} → ${esc(ind.p_max)} · valeurs en ${esc(ind.unit)}, courantes</div>
-      ${classementZones(ind, zones)}
+      <div class="c-per">Dernière période observée : ${esc(periodes[periodes.length - 1])}${
+        additive ? " · valeurs en " + esc(ind.unit) + ", courantes" : ""}</div>
+      ${additive ? classementZones(ind, zones) : comparaisonNiveaux(ind, zones)}
       <div class="c-pied">
         <span>${badgeValidation(met ? met.validation_status : null)}</span>
-        <span>run ${esc(ind.dernier_run)}</span>
+        <span class="c-run">${mentionRun(ind)}</span>
       </div>
+      ${provenance}
       ${pied}</div>`;
   }
 
@@ -357,20 +521,86 @@ function carte(ind) {
   const derniere = serie[serie.length - 1];
   const etiquetteZone = (geoUnique !== "WORLD" && geoUnique !== "W00" && geoUnique !== "EU27_2020")
     ? geoUnique : ({WORLD: "monde", W00: "monde", EU27_2020: "UE27"}[geoUnique] ?? geoUnique);
+  const repere = met ? met.moyenne_mobile_annuelle : null;
+  const repereTrace = serie.length > 2 && repere !== null && repere !== undefined && !isNaN(repere);
 
   return `<div class="carte">${tete}
-    <div class="c-val">${nb(met ? met.value : derniere.value)}<span class="c-unite">${esc(ind.unit)} · ${esc(etiquetteZone)}</span></div>
-    <div class="c-per">${esc(met ? met.period : derniere.period)} ·
-      ${ind.observations} observation${ind.observations > 1 ? "s" : ""} au registre ·
-      ${esc(ind.p_min)} → ${esc(ind.p_max)}</div>
-    ${serie.length > 2 ? spark(serie) : ""}
+    <div class="c-val">${nbAuto(met ? met.value : derniere.value)}<span class="c-unite">${esc(ind.unit)} · ${esc(etiquetteZone)}</span></div>
+    <div class="c-per">Période ${esc(met ? met.period : derniere.period)}</div>
+    ${serie.length > 2 ? spark(serie, repere) : ""}
+    ${repereTrace ? `<div class="c-legende">Ligne pointillée : moyenne mobile annuelle
+      (${nbAuto(repere)}), seul repère calculé disponible pour cet indicateur.</div>` : ""}
     ${blocMetriques(met, serie)}
     ${met && met.completude ? `<div class="c-manque">${esc(met.completude)}</div>` : ""}
     <div class="c-pied">
       <span>${badgeValidation(met ? met.validation_status : null)}</span>
-      <span>run ${esc(ind.dernier_run)}</span>
+      <span class="c-run">${mentionRun(ind)}</span>
     </div>
+    ${provenance}
     ${pied}</div>`;
+}
+
+// ---------------------------------------------------------------------
+// COUCHE DE LECTURE.
+//
+// La restitution montrait des mesures sans jamais dire ce qu'il fallait en
+// penser. Le correctif ne consiste pas à faire commenter un modèle : il
+// consiste à énoncer ce que la couche déterministe établit déjà — combien de
+// séries progressent, combien franchissent leur seuil, lesquelles sont
+// diffusables au sens de RI5, à quelle date remonte l'observation la plus
+// ancienne du secteur. Chaque terme de la phrase est recalculable ; aucun
+// n'est une interprétation. RI10 tient : rien n'est dit d'une cause.
+// ---------------------------------------------------------------------
+function lectureSecteur(code, inds) {
+  const codes = new Set(inds.map(i => i.indicator_id));
+  const met = (D.metriques || []).filter(m => codes.has(m.indicator_id));
+
+  if (!met.length) {
+    return `<div class="lecture"><div class="l-txt">Aucune observation collectée pour ce secteur :
+      il n'y a rien à lire, et la page le constate plutôt que de le masquer.</div></div>`;
+  }
+
+  const varDe = m => m.glissement_annuel_pct ?? m.variation_periode_pct;
+  const chiffres = met.filter(m => varDe(m) !== null && varDe(m) !== undefined && !isNaN(varDe(m)));
+  const hausse = chiffres.filter(m => Number(varDe(m)) > 0).length;
+  const baisse = chiffres.filter(m => Number(varDe(m)) < 0).length;
+  const sansVar = met.length - chiffres.length;
+  const nbInd = new Set(met.map(m => m.indicator_id)).size;
+
+  const franchis = met.filter(m => String(m.franchissement || "").startsWith("franchi"));
+  const diffusables = franchis.filter(m => ["valide_source", "valide_humain"].includes(m.validation_status));
+  const retenus = franchis.length - diffusables.length;
+
+  const periodes = met.map(m => String(m.period)).filter(Boolean).sort();
+
+  let txt = `Sur ce périmètre, <strong>${met.length} série${met.length > 1 ? "s" : ""}</strong>
+    (${nbInd} indicateur${nbInd > 1 ? "s" : ""} × zones) ${met.length > 1 ? "portent" : "porte"} une observation :
+    <strong>${hausse}</strong> en progression, <strong>${baisse}</strong> en recul`;
+  txt += sansVar
+    ? `, ${sansVar} sans comparaison temporelle disponible.`
+    : `.`;
+  txt += franchis.length
+    ? ` <strong>${franchis.length}</strong> franchissement${franchis.length > 1 ? "s" : ""} du seuil de
+       matérialité, dont ${diffusables.length} diffusable${diffusables.length > 1 ? "s" : ""} au décideur
+       (RI5)${retenus ? ` et ${retenus} retenu${retenus > 1 ? "s" : ""} faute de statut de validation suffisant` : ""}.`
+    : ` Aucun seuil de matérialité franchi.`;
+  txt += ` Observations comprises entre ${esc(periodes[0])} et ${esc(periodes[periodes.length - 1])}.`;
+
+  // Le socle transversal n'est pas un secteur : sa lecture est le dénominateur
+  // de l'attribution posée par QV0. La phrase est un rappel de méthode, pas une
+  // conclusion sur les chiffres.
+  const attribution = code === "transversal"
+    ? `<br>Ces valeurs servent de dénominateur : un mouvement sectoriel de même sens et de même
+       ampleur que le socle n'est pas attribuable au secteur. La comparaison reste à la charge du
+       lecteur — le dispositif ne l'automatise pas.`
+    : "";
+
+  return `<div class="lecture">
+    <div class="l-txt">${txt}${attribution}</div>
+    <div class="l-org">Lecture composée par gabarit à partir des métriques calculées en base
+      (glissement annuel, seuil de matérialité, statut de validation). Aucun énoncé de ce bloc
+      n'est produit par un modèle de langage, et aucun n'énonce de cause.</div>
+  </div>`;
 }
 
 function vueSecteur(code) {
@@ -386,6 +616,7 @@ function vueSecteur(code) {
       permettant de distinguer un mouvement propre à une branche d'un mouvement de conjoncture générale.
       Sans lui, un recul sectoriel est ininterprétable.</p>`;
   }
+  html += lectureSecteur(code, inds);
   html += `<p class="note"><strong>${collectes} indicateur${collectes > 1 ? "s" : ""} collecté${collectes > 1 ? "s" : ""}
     sur ${inds.length}</strong> pour ce secteur. Les indicateurs non instrumentés sont affichés :
     la grille décrit ce que le dispositif est conçu pour suivre, cette page constate ce qu'il suit.</p>`;
@@ -489,6 +720,43 @@ function rendre() {
     : vueSecteur(onglet);
 }
 
+// FRANCHISSEMENTS DE SEUIL EN TÊTE DE PAGE.
+//
+// La vue v_alertes_candidates existait en base depuis le 07.08 et n'était lue
+// par aucune vue de la restitution : la couche de lecture était calculée et
+// non consommée. Elle l'est désormais, avec la distinction que la vue porte —
+// diffusable au sens de RI5, ou retenue avec son motif.
+//
+// TROIS ÉTATS, PAS DEUX. L'absence de la clé « alertes » dans la charge utile
+// n'est pas l'absence de franchissement : c'est l'absence d'interrogation. Les
+// confondre afficherait « aucun signal » alors que rien n'a été demandé — la
+// forme de surdéclaration la plus difficile à détecter, puisqu'elle rassure.
+function blocSignaux() {
+  if (D.alertes === undefined) {
+    return `<span class="sig inconnu">Franchissements non interrogés</span>
+      L'interface de restitution servie par l'orchestrateur ne renvoie pas la vue des seuils
+      (<code>v_alertes_candidates</code>). Absence d'interrogation, non absence de signal.`;
+  }
+  const alertes = D.alertes || [];
+  if (!alertes.length) {
+    return `<span class="sig calme">Aucun franchissement de seuil</span>
+      sur la dernière observation de chaque série instrumentée. Les indicateurs dont le seuil
+      de matérialité n'est pas configuré sont hors de ce décompte : leur carte le signale.`;
+  }
+  const diffusables = alertes.filter(a => a.diffusable);
+  const retenues = alertes.filter(a => !a.diffusable);
+  const item = a => `<span class="sig ${a.diffusable ? "diffusable" : "retenu"}">
+      <strong>${esc(a.indicator_id)}</strong> ${esc(a.indicator_label)} ·
+      ${esc(a.geo)} ${esc(a.period)} ·
+      ${pct(a.glissement_annuel_pct ?? a.variation_periode_pct)} contre un seuil de ${nbAuto(a.seuil_materialite_pct)} %
+      ${a.diffusable ? "" : "· retenue : " + esc(a.motif_de_retenue)}
+    </span>`;
+  return `<strong>${alertes.length} franchissement${alertes.length > 1 ? "s" : ""} du seuil de matérialité</strong>
+    sur la dernière observation — ${diffusables.length} diffusable${diffusables.length > 1 ? "s" : ""} au décideur,
+    ${retenues.length} retenue${retenues.length > 1 ? "s" : ""} par la règle RI5 faute de statut de validation suffisant.
+    <div class="signaux">${alertes.map(item).join("")}</div>`;
+}
+
 function bandeau() {
   const r = D.referentiel || [];
   const total = r.length;
@@ -497,12 +765,21 @@ function bandeau() {
   const obs = r.reduce((s, i) => s + Number(i.observations || 0), 0);
   const runs = (D.sante_runs || []).length;
 
+  // ORDRE DE LECTURE INVERSÉ. Le bandeau ne portait que des compteurs de
+  // couverture — indicateurs qualifiés, certifiés, instrumentés, observations,
+  // exécutions. Ce sont des métriques de l'instrument, pas du marché : un
+  // décideur y lisait l'inventaire de l'outil avant tout signal. Les signaux
+  // passent devant, la couverture reste, en second rang et sous son vrai nom.
   document.getElementById("bandeau").innerHTML = `
-    <div class="kpi"><div class="v">${total}</div><div class="l">indicateurs qualifiés</div></div>
-    <div class="kpi"><div class="v">${certifies}</div><div class="l">certifiés</div></div>
-    <div class="kpi"><div class="v">${collectes} <span style="font-size:14px;color:var(--gris)">/ ${certifies}</span></div><div class="l">instrumentés</div></div>
-    <div class="kpi"><div class="v">${obs}</div><div class="l">observations au registre</div></div>
-    <div class="kpi"><div class="v">${runs}</div><div class="l">exécutions</div></div>`;
+    <div class="b-signal">${blocSignaux()}</div>
+    <div class="b-kpis">
+      <div class="l-sec">Couverture du dispositif</div>
+      <div class="kpi"><div class="v">${total}</div><div class="l">indicateurs qualifiés</div></div>
+      <div class="kpi"><div class="v">${certifies}</div><div class="l">certifiés</div></div>
+      <div class="kpi"><div class="v">${collectes} <span style="font-size:14px;color:var(--gris)">/ ${certifies}</span></div><div class="l">instrumentés</div></div>
+      <div class="kpi"><div class="v">${obs}</div><div class="l">observations au registre</div></div>
+      <div class="kpi"><div class="v">${runs}</div><div class="l">exécutions</div></div>
+    </div>`;
 
   const rc = D.run_courant;
   document.getElementById("meta").textContent =
