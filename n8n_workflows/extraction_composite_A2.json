@@ -1,0 +1,497 @@
+{
+  "name": "Veille - Extraction composite A2 (multi-IA, human-in-the-loop)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Déclencheur manuel (nouveau document)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual','B','en_cours','Extraction composite A2 (multi-IA)') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Paramètres de la tâche d'extraction composite pour A2.\n// mode_desaccord : quand true, le modèle C reçoit une consigne dégradée qui le\n// pousse à lire le cumul annuel au lieu du total mensuel. Cela fait diverger les\n// extractions et EXERCE la branche de désaccord — le chemin d'exception que le\n// § 10.4.1 décrit et que le dispositif n'avait jamais vu se déclencher.\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst MODE_DESACCORD = false; // basculer à true pour provoquer et tracer le désaccord\nconst source_doc = 'https://www.acea.auto/files/Press_release_car_registrations_November_2025.pdf';\nconst period = '2025-11';\nreturn [{ json: {\n  indicator_id: 'A2',\n  period,\n  geo: 'EU27',\n  source_doc,\n  run_id: runId,\n  mode_desaccord: MODE_DESACCORD,\n  raw_ref: '/data/staging/A2_run' + runId + '.pdf'\n} }];"
+      },
+      "name": "Préparer tâche d'extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.source_doc }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "name": "Télécharger le PDF ACEA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        400
+      ],
+      "notes": "Document non structuré (communiqué ACEA en PDF). Récupéré tel quel, en binaire."
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $('Préparer tâche d\\'extraction').item.json.raw_ref }}",
+        "options": {}
+      },
+      "name": "Déposer le PDF brut",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        800,
+        400
+      ],
+      "notes": "Exigence E6 : le document source est conservé tel que reçu AVANT toute extraction."
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "name": "Extraire le texte du PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        400
+      ],
+      "notes": "Extraction texte native n8n (pas de dépendance externe). Le même texte est soumis aux trois modèles : le consensus porte sur une entrée identique."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le prompt d'extraction et le texte du document en une seule charge,\n// soumise à l'identique aux trois modèles (sauf consigne dégradée du modèle C en\n// mode désaccord). Chaque champ attendu est { valeur, extrait_source } : le\n// modèle doit recopier le fragment EXACT du document d'où provient la valeur, ce\n// qui rend la validation humaine une comparaison de secondes plutôt qu'une\n// relecture (§ 10.4.1, rang 2).\nconst t = $('Préparer tâche d\\'extraction').first().json;\nconst doc = $input.first().json.text || '';\n\nconst schema = {\n  periode:                 { valeur: '', extrait_source: '' },\n  immatriculations_ue_mois:{ valeur: '', extrait_source: '' },\n  part_bev_pct:            { valeur: '', extrait_source: '' }\n};\n\nconst consigne = `Tu es un extracteur de données. À partir du DOCUMENT ci-dessous (communiqué de presse ACEA sur les immatriculations de voitures neuves), renvoie STRICTEMENT un objet JSON valide conforme au SCHÉMA, sans aucun texte autour, sans balises de code.\nPour CHAQUE champ, renvoie un objet {\"valeur\": ..., \"extrait_source\": ...} où extrait_source est le fragment EXACT du document d'où provient la valeur, recopié à l'identique. Si une valeur est absente, écris \"ABSENT\" dans les deux champs. N'utilise AUCUNE source autre que le document.\nPrécisions de lecture :\n- periode : le mois de référence du communiqué, au format AAAA-MM.\n- immatriculations_ue_mois : le total des immatriculations de l'Union européenne pour le MOIS de référence — la ligne « EUROPEAN UNION » du tableau mensuel, colonne du total. PAS le cumul annuel (year-to-date).\n- part_bev_pct : la part de marché des voitures 100% électriques à batterie, en pourcentage.\nSCHÉMA : ` + JSON.stringify(schema);\n\n// Variante dégradée pour le modèle C : on l'oriente vers le cumul annuel.\nconst consigne_C = t.mode_desaccord\n  ? consigne.replace('PAS le cumul annuel (year-to-date).', 'utilise le CUMUL ANNUEL (year-to-date) cumulé sur l\\'année.')\n  : consigne;\n\nconst enveloppe = (c) => c + '\\n\\nDOCUMENT :\\n' + doc;\n\nreturn [{ json: {\n  ...t,\n  prompt_A: enveloppe(consigne),\n  prompt_B: enveloppe(consigne),\n  prompt_C: enveloppe(consigne_C)\n} }];"
+      },
+      "name": "Consolider le contexte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt_A }] }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "name": "Modèle A (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 1024, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt_B }] }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "name": "Modèle B (Anthropic)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={{ $env.GOOGLE_API_KEY }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $('Consolider le contexte').first().json.prompt_C }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "name": "Modèle C (Google)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        600
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrait le JSON de la réponse de chaque fournisseur, quelle que soit sa forme.\n// Un modèle en échec (clé absente, quota, JSON illisible) devient une extraction\n// vide et un incident tracé — il ne fait pas échouer les autres.\nfunction extraireTexte(rep, fournisseur) {\n  try {\n    if (fournisseur === 'openai') return rep.choices[0].message.content;\n    if (fournisseur === 'anthropic') return rep.content[0].text;\n    if (fournisseur === 'google') return rep.candidates[0].content.parts[0].text;\n  } catch (e) { return null; }\n  return null;\n}\nfunction parserJson(txt) {\n  if (!txt) return null;\n  let s = String(txt).trim();\n  s = s.replace(/^```(?:json)?/i, '').replace(/```$/,'').trim(); // retire d'éventuelles balises\n  const i = s.indexOf('{'), j = s.lastIndexOf('}');\n  if (i >= 0 && j > i) s = s.slice(i, j + 1);\n  try { return JSON.parse(s); } catch (e) { return null; }\n}\n\nconst sources = [\n  { modele: 'gpt-4o',            fournisseur: 'openai',    node: 'Modèle A (OpenAI)' },\n  { modele: 'claude-opus-4-8',   fournisseur: 'anthropic', node: 'Modèle B (Anthropic)' },\n  { modele: 'gemini-2.5-pro',    fournisseur: 'google',    node: 'Modèle C (Google)' }\n];\n\nconst extractions = [];\nconst incidents = [];\nfor (const s of sources) {\n  let rep;\n  try { rep = $(s.node).first().json; } catch (e) { rep = null; }\n  const err = rep && rep.error ? JSON.stringify(rep.error).slice(0,200) : null;\n  const parsed = parserJson(extraireTexte(rep, s.fournisseur));\n  if (err) incidents.push(s.modele + ' : appel en échec (' + err + ')');\n  else if (!parsed) incidents.push(s.modele + ' : réponse non parsable en JSON');\n  extractions.push({ modele: s.modele, extraction: parsed || {} });\n}\n\nconst t = $('Consolider le contexte').first().json;\nreturn [{ json: {\n  indicator_id: t.indicator_id, run_id: t.run_id, period: t.period, geo: t.geo,\n  source_doc: t.source_doc, raw_ref: t.raw_ref, mode_desaccord: t.mode_desaccord,\n  extractions, incidents\n} }];"
+      },
+      "name": "Normaliser les extractions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consensus champ par champ sur la VALEUR. Une valeur unanime mais sans extrait\n// vérifiable ne compte pas comme consensus : l'accord sur une affirmation\n// invérifiable n'est pas une preuve (§ 6.3). Le consensus est une heuristique de\n// priorisation, jamais une vérité — la hiérarchie reste vérité terrain, puis\n// consensus, puis validation humaine.\nconst j = $input.first().json;\nconst parsed = j.extractions.map(e => e.extraction || {});\nconst champs = ['periode', 'immatriculations_ue_mois', 'part_bev_pct'];\n\nconst norm = (v) => String(v ?? '').trim().replace(/\\s|,/g, '').toLowerCase();\nlet accord = 0;\nconst detail = {};\nfor (const f of champs) {\n  const vals = parsed.map(p => norm(p[f]?.valeur ?? p[f]));\n  const extraits = parsed.map(p => String(p[f]?.extrait_source ?? '').trim());\n  const unanime = vals.every(v => v === vals[0] && v !== '' && v !== 'absent');\n  const tous_sources = extraits.every(e => e !== '' && e.toLowerCase() !== 'absent') || vals[0] === 'absent';\n  detail[f] = { valeurs: parsed.map(p => p[f]?.valeur ?? p[f] ?? null), extraits_source: extraits, unanime, tous_sources };\n  if (unanime && tous_sources) accord++;\n}\nconst consensus_score = champs.length ? accord / champs.length : 0;\nconst unanimous = consensus_score === 1;\n\n// Valeur pivot proposée : immatriculations mensuelles UE (numérique), si unanime.\nlet valeur_pivot = null;\nif (detail.immatriculations_ue_mois.unanime) {\n  const brut = String(parsed[0].immatriculations_ue_mois?.valeur ?? '').replace(/[^0-9]/g, '');\n  if (brut) valeur_pivot = Number(brut);\n}\n\nreturn [{ json: { ...j, consensus_score, unanimous, valeur_pivot, detail } }];"
+      },
+      "name": "Contrôle de consistance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.unanimous }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Consensus unanime ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO indicator_values (indicator_id, run_id, period, geo, value, obtained_by, validation_status, raw_ref)\nVALUES ($1, $2, $3, $4, $5, 'ia_extraction', 'pre_valide_consensus', $6)\nON CONFLICT (indicator_id, run_id, period, geo) DO NOTHING\nRETURNING value_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.valeur_pivot, $json.raw_ref] }}"
+        },
+        "additionalFields": {}
+      },
+      "name": "Écrire pré-validé (consensus)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2250,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO validation_queue (indicator_id, run_id, period, geo, extractions, consensus_score, source_doc, raw_ref)\nVALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)\nRETURNING item_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, JSON.stringify({detail: $json.detail, extractions: $json.extractions, incidents: $json.incidents}), $json.consensus_score, $json.source_doc, $json.raw_ref] }}"
+        },
+        "additionalFields": {}
+      },
+      "name": "File de validation humaine",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2250,
+        550
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status = CASE WHEN $2::numeric = 1 THEN 'ok' ELSE 'partiel' END,\n    closed_at = now(),\n    note = 'Extraction composite A2 — consensus ' || round($2::numeric*100) || '%, ' ||\n           CASE WHEN $2::numeric = 1 THEN 'pré-validé (indicator_values)' ELSE 'routé en file de validation humaine' END\nWHERE run_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$('Contrôle de consistance').first().json.run_id, $('Contrôle de consistance').first().json.consensus_score] }}"
+        },
+        "additionalFields": {}
+      },
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2500,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel (nouveau document)": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Préparer tâche d'extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer tâche d'extraction": {
+      "main": [
+        [
+          {
+            "node": "Télécharger le PDF ACEA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Télécharger le PDF ACEA": {
+      "main": [
+        [
+          {
+            "node": "Déposer le PDF brut",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déposer le PDF brut": {
+      "main": [
+        [
+          {
+            "node": "Extraire le texte du PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire le texte du PDF": {
+      "main": [
+        [
+          {
+            "node": "Consolider le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolider le contexte": {
+      "main": [
+        [
+          {
+            "node": "Modèle A (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle A (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Modèle B (Anthropic)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle B (Anthropic)": {
+      "main": [
+        [
+          {
+            "node": "Modèle C (Google)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle C (Google)": {
+      "main": [
+        [
+          {
+            "node": "Normaliser les extractions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser les extractions": {
+      "main": [
+        [
+          {
+            "node": "Contrôle de consistance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contrôle de consistance": {
+      "main": [
+        [
+          {
+            "node": "Consensus unanime ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consensus unanime ?": {
+      "main": [
+        [
+          {
+            "node": "Écrire pré-validé (consensus)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File de validation humaine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire pré-validé (consensus)": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File de validation humaine": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

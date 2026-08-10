@@ -1,0 +1,49 @@
+-- =====================================================================
+-- MIGRATION SUSPENDUE — NE PAS EXÉCUTER — 10.08.2026
+--
+-- Ce fichier contenait la requalification de T1 (CLI → BCICP), fondée
+-- sur la conclusion que la série CLI de l'OCDE avait cessé de paraître.
+--
+-- CETTE CONCLUSION ÉTAIT FAUSSE. L'exécution de l'exemple officiel de
+-- la documentation de l'API (clé .M.LI...AA...H, sans version épinglée)
+-- a renvoyé ~900 observations de CLI, dernière période JUIN 2026. La
+-- série est vivante.
+--
+-- L'erreur de diagnostic tenait à trois causes cumulées, consignées ici
+-- parce qu'elles ont valeur de méthode :
+--   1. une liste de mesures TRONQUÉE par un « head -20 » — triée
+--      alphabétiquement, elle ne montrait que BCICP, et LI venait après
+--      la coupure ;
+--   2. un marquage « DISCONTINUED » d'un entrepôt tiers, retenu alors
+--      qu'il concernait vraisemblablement le miroir et non la série ;
+--   3. deux requêtes comparées qui différaient par DEUX paramètres à la
+--      fois (version épinglée 4.1 et clé de mesure), l'écart ayant été
+--      attribué au seul paramètre qui confortait l'hypothèse.
+--
+-- Le point encore ouvert : en version 4.1, la zone OECD ne porte pas de
+-- mesure LI depuis 2023. L'agrégat OCDE du CLI est soit absent de cette
+-- version, soit publié sous un autre code de zone. La liste des zones à
+-- CLI courant tranchera, et la liaison T1 sera écrite sur cette base —
+-- avec le CLI, pas avec un substitut.
+--
+-- SI CETTE MIGRATION A DÉJÀ ÉTÉ EXÉCUTÉE, la défaire ainsi :
+--
+--   UPDATE indicators
+--      SET label = 'Indicateur composite avancé (CLI)'
+--    WHERE indicator_id = 'T1';
+--
+--   UPDATE sources
+--      SET name  = 'Principaux indicateurs économiques et CLI',
+--          notes = regexp_replace(notes,
+--            ' \| Requalifiée le 10\.08\.2026.*$', '')
+--    WHERE source_id = 'ocde';
+--
+--   DELETE FROM source_bindings
+--    WHERE indicator_id = 'T1' AND statut = 'a_verifier';
+--
+-- (Le DELETE est licite : source_bindings est une table de
+--  configuration, pas le registre des observations — l'ajout seul ne
+--  s'applique pas à elle, et la liaison n'a jamais été activée.)
+-- =====================================================================
+
+\echo 'MIGRATION SUSPENDUE — voir l''en-tête du fichier. Rien n''a été exécuté.'

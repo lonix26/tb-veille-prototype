@@ -1,0 +1,124 @@
+{
+  "name": "Veille - Collecte M2 (Eurostat, production instruments médicaux UE)",
+  "meta": {
+    "description": "Deuxième indicateur hard data instrumenté : M2, production de l'industrie des instruments médicaux UE (NACE C32.5, trimestriel). Réutilise l'adaptateur Eurostat du pilote A5 — même API, même décodage JSON-stat, mêmes contrôles — avec trois paramètres changés : jeu de données trimestriel, code NACE, identifiant d'indicateur. C'est la démonstration minimale de la réutilisabilité de l'adaptateur avant sa généralisation en descripteur (§ 10.6)."
+  },
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 6 15 1,4,7,10 *" }] } },
+      "name": "Déclencheur trimestriel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 400],
+      "notes": "Mi-janvier, avril, juillet, octobre : les indices trimestriels Eurostat paraissent avec environ six semaines de délai sur le trimestre clos."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status) VALUES ('schedule', 'B', 'en_cours') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_inpr_q",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "format", "value": "JSON" },
+            { "name": "lang", "value": "FR" },
+            { "name": "nace_r2", "value": "C325" },
+            { "name": "unit", "value": "I21" },
+            { "name": "s_adj", "value": "SCA" },
+            { "name": "geo", "value": "EU27_2020" },
+            { "name": "sinceTimePeriod", "value": "2023" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "name": "API Eurostat (sts_inpr_q, NACE C32.5)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 400],
+      "notes": "À VÉRIFIER PAR CURL AVANT LA PREMIÈRE EXÉCUTION : le jeu trimestriel (sts_inpr_q) et le code NACE C325 sont plausibles mais non testés — même discipline que pour le pilote A5, dont les codes n'ont été confirmés que le 06.08.2026. Si C325 n'est pas publié en trimestriel, replier sur le jeu mensuel (sts_inpr_m) et consigner l'écart avec la fréquence annoncée au référentiel."
+    },
+    {
+      "parameters": { "operation": "toJson", "mode": "all", "options": {} },
+      "name": "Sérialiser la réponse brute",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/data/staging/M2_eurostat_run{{ $('Ouvrir le run').first().json.run_id }}.json",
+        "options": {}
+      },
+      "name": "Déposer en zone brute",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [940, 400],
+      "notes": "Exigence E6. Précède délibérément toute écriture en base (enseignement du run 4, journal du 06.08.2026)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Décodage JSON-stat 2.0 → une observation par ligne.\nconst resp = $('API Eurostat (sts_inpr_q, NACE C32.5)').first().json;\nconst valeurs = resp.value ?? {};\nconst dims = resp.id ?? [];\nconst tailles = resp.size ?? [];\n\nconst posTemps = dims.indexOf('time');\nconst posGeo   = dims.indexOf('geo');\nif (posTemps < 0) {\n  throw new Error('Réponse Eurostat sans dimension temporelle : structure inattendue, collecte interrompue.');\n}\n\nfunction libelles(dimension) {\n  const index = resp.dimension?.[dimension]?.category?.index ?? {};\n  return Object.keys(index).sort((a, b) => index[a] - index[b]);\n}\nconst periodes = libelles('time');\nconst zones    = libelles('geo');\n\nfunction coordonnees(plat) {\n  const c = new Array(tailles.length);\n  for (let d = tailles.length - 1; d >= 0; d--) {\n    c[d] = plat % tailles[d];\n    plat = Math.floor(plat / tailles[d]);\n  }\n  return c;\n}\n\nconst runId  = $('Ouvrir le run').first().json.run_id;\nconst rawRef = '/data/staging/M2_eurostat_run' + runId + '.json';\n\nconst out = [];\nfor (const [cle, v] of Object.entries(valeurs)) {\n  if (v === null || v === undefined) continue;\n  const c = coordonnees(Number(cle));\n  const periode = periodes[c[posTemps]];\n  const zone    = posGeo >= 0 ? (zones[c[posGeo]] ?? 'EU27_2020') : 'EU27_2020';\n  if (!periode) continue;\n  out.push({ json: {\n    indicator_id: 'M2',\n    run_id: runId,\n    period: periode,\n    geo: zone,\n    value: Number(v),\n    obtained_by: 'etl',\n    validation_status: 'valide_source',\n    raw_ref: rawRef\n  } });\n}\n\nif (out.length === 0) {\n  throw new Error('Aucune observation extraite : vérifier les codes de dimension de la requête Eurostat.');\n}\nout.sort((a, b) => (a.json.geo + '|' + a.json.period).localeCompare(b.json.geo + '|' + b.json.period));\nreturn out;"
+      },
+      "name": "Normaliser (JSON-stat → observations)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Contrôles qualité déterministes — version alignée sur le multi-zones :\n// mémoire de variation par zone, formats mensuel (2023-01) ET trimestriel (2023-Q1) admis.\nconst FENETRE_DEBUT = '2023';\nconst SEUIL_VARIATION_ANORMALE = 50;\n\nconst obs = $input.all().map(i => i.json);\nconst retenues = [];\nconst ecartees = [];\nconst precedentes = new Map();\n\nfor (const o of obs) {\n  const motifs = [];\n  if (!Number.isFinite(o.value))                          motifs.push('valeur non numérique');\n  if (!/^\\d{4}(-(\\d{2}|Q\\d))?$/.test(o.period))           motifs.push('format de période invalide');\n  if (o.period < FENETRE_DEBUT)                           motifs.push(\"hors fenêtre d'historique de trois ans\");\n  if (o.value <= 0)                                       motifs.push('indice nul ou négatif');\n  const prec = precedentes.get(o.geo);\n  if (prec !== undefined && prec !== 0) {\n    const variation = Math.abs((o.value - prec) / prec * 100);\n    if (variation > SEUIL_VARIATION_ANORMALE)             motifs.push('variation anormale de ' + variation.toFixed(1) + ' % (zone ' + o.geo + ')');\n  }\n  if (motifs.length) { ecartees.push({ ...o, motifs }); }\n  else { retenues.push(o); precedentes.set(o.geo, o.value); }\n}\n\nif (retenues.length === 0) {\n  throw new Error('Toutes les observations ont été écartées par les contrôles qualité : ' + JSON.stringify(ecartees.slice(0, 3)));\n}\n\nconst bilan = { retenues: retenues.length, ecartees: ecartees.length, zones: [...new Set(retenues.map(o => o.geo))].length, detail_ecartees: ecartees };\nreturn retenues.map(o => ({ json: { ...o, _bilan: bilan } }));"
+      },
+      "name": "Contrôles qualité déterministes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1420, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO indicator_values (indicator_id, run_id, period, geo, value, obtained_by, validation_status, raw_ref)\nVALUES ($1, $2, $3, $4, $5, 'etl', 'valide_source', $6)\nON CONFLICT (indicator_id, run_id, period, geo) DO NOTHING\nRETURNING value_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.value, $json.raw_ref] }}"
+        }
+      },
+      "name": "Écrire au registre",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1660, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs\n   SET status = CASE WHEN $2::int = 0 THEN 'partiel' ELSE 'ok' END,\n       closed_at = now(),\n       note = $3\n WHERE run_id = $1\nRETURNING run_id, status, closed_at, note;",
+        "options": {
+          "queryReplacement": "={{ [ $('Ouvrir le run').first().json.run_id, $('Écrire au registre').all().length, 'M2 Eurostat — ' + $('Écrire au registre').all().length + ' observation(s) écrite(s), ' + ($('Contrôles qualité déterministes').first().json._bilan?.ecartees ?? 0) + ' écartée(s) par les contrôles qualité' ] }}"
+        }
+      },
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1900, 400],
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Déclencheur trimestriel": { "main": [[ { "node": "Ouvrir le run", "type": "main", "index": 0 } ]] },
+    "Ouvrir le run": { "main": [[ { "node": "API Eurostat (sts_inpr_q, NACE C32.5)", "type": "main", "index": 0 } ]] },
+    "API Eurostat (sts_inpr_q, NACE C32.5)": { "main": [[ { "node": "Sérialiser la réponse brute", "type": "main", "index": 0 } ]] },
+    "Sérialiser la réponse brute": { "main": [[ { "node": "Déposer en zone brute", "type": "main", "index": 0 } ]] },
+    "Déposer en zone brute": { "main": [[ { "node": "Normaliser (JSON-stat → observations)", "type": "main", "index": 0 } ]] },
+    "Normaliser (JSON-stat → observations)": { "main": [[ { "node": "Contrôles qualité déterministes", "type": "main", "index": 0 } ]] },
+    "Contrôles qualité déterministes": { "main": [[ { "node": "Écrire au registre", "type": "main", "index": 0 } ]] },
+    "Écrire au registre": { "main": [[ { "node": "Clôturer le run", "type": "main", "index": 0 } ]] }
+  }
+}

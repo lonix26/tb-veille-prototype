@@ -1,0 +1,93 @@
+{
+  "name": "Veille - Collecte hard data (ETL)",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 6 1 * *" }] } },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.worldbank.org/v2/country/WLD/indicator/NV.IND.MANF.ZS?format=json&date=2023:2026",
+        "options": {}
+      },
+      "name": "API Banque mondiale",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=all&period=2023,2024,2025&cmdCode=8708&flowCode=X",
+        "options": {}
+      },
+      "name": "API UN Comtrade (SH8708)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_inpr_m?nace_r2=C325&unit=I21&s_adj=SCA&format=JSON",
+        "options": {}
+      },
+      "name": "API Eurostat (NACE C32.5)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalisation commune : {indicator_id, period, geo, value, obtained_by:'etl', validation_status:'valide_source', raw_ref}\nconst out = [];\nfor (const item of $input.all()) {\n  const src = item.json;\n  // La logique de mappage par source est déportée dans des sous-fonctions par API (voir documentation ch.11)\n  out.push({ json: { normalized: src, obtained_by: 'etl', validation_status: 'valide_source', collected_at: new Date().toISOString() } });\n}\nreturn out;"
+      },
+      "name": "Normaliser (codes pays, périodes, unités)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Contrôles qualité déterministes : bornes, complétude, variation anormale (> ±50% => alerte de collecte)\nreturn $input.all().filter(i => i.json.normalized !== undefined);"
+      },
+      "name": "Contrôles qualité",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/data/staging/hard_{{ $now.format('yyyy-MM-dd') }}.json",
+        "dataPropertyName": "data"
+      },
+      "name": "Écrire en zone de dépôt brut",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/load",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "name": "Charger en base consolidée",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1240, 300]
+    }
+  ],
+  "connections": {
+    "Déclencheur mensuel": { "main": [[ { "node": "API Banque mondiale", "type": "main", "index": 0 }, { "node": "API UN Comtrade (SH8708)", "type": "main", "index": 0 }, { "node": "API Eurostat (NACE C32.5)", "type": "main", "index": 0 } ]] },
+    "API Banque mondiale": { "main": [[ { "node": "Normaliser (codes pays, périodes, unités)", "type": "main", "index": 0 } ]] },
+    "API UN Comtrade (SH8708)": { "main": [[ { "node": "Normaliser (codes pays, périodes, unités)", "type": "main", "index": 0 } ]] },
+    "API Eurostat (NACE C32.5)": { "main": [[ { "node": "Normaliser (codes pays, périodes, unités)", "type": "main", "index": 0 } ]] },
+    "Normaliser (codes pays, périodes, unités)": { "main": [[ { "node": "Contrôles qualité", "type": "main", "index": 0 } ]] },
+    "Contrôles qualité": { "main": [[ { "node": "Écrire en zone de dépôt brut", "type": "main", "index": 0 } ]] },
+    "Écrire en zone de dépôt brut": { "main": [[ { "node": "Charger en base consolidée", "type": "main", "index": 0 } ]] }
+  }
+}

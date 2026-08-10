@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<!--
+  Tableau de bord de veille économique — TB « Exploration de l'IA pour les entreprises industrielles »
+
+  Deux principes de conception, tous deux imposés par la thèse du travail.
+
+  1. AUCUNE DONNÉE N'EST EMBARQUÉE. La page interroge l'interface de restitution
+     portée par l'orchestrateur. Si la base est coupée, elle n'affiche rien et le
+     dit — elle n'affiche jamais une valeur périmée.
+
+  2. LE RÉFÉRENTIEL EST AFFICHÉ EN ENTIER. Les 26 indicateurs de la grille du
+     chapitre 8 apparaissent, qu'ils soient collectés ou non. Un indicateur
+     qualifié mais non instrumenté s'affiche comme tel, avec sa source et ce
+     qui lui manque. Masquer les non-collectés donnerait l'illusion d'une
+     couverture complète : c'est exactement la surdéclaration que le travail
+     s'interdit.
+
+  Aucune dépendance externe : les graphiques sont dessinés en SVG dans la page.
+  Le dispositif doit rester reproductible par une PME, y compris hors ligne.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veille économique — tableau de bord</title>
+<style>
+  :root{
+    --encre:#1C2733; --gris:#5A6570; --gris-clair:#8A9199; --filet:#D3D6DA;
+    --fond:#F7F8F9; --blanc:#fff;
+    --vert:#2F6E4E; --vert-fond:#D6EBD8;
+    --ambre:#8A6D1F; --ambre-fond:#FBF0D0;
+    --rouge:#9B3B2F; --rouge-fond:#F7D9D5;
+    --violet:#4A3C6B; --violet-fond:#E8E2F2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+       color:var(--encre);background:var(--fond)}
+  header{background:var(--encre);color:#fff;padding:18px 24px}
+  header h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.2px}
+  header .meta{margin-top:5px;font-size:12px;color:#A9B3BD}
+  .bandeau{display:flex;gap:22px;flex-wrap:wrap;padding:14px 24px;background:var(--blanc);
+           border-bottom:1px solid var(--filet)}
+  .kpi{min-width:110px}
+  .kpi .v{font-size:22px;font-weight:600;line-height:1.1}
+  .kpi .l{font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+  nav{display:flex;gap:2px;padding:0 24px;background:var(--blanc);border-bottom:1px solid var(--filet);
+      overflow-x:auto}
+  nav button{border:0;background:none;padding:11px 15px;font:inherit;font-size:13px;color:var(--gris);
+             cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+  nav button:hover{color:var(--encre)}
+  nav button.actif{color:var(--encre);font-weight:600;border-bottom-color:var(--encre)}
+  main{padding:22px 24px 60px;max-width:1180px}
+  .qv{margin:0 0 26px}
+  .qv-tete{border-left:3px solid var(--encre);padding:2px 0 2px 12px;margin-bottom:12px}
+  .qv-code{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--gris)}
+  .qv-q{font-size:15px;font-weight:600;margin:2px 0 4px}
+  .qv-m{font-size:12.5px;color:var(--gris);max-width:820px}
+  .etiq{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:3px;
+        letter-spacing:.3px;vertical-align:middle}
+  .e-vert{background:var(--vert-fond);color:var(--vert)}
+  .e-ambre{background:var(--ambre-fond);color:var(--ambre)}
+  .e-rouge{background:var(--rouge-fond);color:var(--rouge)}
+  .e-violet{background:var(--violet-fond);color:var(--violet)}
+  .e-gris{background:#ECEEF0;color:var(--gris)}
+  .cartes{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+  .carte{background:var(--blanc);border:1px solid var(--filet);border-radius:5px;padding:13px 15px}
+  .carte.vide{background:#FAFBFB;border-style:dashed}
+  .c-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .c-code{font-size:11px;font-weight:700;color:var(--gris-clair);letter-spacing:.5px}
+  .c-titre{font-size:13.5px;font-weight:600;margin:1px 0 7px;line-height:1.35}
+  .c-val{font-size:26px;font-weight:600;line-height:1.1}
+  .c-unite{font-size:12px;color:var(--gris);font-weight:400;margin-left:4px}
+  .c-per{font-size:11.5px;color:var(--gris);margin-top:2px}
+  .c-metr{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px solid var(--filet)}
+  .c-metr div{font-size:11px;color:var(--gris)}
+  .c-metr b{display:block;font-size:14px;color:var(--encre);font-weight:600}
+  .hausse{color:var(--vert)} .baisse{color:var(--rouge)}
+  .c-pied{margin-top:9px;padding-top:8px;border-top:1px solid var(--filet);
+          font-size:11px;color:var(--gris);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .c-pied a{color:var(--gris);text-decoration:underline}
+  .c-manque{font-size:11.5px;color:var(--ambre);margin-top:7px;font-style:italic}
+  .c-absent{font-size:12px;color:var(--gris);margin:6px 0 2px}
+  svg.spark{display:block;margin-top:9px}
+  .carte-large{grid-column:1 / -1;max-width:760px}
+  .z-classement{margin-top:10px}
+  .z-entete,.z-ligne{display:grid;grid-template-columns:52px 1fr 90px 58px 72px;gap:8px;
+                     align-items:center;padding:3px 0;font-size:12px}
+  .z-entete{font-size:10px;color:var(--gris-clair);text-transform:uppercase;letter-spacing:.4px;
+            border-bottom:1px solid var(--filet);text-align:right}
+  .z-entete span:first-child{text-align:left}
+  .z-nom{font-weight:600;font-size:12px}
+  .z-barre{background:#EEF0F2;border-radius:2px;height:14px;overflow:hidden}
+  .z-barre i{display:block;height:100%;background:var(--encre);border-radius:2px}
+  .z-val,.z-part,.z-var{text-align:right;font-variant-numeric:tabular-nums}
+  .z-part{color:var(--gris)}
+  .z-var{font-weight:600}
+  .z-note{font-size:10.5px;color:var(--gris-clair);margin-top:8px;font-style:italic}
+  .z-refper{font-size:11.5px;color:var(--gris);margin-bottom:4px}
+  .z-partiel{font-size:11.5px;background:var(--ambre-fond);color:var(--ambre);
+             padding:7px 10px;border-radius:3px;margin-top:9px;line-height:1.45}
+  table{border-collapse:collapse;width:100%;background:var(--blanc);font-size:12.5px}
+  th,td{border:1px solid var(--filet);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--encre);color:#fff;font-weight:600;font-size:11.5px}
+  .avert{background:var(--ambre-fond);border-left:3px solid var(--ambre);padding:11px 14px;
+         margin-bottom:20px;font-size:12.5px;border-radius:0 4px 4px 0}
+  .erreur{background:var(--rouge-fond);border-left:3px solid var(--rouge);padding:16px;border-radius:0 4px 4px 0}
+  .note{font-size:12px;color:var(--gris);margin:0 0 16px;max-width:820px}
+  h2{font-size:15px;margin:26px 0 10px}
+  h2:first-child{margin-top:0}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Veille économique des marchés cibles — PME de mécanique de précision</h1>
+  <div class="meta" id="meta">Interrogation de la base consolidée…</div>
+</header>
+
+<div class="bandeau" id="bandeau"></div>
+<nav id="nav"></nav>
+<main id="vue"><p class="note">Chargement…</p></main>
+
+<script>
+const API = "http://localhost:5678/webhook/veille/donnees";
+
+const SECTEURS = [
+  ["transversal","Contexte"],
+  ["horlogerie","Horlogerie"],
+  ["medical","Médical"],
+  ["automobile","Automobile"],
+  ["aerospatial","Aérospatial"]
+];
+
+let D = null, onglet = "transversal";
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nb = (v, d = 1) => v === null || v === undefined || v === "" || isNaN(v)
+  ? "—" : Number(v).toLocaleString("fr-CH", {minimumFractionDigits: d, maximumFractionDigits: d});
+const pct = v => v === null || v === undefined || isNaN(v) ? "—"
+  : (v > 0 ? "+" : "") + Number(v).toLocaleString("fr-CH", {minimumFractionDigits: 1, maximumFractionDigits: 1}) + " %";
+const signe = v => v === null || v === undefined || isNaN(v) ? "" : (v > 0 ? "hausse" : v < 0 ? "baisse" : "");
+
+// Courbe en SVG, sans dépendance externe : le dispositif doit rester
+// reproductible par une PME, y compris hors ligne.
+function spark(serie, L = 300, H = 42) {
+  if (!serie || serie.length < 2) return "";
+  const v = serie.map(p => p.value);
+  const min = Math.min(...v), max = Math.max(...v), amp = (max - min) || 1;
+  const pts = serie.map((p, i) => [
+    (i / (serie.length - 1)) * (L - 2) + 1,
+    H - 4 - ((p.value - min) / amp) * (H - 8)
+  ]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  const dernier = pts[pts.length - 1];
+  return `<svg class="spark" width="100%" height="${H}" viewBox="0 0 ${L} ${H}" preserveAspectRatio="none"
+    role="img" aria-label="Évolution sur ${serie.length} périodes, de ${esc(serie[0].period)} à ${esc(serie[serie.length-1].period)}">
+    <path d="${d}" fill="none" stroke="#1C2733" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+    <circle cx="${dernier[0].toFixed(1)}" cy="${dernier[1].toFixed(1)}" r="2.6" fill="#1C2733"/>
+  </svg>`;
+}
+
+const badgeStatut = s => s === "certifie"
+  ? '<span class="etiq e-vert">certifié</span>'
+  : s === "a_confirmer" ? '<span class="etiq e-ambre">à confirmer</span>'
+  : '<span class="etiq e-rouge">restreint</span>';
+
+const badgeValidation = s => ({
+  valide_source:        '<span class="etiq e-vert">validé par la source</span>',
+  valide_humain:        '<span class="etiq e-vert">validé humainement</span>',
+  pre_valide_consensus: '<span class="etiq e-ambre">consensus, non validé</span>',
+  rejete:               '<span class="etiq e-rouge">rejeté</span>'
+}[s] || '<span class="etiq e-gris">sans statut</span>');
+
+const badgeCriticite = c => c === "dominante"
+  ? '<span class="etiq e-violet">criticité dominante</span>'
+  : c === "significative" ? '<span class="etiq e-gris">criticité significative</span>'
+  : '<span class="etiq e-gris">criticité marginale</span>';
+
+// ---------------------------------------------------------------------
+// Détection de la nature de l'indicateur : une série unique, ou un
+// panier multi-zones. La distinction commande la forme d'affichage —
+// une valeur unique n'a de sens que pour une série unique. Afficher
+// « la » valeur d'un indicateur qui en porte sept (une par pays) sans
+// dire laquelle serait un chiffre d'apparence normale répondant à une
+// question que personne n'a posée.
+// ---------------------------------------------------------------------
+function zonesDe(ind) {
+  const zones = [...new Set((D.valeurs || [])
+    .filter(v => v.indicator_id === ind.indicator_id)
+    .map(v => v.geo))];
+  return zones;
+}
+
+function serieDe(ind, geo) {
+  return (D.valeurs || [])
+    .filter(v => v.indicator_id === ind.indicator_id && (geo === undefined || v.geo === geo))
+    .sort((a, b) => String(a.period).localeCompare(String(b.period)))
+    .map(v => ({period: v.period, value: Number(v.value), geo: v.geo}));
+}
+
+// Une série est infra-annuelle si ses périodes portent un mois ou un
+// trimestre. Sur une série annuelle, glissement annuel et variation de
+// période sont le même nombre : n'en afficher qu'un.
+const estInfraAnnuelle = serie => serie.some(p => /-/.test(String(p.period)));
+
+function blocMetriques(met, serie) {
+  if (!met) return "";
+  const infra = estInfraAnnuelle(serie);
+  const gl = met.glissement_annuel_pct;
+  const vp = met.variation_periode_pct;
+  const mm = met.moyenne_mobile_annuelle;
+  const franchi = String(met.franchissement || "").startsWith("franchi");
+  return `<div class="c-metr">
+      <div>${infra ? "glissement annuel" : "variation annuelle"}<b class="${signe(gl ?? vp)}">${pct(gl ?? vp)}</b></div>
+      ${infra ? `<div>période précédente<b class="${signe(vp)}">${pct(vp)}</b></div>` : ""}
+      ${infra && mm !== null && mm !== undefined ? `<div>moyenne mobile<b>${nb(mm)}</b></div>` : ""}
+      ${franchi ? `<div>seuil<b class="baisse">franchi</b></div>` : ""}
+    </div>`;
+}
+
+// Classement multi-zones : barres horizontales triées, part du panier,
+// et variation annuelle par zone. Répond à « qui pèse quoi, qui bouge »
+// — la forme que QV2 et QV3 appellent, là où une valeur unique ne
+// répond à rien.
+//
+// ANNÉE DE RÉFÉRENCE. Le classement se fait sur la dernière période où
+// TOUTES les zones du panier ont déclaré, et non sur la plus récente.
+// Les déclarants d'une statistique internationale ne publient pas au
+// même rythme : en août 2026, sept déclarants sur huit portaient 2025,
+// la Chine s'arrêtait à 2024. Classer sur la période la plus récente
+// aurait affiché une part chinoise nulle et gonflé mécaniquement celle
+// des autres — un effondrement apparent qui n'est qu'un retard de
+// déclaration. La période la plus récente, quand elle est incomplète,
+// est signalée comme information partielle avec la liste des déclarants
+// manquants. La fraîcheur d'un indicateur multi-pays est celle de son
+// déclarant le plus lent.
+function classementZones(ind, zones) {
+  const zonesReelles = zones.filter(g => g !== "WORLD" && g !== "W00");
+  if (!zonesReelles.length) return "";
+
+  // Périodes couvertes par chaque zone, puis dernière période commune.
+  const periodesParZone = new Map(zonesReelles.map(g =>
+    [g, new Set(serieDe(ind, g).map(p => p.period))]));
+  const toutesPeriodes = [...new Set(serieDe(ind).map(p => p.period))]
+    .filter(p => p !== undefined).sort();
+
+  const periodesCommunes = toutesPeriodes.filter(p =>
+    zonesReelles.every(g => periodesParZone.get(g).has(p)));
+  const pReference = periodesCommunes.length
+    ? periodesCommunes[periodesCommunes.length - 1]
+    : toutesPeriodes[toutesPeriodes.length - 1];
+  const pRecente = toutesPeriodes[toutesPeriodes.length - 1];
+
+  // Période précédant la référence, pour la variation — comparée sur les
+  // mêmes périodes pour toutes les zones, sinon les variations ne sont
+  // pas comparables entre elles.
+  const idxRef = toutesPeriodes.indexOf(pReference);
+  const pPrecedente = idxRef > 0 ? toutesPeriodes[idxRef - 1] : null;
+
+  const parZone = zonesReelles.map(g => {
+    const s = serieDe(ind, g);
+    const vRef = s.find(p => p.period === pReference);
+    const vPrec = pPrecedente ? s.find(p => p.period === pPrecedente) : null;
+    const varPct = (vRef && vPrec && vPrec.value !== 0)
+      ? (vRef.value - vPrec.value) / vPrec.value * 100 : null;
+    return {geo: g, valeur: vRef ? vRef.value : null, varPct};
+  }).filter(z => z.valeur !== null)
+    .sort((a, b) => b.valeur - a.valeur);
+
+  if (!parZone.length) return "";
+  const total = parZone.reduce((s, z) => s + z.valeur, 0);
+  const maxV = parZone[0].valeur;
+
+  const lignes = parZone.map(z => {
+    const part = total > 0 ? z.valeur / total * 100 : 0;
+    const largeur = maxV > 0 ? Math.max(2, z.valeur / maxV * 100) : 2;
+    return `<div class="z-ligne">
+      <span class="z-nom">${esc(z.geo)}</span>
+      <span class="z-barre"><i style="width:${largeur.toFixed(1)}%"></i></span>
+      <span class="z-val">${nb(z.valeur, 0)}</span>
+      <span class="z-part">${part.toFixed(1)} %</span>
+      <span class="z-var ${signe(z.varPct)}">${pct(z.varPct)}</span>
+    </div>`;
+  }).join("");
+
+  // Information partielle sur la période plus récente que la référence :
+  // qui a déjà déclaré, qui manque. Montrée, jamais mélangée au classement.
+  let blocPartiel = "";
+  if (pRecente !== pReference) {
+    const ontDeclare = zonesReelles.filter(g => periodesParZone.get(g).has(pRecente));
+    const manquent = zonesReelles.filter(g => !periodesParZone.get(g).has(pRecente));
+    blocPartiel = `<div class="z-partiel">
+      <strong>${esc(pRecente)} — données partielles :</strong>
+      ${ontDeclare.length} déclarant${ontDeclare.length > 1 ? "s" : ""} sur ${zonesReelles.length}
+      (manquent : ${manquent.map(esc).join(", ")}).
+      Le classement ci-dessus porte sur ${esc(pReference)}, dernière période complète du panier :
+      classer sur une période incomplète attribuerait une part nulle aux déclarants en retard.
+    </div>`;
+  }
+
+  return `<div class="z-classement">
+    <div class="z-refper">Classement au titre de <strong>${esc(pReference)}</strong>${pPrecedente ? ", variation contre " + esc(pPrecedente) : ""}</div>
+    <div class="z-entete"><span></span><span></span><span>valeur</span><span>part</span><span>var. ann.</span></div>
+    ${lignes}
+    ${blocPartiel}
+    <div class="z-note">Part du panier suivi (${parZone.length} zone${parZone.length > 1 ? "s" : ""}),
+      non du marché mondial. La composition du panier est un choix de qualification, daté et révisable.</div>
+  </div>`;
+}
+
+function carte(ind) {
+  const zones = zonesDe(ind);
+  const multiZones = zones.filter(g => g !== "WORLD" && g !== "W00").length > 1;
+
+  const tete = `<div class="c-tete">
+      <span class="c-code">${esc(ind.indicator_id)} · ${esc(ind.category === "hard" ? "donnée officielle" : "composite")}</span>
+      ${badgeStatut(ind.status)}
+    </div>
+    <div class="c-titre">${esc(ind.label)}</div>`;
+
+  const pied = `<div class="c-pied">
+      <span>${esc(ind.source_organisation)} · ${esc(ind.frequency)}</span>
+      <a href="${esc(ind.source_url)}" target="_blank" rel="noopener">source</a>
+    </div>`;
+
+  // Indicateur qualifié mais non instrumenté : dit tel quel, jamais masqué.
+  if (!ind.observations || ind.observations === 0) {
+    return `<div class="carte vide">${tete}
+      <div class="c-absent"><span class="etiq e-gris">qualifié, non instrumenté</span></div>
+      <div class="c-manque">Aucune collecte à ce jour.
+        ${ind.liaisons_actives > 0
+          ? "Liaison de collecte active : la prochaine exécution renseignera cet indicateur."
+          : "Aucune liaison de collecte vérifiée — les paramètres d'accès à la source restent à confirmer."}</div>
+      ${pied}</div>`;
+  }
+
+  const met = (D.metriques || []).find(m => m.indicator_id === ind.indicator_id);
+
+  // --- Indicateur multi-zones : classement, jamais de valeur unique ---
+  if (multiZones) {
+    const periodes = [...new Set(serieDe(ind).map(p => p.period))].sort();
+    return `<div class="carte carte-large">${tete}
+      <div class="c-per">${esc(periodes[periodes.length - 1])} ·
+        ${ind.observations} observation${ind.observations > 1 ? "s" : ""} au registre ·
+        ${esc(ind.p_min)} → ${esc(ind.p_max)} · valeurs en ${esc(ind.unit)}, courantes</div>
+      ${classementZones(ind, zones)}
+      <div class="c-pied">
+        <span>${badgeValidation(met ? met.validation_status : null)}</span>
+        <span>run ${esc(ind.dernier_run)}</span>
+      </div>
+      ${pied}</div>`;
+  }
+
+  // --- Série unique : valeur, courbe, métriques adaptées à la fréquence ---
+  const geoUnique = zones.length === 1 ? zones[0] : (zones.includes("WORLD") ? "WORLD" : zones[0]);
+  const serie = serieDe(ind, geoUnique);
+  const derniere = serie[serie.length - 1];
+  const etiquetteZone = (geoUnique !== "WORLD" && geoUnique !== "W00" && geoUnique !== "EU27_2020")
+    ? geoUnique : ({WORLD: "monde", W00: "monde", EU27_2020: "UE27"}[geoUnique] ?? geoUnique);
+
+  return `<div class="carte">${tete}
+    <div class="c-val">${nb(met ? met.value : derniere.value)}<span class="c-unite">${esc(ind.unit)} · ${esc(etiquetteZone)}</span></div>
+    <div class="c-per">${esc(met ? met.period : derniere.period)} ·
+      ${ind.observations} observation${ind.observations > 1 ? "s" : ""} au registre ·
+      ${esc(ind.p_min)} → ${esc(ind.p_max)}</div>
+    ${serie.length > 2 ? spark(serie) : ""}
+    ${blocMetriques(met, serie)}
+    ${met && met.completude ? `<div class="c-manque">${esc(met.completude)}</div>` : ""}
+    <div class="c-pied">
+      <span>${badgeValidation(met ? met.validation_status : null)}</span>
+      <span>run ${esc(ind.dernier_run)}</span>
+    </div>
+    ${pied}</div>`;
+}
+
+function vueSecteur(code) {
+  const inds = (D.referentiel || []).filter(i => i.sector_code === code);
+  if (!inds.length) return `<p class="note">Aucun indicateur pour ce secteur.</p>`;
+
+  const qvs = (D.instanciation || []).filter(q => q.sector_code === code);
+  const collectes = inds.filter(i => i.observations > 0).length;
+
+  let html = "";
+  if (code === "transversal") {
+    html += `<p class="note">Le socle transversal ne décrit aucun secteur : il fournit le référentiel
+      permettant de distinguer un mouvement propre à une branche d'un mouvement de conjoncture générale.
+      Sans lui, un recul sectoriel est ininterprétable.</p>`;
+  }
+  html += `<p class="note"><strong>${collectes} indicateur${collectes > 1 ? "s" : ""} collecté${collectes > 1 ? "s" : ""}
+    sur ${inds.length}</strong> pour ce secteur. Les indicateurs non instrumentés sont affichés :
+    la grille décrit ce que le dispositif est conçu pour suivre, cette page constate ce qu'il suit.</p>`;
+
+  const traites = new Set();
+  for (const q of qvs.sort((a, b) => a.watch_question_code.localeCompare(b.watch_question_code))) {
+    const liste = inds.filter(i => (i.questions || "").split(",").includes(q.watch_question_code));
+    liste.forEach(i => traites.add(i.indicator_id));
+    const lacune = Number(q.nb_certifies) === 0;
+    html += `<section class="qv">
+      <div class="qv-tete">
+        <div class="qv-code">${esc(q.watch_question_code)} — ${esc(q.question_generique)}
+          ${badgeCriticite(q.criticite)}
+          ${lacune ? '<span class="etiq e-rouge">non couverte</span>' : ''}</div>
+        <div class="qv-q">${esc(q.question_sectorielle)}</div>
+        <div class="qv-m">${esc(q.mecanisme)}</div>
+      </div>
+      ${liste.length
+        ? `<div class="cartes">${liste.map(carte).join("")}</div>`
+        : `<p class="note"><em>Aucun indicateur rattaché. La lacune est énoncée plutôt que masquée :
+             le terrain existe, il n'a pas été instrumenté dans cette itération.</em></p>`}
+    </section>`;
+  }
+
+  const orphelins = inds.filter(i => !traites.has(i.indicator_id));
+  if (orphelins.length) {
+    html += `<section class="qv"><div class="qv-tete"><div class="qv-q">Autres indicateurs du secteur</div></div>
+      <div class="cartes">${orphelins.map(carte).join("")}</div></section>`;
+  }
+  return html;
+}
+
+function vueReferentiel() {
+  const r = D.referentiel || [];
+  const lignes = r.map(i => `<tr>
+      <td><strong>${esc(i.indicator_id)}</strong></td>
+      <td>${esc(i.sector_label)}</td>
+      <td>${esc(i.label)}</td>
+      <td>${esc(i.questions || "—")}</td>
+      <td>${esc(i.source_organisation)}</td>
+      <td>${i.category === "hard" ? "officielle" : "composite"}</td>
+      <td>${badgeStatut(i.status)}</td>
+      <td>${i.observations > 0
+            ? `${i.observations} obs. · ${esc(i.p_min)} → ${esc(i.p_max)}`
+            : '<span class="etiq e-gris">non instrumenté</span>'}</td>
+    </tr>`).join("");
+
+  const bilan = (D.bilan_referentiel || []).map(b => `<tr>
+      <td>${b.sector_code ? esc(b.sector_code) : "<strong>Total</strong>"}</td>
+      <td>${b.total}</td><td>${b.certifies}</td><td>${b.certifies_hard}</td>
+      <td>${b.certifies_composite}</td><td>${b.a_confirmer}</td></tr>`).join("");
+
+  return `<h2>Bilan du référentiel</h2>
+    <p class="note">Ce décompte est calculé par requête. C'est lui qui fait foi : toute valeur
+      différente figurant ailleurs dans le rapport est une erreur du rapport.</p>
+    <table><tr><th>Secteur</th><th>Total</th><th>Certifiés</th><th>dont officielles</th>
+      <th>dont composites</th><th>À confirmer</th></tr>${bilan}</table>
+    <h2>Les 26 indicateurs de la grille</h2>
+    <table><tr><th>Code</th><th>Secteur</th><th>Indicateur</th><th>Questions</th><th>Source</th>
+      <th>Catégorie</th><th>Qualification</th><th>Instrumentation</th></tr>${lignes}</table>`;
+}
+
+function vueExecutions() {
+  const runs = (D.sante_runs || []).map(s => `<tr>
+      <td>${s.run_id}</td>
+      <td>${new Date(s.executed_at).toLocaleString("fr-CH")}</td>
+      <td>${esc(s.status)}</td>
+      <td>${s.valeurs_ecrites}</td>
+      <td>${s.indicateurs_couverts} / ${s.indicateurs_certifies_attendus}</td>
+    </tr>`).join("");
+
+  const rev = (D.revisions || []);
+  const revHtml = rev.length
+    ? `<table><tr><th>Indicateur</th><th>Période</th><th>Zone</th><th>Run</th><th>Écart</th></tr>
+        ${rev.map(e => `<tr><td>${esc(e.indicator_id)}</td><td>${esc(e.period)}</td>
+          <td>${esc(e.geo)}</td><td>${e.run_id}</td><td>${pct(e.ecart_pct)}</td></tr>`).join("")}</table>`
+    : `<p class="note">Aucune révision constatée sur ${D.comparaisons_runs ?? 0} comparaison(s) entre exécutions.
+        Le mécanisme est en place et n'a pas encore de contenu : aucune source n'a révisé une valeur
+        entre deux collectes. C'est un constat, non une absence de fonctionnalité.</p>`;
+
+  return `<h2>Exécutions</h2>
+    <p class="note">Le registre est en ajout seul : chaque exécution ajoute ses observations sans écraser
+      les précédentes. C'est l'écart entre exécutions qui fait la tendance.</p>
+    <table><tr><th>Run</th><th>Exécuté le</th><th>Statut</th><th>Valeurs écrites</th>
+      <th>Indicateurs couverts</th></tr>${runs}</table>
+    <h2>Révisions constatées par la source</h2>${revHtml}`;
+}
+
+function rendre() {
+  document.getElementById("nav").innerHTML =
+    SECTEURS.map(([c, l]) => `<button data-o="${c}" class="${onglet === c ? "actif" : ""}">${l}</button>`).join("")
+    + `<button data-o="referentiel" class="${onglet === "referentiel" ? "actif" : ""}">Référentiel complet</button>`
+    + `<button data-o="executions" class="${onglet === "executions" ? "actif" : ""}">Exécutions</button>`;
+
+  document.querySelectorAll("nav button").forEach(b =>
+    b.onclick = () => { onglet = b.dataset.o; rendre(); window.scrollTo(0, 0); });
+
+  document.getElementById("vue").innerHTML =
+    onglet === "referentiel" ? vueReferentiel()
+    : onglet === "executions" ? vueExecutions()
+    : vueSecteur(onglet);
+}
+
+function bandeau() {
+  const r = D.referentiel || [];
+  const total = r.length;
+  const certifies = r.filter(i => i.status === "certifie").length;
+  const collectes = r.filter(i => i.observations > 0).length;
+  const obs = r.reduce((s, i) => s + Number(i.observations || 0), 0);
+  const runs = (D.sante_runs || []).length;
+
+  document.getElementById("bandeau").innerHTML = `
+    <div class="kpi"><div class="v">${total}</div><div class="l">indicateurs qualifiés</div></div>
+    <div class="kpi"><div class="v">${certifies}</div><div class="l">certifiés</div></div>
+    <div class="kpi"><div class="v">${collectes} <span style="font-size:14px;color:var(--gris)">/ ${certifies}</span></div><div class="l">instrumentés</div></div>
+    <div class="kpi"><div class="v">${obs}</div><div class="l">observations au registre</div></div>
+    <div class="kpi"><div class="v">${runs}</div><div class="l">exécutions</div></div>`;
+
+  const rc = D.run_courant;
+  document.getElementById("meta").textContent =
+    "Données lues en base le " + new Date(D.genere_le).toLocaleString("fr-CH")
+    + (rc ? " · dernière exécution n° " + rc.run_id + " (" + rc.status + ")" : " · aucune exécution close");
+}
+
+fetch(API, {cache: "no-store"})
+  .then(r => { if (!r.ok) throw new Error("réponse " + r.status); return r.json(); })
+  .then(charge => {
+    // Normalisation de la forme de la réponse. L'orchestrateur peut livrer la
+    // charge utile de trois manières selon sa configuration : l'objet lui-même,
+    // un tableau d'un seul élément, ou une chaîne JSON encodée une seconde fois.
+    // Supposer une seule forme produisait un affichage entièrement vide SANS
+    // lever d'erreur — le pire des comportements, puisque rien ne signalait que
+    // la donnée était pourtant arrivée.
+    let d = charge;
+    if (typeof d === "string") d = JSON.parse(d);
+    if (Array.isArray(d)) d = d[0];
+    if (d && d.payload !== undefined) d = d.payload;
+    if (typeof d === "string") d = JSON.parse(d);
+
+    if (!d || !Array.isArray(d.referentiel)) {
+      throw new Error(
+        "réponse reçue mais inexploitable : le référentiel est absent de la charge utile (clés reçues : "
+        + (d && typeof d === "object" ? Object.keys(d).join(", ") : typeof d) + ")");
+    }
+
+    D = d;
+    bandeau();
+    rendre();
+    if ((D.referentiel || []).filter(i => i.observations > 0).length < (D.referentiel || []).length) {
+      document.getElementById("vue").insertAdjacentHTML("afterbegin",
+        `<div class="avert"><strong>Lecture de cette page.</strong> Le référentiel est affiché en entier.
+         Un indicateur sans données n'est pas une erreur d'affichage : il est qualifié et documenté,
+         mais sa collecte n'est pas instrumentée à ce jour. L'écart entre ce que le dispositif est conçu
+         pour suivre et ce qu'il suit effectivement est une limite du travail, énoncée et non masquée.</div>`);
+    }
+  })
+  .catch(e => {
+    document.getElementById("meta").textContent = "Base inaccessible";
+    document.getElementById("bandeau").innerHTML = "";
+    document.getElementById("vue").innerHTML =
+      `<div class="erreur"><strong>Aucune donnée ne peut être affichée.</strong>
+       <p>La page n'embarque aucune valeur : elle lit la base consolidée à chaque ouverture.
+       Tant que l'interface de restitution est injoignable, elle n'affiche rien plutôt qu'une
+       valeur périmée dont l'ancienneté serait invisible.</p>
+       <p style="font-size:12px;color:var(--gris)">Détail technique : ${esc(e.message)} — vérifier que les
+       services sont démarrés et que le workflow « API de restitution » est actif dans l'orchestrateur.</p></div>`;
+  });
+</script>
+</body>
+</html>

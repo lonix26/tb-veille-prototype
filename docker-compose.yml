@@ -1,0 +1,92 @@
+# Environnement du prototype de veille — TB « Exploration de l'IA pour les entreprises industrielles »
+# Deux services seulement : la contrainte E5 (coût de licence nul, reproductible par une PME) interdit d'en ajouter sans nécessité.
+#
+#   docker compose up -d
+#   n8n        → http://localhost:5678
+#   adminer    → http://localhost:8081  (profil "outils" uniquement : docker compose --profile outils up -d)
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: veille_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-veille}
+      POSTGRES_USER: ${POSTGRES_USER:-veille}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?mot de passe requis dans .env}
+      # Les données de veille sont publiques (OSINT) ; le mot de passe protège l'instance, pas un secret d'affaires.
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Les scripts du dossier db/ sont exécutés dans l'ordre alphabétique au PREMIER démarrage seulement.
+      # Pour rejouer le schéma : docker compose down -v puis up -d (destructif), ou psql manuel.
+      - ./db:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"   # exposé en local uniquement, pour psql et l'inspection
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-veille} -d ${POSTGRES_DB:-veille}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: veille_n8n
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GENERIC_TIMEZONE: Europe/Zurich
+      TZ: Europe/Zurich
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      WEBHOOK_URL: http://localhost:5678/
+      # n8n conserve ses propres données (workflows, credentials) en SQLite dans son volume :
+      # aucune raison de les mêler à la base métier, et cela garde la base de veille lisible.
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      # Les nœuds Code doivent pouvoir utiliser les modules internes utilisés par les workflows.
+      NODE_FUNCTION_ALLOW_BUILTIN: "crypto"
+      # Accès disque des nœuds de fichier restreint à la seule zone de dépôt brut.
+      # Sans cette autorisation explicite, l'écriture dans /data/staging est refusée
+      # (« is not writable ») alors que les droits POSIX du montage sont corrects —
+      # constaté le 06.08.2026. La restriction est ici un gain : elle borne l'accès
+      # disque des workflows à la zone d'audit et à rien d'autre.
+      N8N_RESTRICT_FILE_ACCESS_TO: "/data"
+      # Clés d'API des trois LLM du pipeline composite (A2). EXCEPTION ASSUMÉE à la
+      # contrainte E5 : l'inférence recourt à des services payants (décision de
+      # l'étudiant du 09.08.2026). L'auto-hébergement couvre l'orchestration, non
+      # l'inférence ; le dispositif reste reproductible par toute PME disposant de
+      # clés. Les valeurs vivent dans .env (jamais versionné) et sont référencées
+      # dans le workflow par {{ $env.* }} — elles n'apparaissent ni dans le JSON du
+      # workflow ni dans le dépôt. Vides par défaut : le pipeline composite ne
+      # tourne pas tant qu'elles ne sont pas renseignées.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Zone de dépôt brut : chaque réponse d'API et chaque document sont conservés tels que reçus (exigence E6, audit).
+      - ./data:/data
+      # Workflows accessibles en lecture depuis le conteneur, pour import par l'interface ou la CLI.
+      - ./n8n_workflows:/workflows:ro
+    ports:
+      - "127.0.0.1:5678:5678"
+
+  adminer:
+    image: adminer:latest
+    container_name: veille_adminer
+    restart: unless-stopped
+    profiles: ["outils"]
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8081:8080"
+
+volumes:
+  db_data:
+  n8n_data:

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veille économique — Tableau de bord décideur</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1c2733; --muted:#6b7a8c; --accent:#0b5cad; --hard:#1e7e34; --comp:#b8860b; --alert:#c0392b; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--ink); color:#fff; padding:16px 28px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; }
+  header h1 { font-size:1.15rem; font-weight:600; }
+  header .run { font-size:.8rem; color:#aebccb; }
+  nav { display:flex; gap:4px; padding:10px 24px 0; background:var(--ink); }
+  nav button { border:none; padding:10px 18px; border-radius:8px 8px 0 0; cursor:pointer; font-size:.9rem; background:#33465c; color:#cfd9e4; }
+  nav button.active { background:var(--bg); color:var(--ink); font-weight:600; }
+  main { padding:20px 24px; max-width:1200px; margin:0 auto; }
+  .qv { margin-bottom:8px; font-size:.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; margin-bottom:20px; }
+  .card { background:var(--card); border-radius:10px; padding:16px 18px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .card h3 { font-size:.95rem; font-weight:600; margin-bottom:2px; }
+  .meta { font-size:.74rem; color:var(--muted); margin-bottom:10px; }
+  .meta a { color:var(--accent); text-decoration:none; }
+  .badge { display:inline-block; font-size:.68rem; padding:2px 8px; border-radius:10px; color:#fff; vertical-align:middle; margin-left:6px; }
+  .badge.hard { background:var(--hard); } .badge.comp { background:var(--comp); }
+  .kpi { font-size:1.5rem; font-weight:700; }
+  .kpi small { font-size:.85rem; font-weight:500; margin-left:8px; }
+  .up { color:var(--hard); } .down { color:var(--alert); }
+  .alertbox { background:#fdf0ee; border-left:4px solid var(--alert); padding:10px 14px; border-radius:6px; font-size:.85rem; margin-bottom:16px; }
+  .commentbox { background:#eef4fb; border-left:4px solid var(--accent); padding:12px 14px; border-radius:6px; font-size:.88rem; margin-bottom:20px; }
+  .commentbox .tag { font-size:.7rem; color:var(--muted); display:block; margin-top:6px; }
+  footer { text-align:center; font-size:.72rem; color:var(--muted); padding:18px; }
+  canvas { max-height:190px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Veille économique multi-marchés — PME industrielle (cas d'illustration CODEC SA)</h1>
+  <span class="run" id="runinfo"></span>
+</header>
+<nav id="tabs"></nav>
+<main id="content"></main>
+<footer>Prototype TB « Exploration de l'IA pour les entreprises industrielles » — scénario B (human-in-the-loop).
+Badges : <span class="badge hard">HARD DATA</span> donnée officielle structurée · <span class="badge comp">COMPOSITE</span> extraite/synthétisée, fiabilisée par consensus multi-IA et validation humaine.</footer>
+
+<script>
+/* ============ DONNÉES CONSOLIDÉES (extrait réel, collecté et vérifié — run du 04.08.2026) ============
+   Chaque valeur porte sa source. En production, ce bloc est produit par la base consolidée (v_current). */
+const RUN = { id: 1, date: "2026-08-04", label: "Collecte initiale — historique 3 ans" };
+
+const DATA = {
+  horlogerie: {
+    alerts: [ { text: "H1 — Exportations 2025 en recul de -1,7 % : deuxième année consécutive de repli ; marché chinois en baisse de plus d'un tiers en deux ans. Seuil de vigilance QV2 franchi.", validated: true } ],
+    comment: { text: "Les exportations horlogères suisses s'établissent à 25,6 mia CHF en 2025, en recul pour la deuxième année consécutive (-1,7 % après -2,8 %). Le repli est concentré sur la Chine et Hong Kong, tandis que la politique douanière américaine a pesé sur le premier débouché de la branche. Le niveau reste toutefois supérieur aux années pré-2023. Pour un sous-traitant, le signal dominant est un déplacement de la demande entre marchés plus qu'un effondrement du volume global.", status: "Validé (veilleur) — généré par LLM à partir des seules données ci-dessous" },
+    indicators: [
+      { id:"H1", qv:"QV2 — Demande et débouchés", label:"Exportations horlogères suisses", unit:"mia CHF", cat:"hard",
+        source:"FH — Fédération de l'industrie horlogère suisse", url:"https://www.fhs.swiss/fre/statistics.html", freq:"mensuelle (agrégat annuel)",
+        series:{ labels:["2023","2024","2025"], values:[26.7, 25.9, 25.6] } },
+      { id:"H1b", qv:"QV2 — Demande et débouchés", label:"Variation annuelle des exportations", unit:"%", cat:"hard",
+        source:"FH", url:"https://www.fhs.swiss/fre/statistics.html", freq:"annuelle",
+        series:{ labels:["2023","2024","2025"], values:[7.6, -2.8, -1.7] } }
+    ]
+  },
+  medical: {
+    alerts: [],
+    comment: { text: "La branche medtech suisse poursuit sa croissance structurelle : 23,4 mia CHF de chiffre d'affaires en 2023 (+12,5 % vs 2021), portée par ~1 400 entreprises et plus de 71 000 emplois, avec un excédent commercial de 5,8 mia CHF. La demande de fond (dépenses de santé, vieillissement) reste orientée à la hausse ; l'enjeu de veille est géographique : environ la moitié des exportations partent vers l'UE.", status: "Validé (veilleur) — généré par LLM à partir des seules données ci-dessous" },
+    indicators: [
+      { id:"M5", qv:"QV1 — Santé structurelle", label:"Chiffre d'affaires de la branche medtech suisse", unit:"mia CHF", cat:"comp",
+        source:"Swiss Medtech — SMTI Sector Study (bisannuelle)", url:"https://www.swiss-medtech.ch/en/news/medtech-sector-study-2024", freq:"bisannuelle",
+        series:{ labels:["2019","2021","2023"], values:[17.9, 20.8, 23.4] },
+        note:"Valeur 2019 : SMTI 2020 ; extraction PDF fiabilisée (consensus 3 modèles + validation humaine)." },
+      { id:"M5b", qv:"QV1 — Santé structurelle", label:"Emplois de la branche medtech suisse", unit:"milliers", cat:"comp",
+        source:"Swiss Medtech — SMTI", url:"https://www.swiss-medtech.ch/en/news/medtech-sector-study-2024", freq:"bisannuelle",
+        series:{ labels:["2023"], values:[71.0] }, note:"Série à compléter (SMTI 2026 attendu)." }
+    ]
+  },
+  automobile: {
+    alerts: [ { text: "A3 — Ventes de véhicules électriques : +23 % en 2025 (21 M d'unités, un quart des ventes mondiales). Mutation structurelle de la demande de composants : signal stratégique QV4 — dynamique technologique — pour la sous-traitance.", validated: true } ],
+    comment: { text: "La production mondiale rebondit à 96,4 M de véhicules en 2025 (+3,9 %), tirée par l'Asie-Pacifique (61 % du total, Chine : 34,5 M). Dans le même temps, les ventes de véhicules électriques atteignent 21 M d'unités (+~23 %), soit un quart du marché. Pour un sous-traitant de précision, la croissance du volume global masque une recomposition de la demande de pièces : la part thermique se contracte à mesure que l'électrique progresse, et la géographie de la production se déplace vers l'Est.", status: "Validé (veilleur) — généré par LLM à partir des seules données ci-dessous" },
+    indicators: [
+      { id:"A1", qv:"QV1 — Santé structurelle / QV3 — Dynamique géographique", label:"Production mondiale de véhicules", unit:"millions", cat:"hard",
+        source:"OICA", url:"https://oica.net/production-statistics/", freq:"annuelle",
+        series:{ labels:["2023","2024","2025"], values:[93.5, 92.7, 96.4] } },
+      { id:"A3", qv:"QV2 — Demande / QV3 — Dynamique géographique / QV4 — Dynamique technologique", label:"Ventes mondiales de véhicules électriques", unit:"millions", cat:"hard",
+        source:"AIE — Global EV Outlook", url:"https://www.iea.org/reports/global-ev-outlook-2026", freq:"annuelle",
+        series:{ labels:["2023","2024","2025"], values:[13.9, 17.1, 21.0] } }
+    ]
+  },
+  aerospatial: {
+    alerts: [ { text: "S4 — Dépenses militaires mondiales : 2 887 mia USD en 2025, onzième année consécutive de hausse. Impulsion publique durable (QV5) sur la chaîne défense/aérospatial.", validated: true } ],
+    comment: { text: "Le cycle civil se redresse nettement : 1 393 livraisons Airbus+Boeing en 2025 (793 + 600), contre 1 114 en 2024, Boeing retrouvant un rythme normal après une année 2024 difficile. Côté étatique, les dépenses militaires mondiales atteignent 2 887 mia USD (+2,9 %), onzième hausse consécutive. Les deux moteurs du secteur — carnets civils et budgets publics — sont simultanément orientés à la hausse, configuration favorable à la charge de la chaîne de sous-traitance sur un horizon pluriannuel.", status: "Validé (veilleur) — généré par LLM à partir des seules données ci-dessous" },
+    indicators: [
+      { id:"S1", qv:"QV1 / QV2 — Cycle civil", label:"Livraisons d'avions commerciaux (Airbus + Boeing)", unit:"appareils", cat:"hard",
+        source:"Constructeurs (communiqués annuels)", url:"https://www.airbus.com/en/products-services/commercial-aircraft/market/orders-deliveries", freq:"mensuelle (agrégat annuel)",
+        series:{ labels:["2023","2024","2025"], values:[1263, 1114, 1393] },
+        note:"Détail 2025 : Airbus 793, Boeing 600. 2024 : 766/348. 2023 : 735/528." },
+      { id:"S4", qv:"QV5 — Impulsions publiques", label:"Dépenses militaires mondiales", unit:"mia USD", cat:"hard",
+        source:"SIPRI — Military Expenditure Database", url:"https://www.sipri.org/databases/milex", freq:"annuelle",
+        series:{ labels:["2023","2024","2025"], values:[2443, 2718, 2887] } }
+    ]
+  }
+};
+
+const SECTOR_LABELS = { horlogerie:"Horlogerie", medical:"Médical", automobile:"Automobile", aerospatial:"Aérospatial" };
+
+/* ============ RENDU ============ */
+document.getElementById('runinfo').textContent = `Run #${RUN.id} — ${RUN.date} — ${RUN.label}`;
+const tabs = document.getElementById('tabs'), content = document.getElementById('content');
+let charts = [];
+
+Object.keys(DATA).forEach((k,i) => {
+  const b = document.createElement('button');
+  b.textContent = SECTOR_LABELS[k];
+  b.onclick = () => render(k);
+  b.id = 'tab-'+k;
+  tabs.appendChild(b);
+});
+
+function render(sector) {
+  charts.forEach(c=>c.destroy()); charts=[];
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+sector).classList.add('active');
+  const d = DATA[sector];
+  let html = '';
+  d.alerts.forEach(a => html += `<div class="alertbox">⚠ <strong>Alerte</strong> — ${a.text} <em>(${a.validated?'validée par le veilleur':'en attente de validation'})</em></div>`);
+  html += `<div class="commentbox"><strong>Commentaire exécutif.</strong> ${d.comment.text}<span class="tag">${d.comment.status}</span></div>`;
+  html += '<div class="grid">';
+  d.indicators.forEach((ind,idx) => {
+    const last = ind.series.values[ind.series.values.length-1];
+    const prev = ind.series.values[ind.series.values.length-2];
+    const varr = (prev!==undefined && prev!==0) ? ((last-prev)/Math.abs(prev)*100) : null;
+    html += `<div class="card">
+      <div class="qv">${ind.qv}</div>
+      <h3>${ind.label}<span class="badge ${ind.cat==='hard'?'hard':'comp'}">${ind.cat==='hard'?'HARD DATA':'COMPOSITE'}</span></h3>
+      <div class="meta">Source : <a href="${ind.url}" target="_blank">${ind.source}</a> · fréq. ${ind.freq} · run #${RUN.id}${ind.note?' · '+ind.note:''}</div>
+      <div class="kpi">${last.toLocaleString('fr-CH')} <small>${ind.unit}</small>
+        ${varr!==null?`<small class="${varr>=0?'up':'down'}">${varr>=0?'▲':'▼'} ${Math.abs(varr).toFixed(1)} %</small>`:''}</div>
+      <canvas id="ch-${sector}-${idx}"></canvas>
+    </div>`;
+  });
+  html += '</div>';
+  content.innerHTML = html;
+  d.indicators.forEach((ind,idx) => {
+    const ctx = document.getElementById(`ch-${sector}-${idx}`);
+    charts.push(new Chart(ctx, {
+      type: ind.series.values.length > 2 ? 'line' : 'bar',
+      data: { labels: ind.series.labels, datasets: [{ label: ind.unit, data: ind.series.values,
+        borderColor:'#0b5cad', backgroundColor:'rgba(11,92,173,.15)', fill:true, tension:.25, pointRadius:4 }] },
+      options: { plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:false } }, responsive:true, maintainAspectRatio:true }
+    }));
+  });
+}
+render('horlogerie');
+</script>
+</body>
+</html>

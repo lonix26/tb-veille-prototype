@@ -1,0 +1,23 @@
+Identifiant,Source,Organisme,Fréquence,Format,Accès,Statut de qualification,Qualifiée par,Le,Indicateurs alimentés,URL,Remarque
+acea,Immatriculations de véhicules neufs,ACEA,mensuelle,PDF / communiqués,libre,certifiee,N. Castillo,07.08.2026,A2,https://www.acea.auto,Communiqués mensuels ; extraction nécessaire
+aie,Global EV Data Explorer,Agence internationale de l'énergie,annuelle,CSV,libre,certifiee,N. Castillo,07.08.2026,A3,https://www.iea.org,
+banque_mondiale,Séries macroéconomiques mondiales,Banque mondiale,annuelle,API + CSV,libre,certifiee,N. Castillo,07.08.2026,,https://data.worldbank.org,
+bns,Taux de change de référence,Banque nationale suisse,mensuelle,API / CSV,libre,certifiee,N. Castillo,07.08.2026,T2,https://data.snb.ch,
+comtrade,UN Comtrade — commerce international par code SH,Nations Unies,annuelle,API + CSV,libre_quota,certifiee,N. Castillo,07.08.2026,"A4, H1, H3, M1, S6",https://comtradeplus.un.org,Quota sur l'API publique
+constructeurs,Commandes et livraisons d'avions commerciaux,"Airbus, Boeing",mensuelle,Web / Excel,libre,certifiee,N. Castillo,07.08.2026,S1,https://www.airbus.com,Deux producteurs à consolider
+cpb,World Trade Monitor,CPB Netherlands Bureau for Economic Policy Analysis,mensuelle,Excel,libre,certifiee,N. Castillo,07.08.2026,T3,https://www.cpb.nl/en/worldtrademonitor,
+deloitte,Swiss Watch Industry Study,Deloitte,annuelle,PDF,libre,a_confirmer,N. Castillo,07.08.2026,H5,https://www.deloitte.com/ch,"Étude annuelle, méthodologie déclarative"
+esa,Budgets spatiaux publics,ESA et agences nationales,annuelle,PDF,libre,a_confirmer,N. Castillo,07.08.2026,S5,https://www.esa.int,Formats hétérogènes selon les agences
+eurostat,Eurostat — statistiques conjoncturelles et structurelles,Commission européenne,mensuelle,API + CSV,libre,certifiee,N. Castillo,07.08.2026,"A5, M2",https://ec.europa.eu/eurostat/data/database,API de dissémination sans authentification
+fh,Statistiques d'exportation horlogère,Fédération de l'industrie horlogère suisse,mensuelle,PDF / communiqués,libre,certifiee,N. Castillo,09.08.2026,,https://www.fhs.swiss,Détail par marché de destination
+fmi,World Economic Outlook,Fonds monétaire international,semestrielle,CSV,libre,certifiee,N. Castillo,07.08.2026,T4,https://www.imf.org/en/Publications/WEO,
+iata,Air Passenger Market Analysis,IATA,mensuelle,PDF,libre,a_confirmer,N. Castillo,07.08.2026,S2,https://www.iata.org,Séries détaillées réservées aux membres
+ocde,Principaux indicateurs économiques et CLI,OCDE,mensuelle,API + CSV,libre,certifiee,N. Castillo,07.08.2026,T1,https://data-explorer.oecd.org,"Vérifié le 10.08.2026 : la série CLI est vivante et mensuelle, mais l'agrégat « OCDE total » n'est plus publié — 22 zones disponibles dont G20, G7, G4E, NAFTA. T1 réancré sur G20. Version du flux non épinglée : la 4.1 ne porte plus la mesure LI. Limitation de débit annoncée par la documentation sans être chiffrée."
+ofs,STATENT et statistiques conjoncturelles,Office fédéral de la statistique,annuelle,CSV / Excel,libre,certifiee,N. Castillo,07.08.2026,"H2, M4",https://www.bfs.admin.ch,Nomenclature NOGA
+oica,Statistiques de production automobile,OICA,annuelle,Tableaux web,libre,certifiee,N. Castillo,07.08.2026,A1,https://www.oica.net/production-statistics,
+ompi,Statistiques de propriété intellectuelle,OMPI,annuelle,CSV,libre,certifiee,N. Castillo,07.08.2026,"H4, M6",https://www.wipo.int/ipstats,Classification CIB
+oms_ghed,Global Health Expenditure Database,OMS,annuelle,API / CSV,libre,certifiee,N. Castillo,07.08.2026,M3,https://apps.who.int/nha/database,
+sipri,Military Expenditure Database,SIPRI,annuelle,CSV,libre,certifiee,N. Castillo,07.08.2026,S4,https://milex.sipri.org,
+sp_global_pmi,Indices PMI manufacturiers,S&P Global,mensuelle,Communiqués,payant,a_confirmer,N. Castillo,07.08.2026,,https://www.pmi.spglobal.com,Indices détaillés payants ; valeurs de synthèse dans les communiqués
+swiss_medtech,Swiss Medical Technology Industry report,Swiss Medtech,bisannuelle,PDF,libre,a_confirmer,N. Castillo,07.08.2026,M5,https://www.swiss-medtech.ch,"Publication bisannuelle, périodes non alignées sur la fenêtre 2023-2025"
+unoosa,Objets lancés dans l'espace,UNOOSA / Our World in Data,annuelle,CSV,libre,certifiee,N. Castillo,07.08.2026,S3,https://ourworldindata.org/space-exploration-satellites,

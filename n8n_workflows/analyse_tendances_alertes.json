@@ -1,0 +1,85 @@
+{
+  "name": "Veille - Analyse de tendances, commentaire LLM et alertes",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 7 2 * *" }] } },
+      "name": "Déclencheur (après collecte)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": { "url": "http://loader:8080/series?validated=true", "options": {} },
+      "name": "Lire séries validées",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculs déterministes : variation période/période, variation vs même période de l'année précédente (yoy),\n// moyenne mobile 12 mois (mm12), tendance linéaire, franchissement de seuil.\n// Les métriques yoy, mm12, seuil de matérialité et statut de validation sont requises par les règles\n// d'interprétation RI2, RI4 et RI5 (§ 10.4.3 du rapport). Toute métrique non calculable est transmise\n// à null : la couche d'interprétation doit alors signaler l'absence (RI0), pas conclure.\nfunction trend(series){\n  if (series.length < 2) return null;\n  const n = series.length;\n  const xs = series.map((_,i)=>i), ys = series.map(p=>p.value);\n  const mx = xs.reduce((a,b)=>a+b,0)/n, my = ys.reduce((a,b)=>a+b,0)/n;\n  const slope = xs.map((x,i)=>(x-mx)*(ys[i]-my)).reduce((a,b)=>a+b,0) / xs.map(x=>(x-mx)**2).reduce((a,b)=>a+b,0);\n  return slope;\n}\nconst out = [];\nfor (const item of $input.all()) {\n  const s = item.json;\n  const sorted = (s.points||[]).sort((a,b)=>a.period.localeCompare(b.period));\n  const last = sorted[sorted.length-1], prev = sorted[sorted.length-2];\n  const variation = (last && prev && prev.value) ? (last.value-prev.value)/prev.value*100 : null;\n  let yoy = null;\n  if (last && /^\\d{4}-/.test(last.period)) {\n    const refPeriod = String(Number(last.period.slice(0,4))-1) + last.period.slice(4);\n    const ref = sorted.find(p=>p.period===refPeriod);\n    if (ref && ref.value) yoy = (last.value-ref.value)/ref.value*100;\n  }\n  const mm12 = sorted.length >= 12 ? sorted.slice(-12).reduce((a,p)=>a+p.value,0)/12 : null;\n  const threshold = s.alert_threshold_pct ?? 5;\n  out.push({ json: { indicator_id: s.indicator_id, sector: s.sector, unit: s.unit,\n    last_period: last?.period, last_value: last?.value,\n    variation_pct: variation, yoy_pct: yoy, mm12: mm12,\n    materiality_threshold_pct: threshold, validation_status: s.validation_status ?? null,\n    n_points: sorted.length, slope: trend(sorted),\n    breach: variation !== null && Math.abs(variation) >= threshold } });\n}\nreturn out;"
+      },
+      "name": "Calculs de tendance (déterministes)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-5', max_tokens:1200, temperature:0.2, system: 'Tu es la couche de rédaction d’un dispositif de veille économique destiné à un décideur de PME industrielle. Tu reçois un objet JSON de métriques calculées en amont par la base de données : c’est ta seule source. Applique dans l’ordre les règles d’interprétation suivantes (RI0 à RI10, § 10.4.3 du dispositif). RI0, prioritaire sur toutes les autres — interdiction de calcul : ne produis, ne recalcule, n’arrondis et n’extrapole aucune valeur ; reprends les chiffres tels quels ; toute métrique absente ou null est signalée dans « Points à vérifier », sans conclusion. RI1 — effet de base : si la période de référence paraît atypique, déclare la variation relative peu significative et privilégie le niveau absolu. RI2 — saisonnalité : ne fonde aucune lecture sur la comparaison de deux périodes consécutives en série brute (variation_pct) ; fonde-la sur yoy_pct (même période de l’année précédente) ou mm12 (moyenne mobile 12 mois) ; si les deux sont null, dis-le et abstiens-toi de qualifier l’évolution. RI3 — effets d’anticipation : un pic suivi d’un creux d’ampleur comparable est traité comme un ensemble unique, avec recherche d’une échéance réglementaire ou fiscale en hypothèse. RI4 — matérialité : si la variation est inférieure en valeur absolue à materiality_threshold_pct, déclare-la non significative et ne lui attribue aucune explication. RI5 — fiabilité : si validation_status n’est pas « valide », abaisse d’un niveau la confiance attribuée et motive cet abaissement. RI6 — persistance : n’emploie « tendance » ou « inversion » qu’avec au moins trois périodes cohérentes (n_points et slope fournis). RI7 — volume et structure : si les deux dimensions sont fournies, analyse-les conjointement et signale toute divergence en priorité. RI8 — décomposition : si des segments évoluent en sens opposés, ne présente pas l’agrégat comme représentatif. RI9 — interdiction de causalité : formulations proscrites : « en raison de », « causé par », « s’explique par » ; admises : « concomitant avec », « hypothèse à vérifier », « compatible avec ». RI10 — hypothèses concurrentes : présente toutes les explications compatibles avec les données, chacune accompagnée de la donnée qui permettrait de trancher. Format imposé, 250 mots maximum : Constat / Neutralisations appliquées / Lecture / Hypothèses / Qualification (niveau de signal : routine, à surveiller, significatif, rupture ; niveau de confiance : élevée, moyenne, faible) / Points à vérifier. Arrête-toi au diagnostic : aucune recommandation de décision.', messages:[{role:'user', content: 'Métriques calculées : ' + JSON.stringify($json)}]}) }}"
+      },
+      "name": "Commentaire exécutif (LLM, données fournies uniquement)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "conditions": { "boolean": [ { "value1": "={{ $json.breach }}", "value2": true } ] }
+      },
+      "name": "Seuil franchi ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/alerts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({indicator_id:$json.indicator_id, rule:'variation>=seuil', payload:$json, validated_by:null}) }}"
+      },
+      "name": "Créer alerte (en attente de validation)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/commentaries",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({indicator_id:$json.indicator_id, text:$json.content?.[0]?.text, status:'a_valider'}) }}"
+      },
+      "name": "Stocker commentaire (statut : à valider)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 200]
+    }
+  ],
+  "connections": {
+    "Déclencheur (après collecte)": { "main": [[ { "node": "Lire séries validées", "type": "main", "index": 0 } ]] },
+    "Lire séries validées": { "main": [[ { "node": "Calculs de tendance (déterministes)", "type": "main", "index": 0 } ]] },
+    "Calculs de tendance (déterministes)": { "main": [[ { "node": "Commentaire exécutif (LLM, données fournies uniquement)", "type": "main", "index": 0 }, { "node": "Seuil franchi ?", "type": "main", "index": 0 } ]] },
+    "Commentaire exécutif (LLM, données fournies uniquement)": { "main": [[ { "node": "Stocker commentaire (statut : à valider)", "type": "main", "index": 0 } ]] },
+    "Seuil franchi ?": { "main": [ [ { "node": "Créer alerte (en attente de validation)", "type": "main", "index": 0 } ], [] ] }
+  }
+}

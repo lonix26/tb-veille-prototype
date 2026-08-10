@@ -1,0 +1,7 @@
+Code,Intitulé,Formulation générique,Portée,Indicateurs rattachés
+QV0,Attribution,"Le mouvement observé sur un secteur est-il propre à ce secteur, ou porté par la conjoncture générale ?",transversal,4
+QV1,Santé structurelle,"Comment évolue la substance de la branche : production, emploi, tissu d'entreprises ?",sectoriel,8
+QV2,Demande et débouchés,Où la demande mondiale croît-elle ou se contracte-t-elle ? Quels flux commerciaux se déplacent ?,sectoriel,10
+QV3,Dynamique géographique,"Où le centre de gravité du secteur se déplace-t-il : quels pays produisent, importent ou accèdent à une capacité nouvelle ?",sectoriel,6
+QV4,Dynamique technologique,"Quelle mutation technique recompose la demande de composants : quels procédés, matériaux ou architectures se substituent aux précédents ?",sectoriel,3
+QV5,Impulsions publiques,"Quelle action publique — dépense, réglementation, condition d'accès — modifie le niveau ou la composition de la demande à moyen terme ?",sectoriel,4

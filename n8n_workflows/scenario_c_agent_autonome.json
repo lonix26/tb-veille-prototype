@@ -1,0 +1,218 @@
+{
+  "name": "Veille - Scénario C : agent autonome (artefact expérimental de confrontation)",
+  "meta": {
+    "description": "ARTEFACT EXPÉRIMENTAL — NON DESTINÉ À LA PRODUCTION. Implémente le scénario C (agent autonome, § 3.1) dans le seul but de le confronter au scénario B selon la grille du § 10.5. L'agent choisit ses sources, collecte, extrait, calcule, rédige et publie sans validation humaine. Trois garde-fous de laboratoire l'encadrent : écriture exclusive en espace bac à sable, plafond d'itérations et de coût, journalisation intégrale de la trace. Aucune sortie de ce workflow n'alimente le tableau de bord du scénario B."
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Déclencheur d'expérimentation",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 400],
+      "notes": "Déclenchement manuel uniquement : l'artefact ne tourne que sous observation, dans le cadre du protocole du § 10.5."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ouverture du run agentique en espace bac à sable.\n// La mission confiée à l'agent est la MÊME tâche de veille que celle exécutée par le dispositif B\n// (condition de comparabilité du protocole § 10.5).\nreturn [{ json: {\n  run_namespace: 'sandbox_agent',\n  run_ouvert_le: new Date().toISOString(),\n  plafond_iterations: 25,\n  plafond_appels_modele: 40,\n  secteur: 'automobile',\n  questions_veille: ['QV1', 'QV2', 'QV3', 'QV4', 'QV5'],\n  mission: \"Établis l'état actuel du marché automobile mondial pour un décideur de PME sous-traitante de précision. Pour chacune des cinq questions de veille (QV1 santé structurelle de la branche, QV2 demande et débouchés, QV3 dynamique géographique, QV4 dynamique technologique, QV5 impulsions publiques) : identifie les sources officielles pertinentes, collecte les valeurs des trois derniers exercices, calcule les variations, puis publie pour chaque indicateur une valeur datée et sourcée ainsi qu'un commentaire exécutif de 120 mots maximum par question de veille. Tu disposes des outils nécessaires ; tu décides seul de leur usage, de l'ordre des opérations et du moment où le travail est terminé.\"\n} }];"
+      },
+      "name": "Ouvrir le run agentique (bac à sable)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mission }}",
+        "options": {
+          "systemMessage": "Tu es un agent de veille économique autonome au service d'une PME industrielle. Tu planifies, exécutes et clôtures ta mission sans intervention humaine : aucune de tes productions ne sera relue avant publication. Tu disposes d'outils de recherche, de lecture, de calcul et d'écriture. Contraintes de fonctionnement : (1) toute valeur publiée doit porter l'URL de la source dont elle est issue et la date de collecte ; (2) tu ne publies aucune valeur que tu n'as pas lue dans une source consultée pendant cette exécution ; (3) tu utilises l'outil de calcul pour toute opération arithmétique ; (4) tu déclares explicitement, dans ton rapport final, les questions de veille que tu n'as pas pu traiter et les valeurs dont tu doutes. Tu t'arrêtes lorsque la mission est traitée ou lorsque tu as épuisé ton plafond d'itérations.",
+          "maxIterations": 25,
+          "returnIntermediateSteps": true
+        }
+      },
+      "name": "Agent de veille autonome",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [560, 400],
+      "notes": "returnIntermediateSteps activé : la trace de raisonnement et d'appels d'outils est l'objet même de la mesure d'auditabilité (§ 10.5)."
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-5",
+        "options": { "temperature": 0.2, "maxTokensToSample": 4096 }
+      },
+      "name": "Modèle de raisonnement",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [400, 660]
+    },
+    {
+      "parameters": { "sessionIdType": "customKey", "sessionKey": "=sandbox_agent_run", "contextWindowLength": 30 },
+      "name": "Mémoire de session",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [560, 660]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Recherche web. Renvoie des résultats de recherche pour une requête donnée. À utiliser pour identifier des sources ou des publications récentes.",
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"sonar-pro\",\"messages\":[{\"role\":\"user\",\"content\":\"{requete}\"}]}",
+        "placeholderDefinitions": {
+          "values": [ { "name": "requete", "description": "La requête de recherche", "type": "string" } ]
+        }
+      },
+      "name": "Outil : rechercher sur le web",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [740, 660]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lit le contenu d'une URL et le renvoie en texte. À utiliser pour consulter une page ou un document statistique.",
+        "method": "GET",
+        "url": "={url}",
+        "placeholderDefinitions": {
+          "values": [ { "name": "url", "description": "L'URL à consulter", "type": "string" } ]
+        },
+        "optimizeResponse": true
+      },
+      "name": "Outil : lire une URL",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [900, 660]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Renvoie le référentiel d'indicateurs et de sources déjà qualifiés par le dispositif de veille. Consultation facultative.",
+        "method": "GET",
+        "url": "http://loader:8080/indicators"
+      },
+      "name": "Outil : consulter le référentiel",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1060, 660],
+      "notes": "Outil délibérément facultatif : mesurer si l'agent s'appuie sur le référentiel qualifié ou lui préfère des sources de son choix est l'un des points de comparaison B/C."
+    },
+    {
+      "parameters": {
+        "name": "calculer",
+        "description": "Exécute un calcul arithmétique déterministe sur une série de valeurs. Entrée : un tableau JSON de nombres et une opération parmi variation_pct, moyenne, pente.",
+        "jsCode": "const p = JSON.parse(query);\nconst v = p.valeurs || [];\nif (p.operation === 'variation_pct') { const a = v[v.length-2], b = v[v.length-1]; return String(a ? ((b-a)/a*100).toFixed(2) : 'indéfini'); }\nif (p.operation === 'moyenne') { return String(v.reduce((x,y)=>x+y,0)/(v.length||1)); }\nif (p.operation === 'pente') { const n=v.length, xs=v.map((_,i)=>i); const mx=xs.reduce((a,b)=>a+b,0)/n, my=v.reduce((a,b)=>a+b,0)/n; const num=xs.map((x,i)=>(x-mx)*(v[i]-my)).reduce((a,b)=>a+b,0); const den=xs.map(x=>(x-mx)**2).reduce((a,b)=>a+b,0); return String(den? num/den : 0); }\nreturn 'opération inconnue';"
+      },
+      "name": "Outil : calculer",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [1220, 660]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Publie une valeur d'indicateur dans l'espace bac à sable. La valeur est immédiatement visible : aucune validation n'intervient.",
+        "method": "POST",
+        "url": "http://loader:8080/sandbox/load",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"run_namespace\":\"sandbox_agent\",\"indicator_label\":\"{libelle}\",\"sector\":\"{secteur}\",\"watch_question\":\"{question_veille}\",\"period\":\"{periode}\",\"geo\":\"{geo}\",\"value\":\"{valeur}\",\"source_url\":\"{source_url}\",\"obtained_by\":\"agent_autonome\",\"validation_status\":\"publie_sans_validation\"}",
+        "placeholderDefinitions": {
+          "values": [
+            { "name": "libelle", "description": "Libellé de l'indicateur", "type": "string" },
+            { "name": "secteur", "description": "Secteur concerné", "type": "string" },
+            { "name": "question_veille", "description": "Question de veille (QV1 à QV5)", "type": "string" },
+            { "name": "periode", "description": "Période (ex. 2025)", "type": "string" },
+            { "name": "geo", "description": "Zone géographique ou WORLD", "type": "string" },
+            { "name": "valeur", "description": "Valeur numérique", "type": "string" },
+            { "name": "source_url", "description": "URL de la source d'où la valeur est issue", "type": "string" }
+          ]
+        }
+      },
+      "name": "Outil : publier une valeur",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1380, 660],
+      "notes": "Statut 'publie_sans_validation' : le statut qui n'existe pas dans le dispositif B. C'est la différence de régime que la grille du § 10.5 met à l'épreuve."
+    },
+    {
+      "parameters": {
+        "toolDescription": "Publie un commentaire exécutif pour une question de veille dans l'espace bac à sable, sans relecture.",
+        "method": "POST",
+        "url": "http://loader:8080/sandbox/commentaries",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"run_namespace\":\"sandbox_agent\",\"sector\":\"{secteur}\",\"watch_question\":\"{question_veille}\",\"text\":\"{texte}\",\"status\":\"publie_sans_validation\"}",
+        "placeholderDefinitions": {
+          "values": [
+            { "name": "secteur", "description": "Secteur concerné", "type": "string" },
+            { "name": "question_veille", "description": "Question de veille", "type": "string" },
+            { "name": "texte", "description": "Le commentaire exécutif", "type": "string" }
+          ]
+        }
+      },
+      "name": "Outil : publier un commentaire",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1540, 660]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-5', max_tokens:2048, temperature:0, messages:[{role:'user', content: \"Tu contrôles la production d'un agent de veille autonome. Pour chaque valeur publiée et chaque commentaire, vérifie : (a) une URL de source est-elle fournie ; (b) le commentaire contient-il un chiffre absent des valeurs publiées ; (c) une variation annoncée est-elle arithmétiquement exacte au regard des valeurs publiées. Réponds en JSON strict {\\\"anomalies\\\":[{\\\"type\\\":\\\"\\\",\\\"element\\\":\\\"\\\",\\\"detail\\\":\\\"\\\"}],\\\"nb_elements_controles\\\":0}. Production à contrôler : \" + JSON.stringify($json).slice(0, 60000)}]}) }}"
+      },
+      "name": "Auto-critique (substitut de la validation humaine)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400],
+      "onError": "continueRegularOutput",
+      "notes": "Le scénario C remplace le contrôle humain par un contrôle homogène au système contrôlé. Mesurer l'écart entre les anomalies qu'il détecte et celles que le dépouillement humain relève est un résultat attendu du protocole § 10.5."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Trace d'exécution complète : la seule chose que le scénario C offre en substitut de la traçabilité par statuts du scénario B.\nconst agent = $('Agent de veille autonome').first().json;\nconst etapes = agent.intermediateSteps || [];\nconst outils = {};\nfor (const e of etapes) {\n  const n = e.action?.tool || 'inconnu';\n  outils[n] = (outils[n] || 0) + 1;\n}\nlet critique = {};\ntry { critique = JSON.parse(($json.content?.[0]?.text || '{}').replace(/^```json/i, '').replace(/```$/, '').trim()); } catch (e) { critique = { erreur_parsing: true }; }\n\nreturn [{ json: {\n  run_namespace: 'sandbox_agent',\n  clos_le: new Date().toISOString(),\n  scenario: 'C',\n  nb_iterations: etapes.length,\n  plafond_atteint: etapes.length >= 25,\n  appels_par_outil: outils,\n  referentiel_consulte: Object.keys(outils).some(n => /r.f.rentiel/i.test(n)),\n  outil_calcul_utilise: Object.keys(outils).some(n => /calcul/i.test(n)),\n  sortie_finale: agent.output ?? null,\n  trace_complete: etapes,\n  autocritique: critique\n} }];"
+      },
+      "name": "Journaliser la trace d'exécution",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/sandbox/agent-runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "name": "Archiver le run agentique",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 400],
+      "notes": "Alimente la colonne « scénario C » de la grille de confrontation (§ 10.5). Le dépouillement contre vérité terrain reste manuel."
+    }
+  ],
+  "connections": {
+    "Déclencheur d'expérimentation": { "main": [[ { "node": "Ouvrir le run agentique (bac à sable)", "type": "main", "index": 0 } ]] },
+    "Ouvrir le run agentique (bac à sable)": { "main": [[ { "node": "Agent de veille autonome", "type": "main", "index": 0 } ]] },
+    "Agent de veille autonome": { "main": [[ { "node": "Auto-critique (substitut de la validation humaine)", "type": "main", "index": 0 } ]] },
+    "Auto-critique (substitut de la validation humaine)": { "main": [[ { "node": "Journaliser la trace d'exécution", "type": "main", "index": 0 } ]] },
+    "Journaliser la trace d'exécution": { "main": [[ { "node": "Archiver le run agentique", "type": "main", "index": 0 } ]] },
+    "Modèle de raisonnement": { "ai_languageModel": [[ { "node": "Agent de veille autonome", "type": "ai_languageModel", "index": 0 } ]] },
+    "Mémoire de session": { "ai_memory": [[ { "node": "Agent de veille autonome", "type": "ai_memory", "index": 0 } ]] },
+    "Outil : rechercher sur le web": { "ai_tool": [[ { "node": "Agent de veille autonome", "type": "ai_tool", "index": 0 } ]] },
+    "Outil : lire une URL": { "ai_tool": [[ { "node": "Agent de veille autonome", "type": "ai_tool", "index": 0 } ]] },
+    "Outil : consulter le référentiel": { "ai_tool": [[ { "node": "Agent de veille autonome", "type": "ai_tool", "index": 0 } ]] },
+    "Outil : calculer": { "ai_tool": [[ { "node": "Agent de veille autonome", "type": "ai_tool", "index": 0 } ]] },
+    "Outil : publier une valeur": { "ai_tool": [[ { "node": "Agent de veille autonome", "type": "ai_tool", "index": 0 } ]] },
+    "Outil : publier un commentaire": { "ai_tool": [[ { "node": "Agent de veille autonome", "type": "ai_tool", "index": 0 } ]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,119 @@
+{
+  "name": "Veille - Extraction composite multi-IA (human-in-the-loop)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Déclencheur manuel (nouveau document)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Entrée : URL/chemin du document non structuré + schéma d'extraction imposé.\n// Chaque champ est un objet { valeur, extrait_source } : le modèle doit restituer le passage\n// exact du document d'où provient la valeur. La validation humaine devient une comparaison\n// de secondes (valeur contre extrait) au lieu d'une relecture du document (§ 10.4.1, rang 2).\nreturn [{ json: {\n  source_doc: 'https://www.fhs.swiss/…/communique.pdf',\n  indicator_id: 'H1',\n  period: '2025',\n  extraction_schema: {\n    periode:          { valeur: '', extrait_source: '' },\n    valeur_totale_chf:{ valeur: '', extrait_source: '' },\n    variation_pct:    { valeur: '', extrait_source: '' },\n    premier_marche:   { valeur: '', extrait_source: '' }\n  },\n  prompt: \"Extrais exactement les valeurs suivantes du document fourni au format JSON strict. Pour CHAQUE champ, renvoie un objet {valeur, extrait_source} où extrait_source est la phrase ou le fragment EXACT du document d'où provient la valeur, recopié à l'identique. Si une valeur est absente du document, écris ABSENT dans les deux champs. N'utilise aucune autre source que le document. Une valeur sans extrait_source vérifiable sera rejetée.\"\n} }];"
+      },
+      "name": "Préparer tâche d'extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'gpt-4o', temperature:0, messages:[{role:'user', content: $json.prompt + ' Document: ' + $json.source_doc + ' Schéma: ' + JSON.stringify($json.extraction_schema)}]}) }}"
+      },
+      "name": "Modèle A (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-5', max_tokens:1024, temperature:0, messages:[{role:'user', content: $json.prompt + ' Document: ' + $json.source_doc + ' Schéma: ' + JSON.stringify($json.extraction_schema)}]}) }}"
+      },
+      "name": "Modèle B (Anthropic)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({contents:[{parts:[{text: $json.prompt + ' Document: ' + $json.source_doc + ' Schéma: ' + JSON.stringify($json.extraction_schema)}]}]}) }}"
+      },
+      "name": "Modèle C (Google)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Contrôle de consistance : comparaison champ par champ des 3 extractions.\n// La comparaison porte sur la VALEUR ; l'extrait source accompagne chaque valeur\n// et est conservé pour l'affichage côte à côte en file de validation.\nconst items = $input.all().map(i => i.json);\nconst parsed = items.map(x => { try { return typeof x.extraction === 'object' ? x.extraction : JSON.parse(x.choices?.[0]?.message?.content || x.content?.[0]?.text || '{}'); } catch(e) { return {}; } });\nconst fields = Object.keys(parsed[0] || {});\nlet agree = 0;\nconst detail = {};\nfor (const f of fields) {\n  const vals = parsed.map(p => String(p[f]?.valeur ?? p[f] ?? '').trim());\n  const extraits = parsed.map(p => String(p[f]?.extrait_source ?? '').trim());\n  const unanimous = vals.every(v => v === vals[0] && v !== '');\n  const tous_sources = extraits.every(e => e !== '' && e !== 'ABSENT') || vals[0] === 'ABSENT';\n  detail[f] = { values: vals, extraits_source: extraits, unanimous, tous_sources };\n  if (unanimous && tous_sources) agree++;\n}\nconst consensus_score = fields.length ? agree / fields.length : 0;\n// Une valeur unanime mais sans extrait vérifiable ne compte pas comme consensus :\n// l'accord sur une affirmation invérifiable n'est pas une preuve (§ 6.3).\nreturn [{ json: { consensus_score, detail, unanimous: consensus_score === 1, extractions: parsed } }];"
+      },
+      "name": "Contrôle de consistance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "conditions": { "boolean": [ { "value1": "={{ $json.unanimous }}", "value2": true } ] }
+      },
+      "name": "Consensus unanime ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [980, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/load",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({...$json, validation_status: 'pre_valide_consensus', obtained_by: 'ia_extraction'}) }}"
+      },
+      "name": "Charger (pré-validé consensus)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1220, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/validation-queue",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({...$json, validation_status: 'en_attente'}) }}"
+      },
+      "name": "File de validation humaine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1220, 420]
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel (nouveau document)": { "main": [[ { "node": "Préparer tâche d'extraction", "type": "main", "index": 0 } ]] },
+    "Préparer tâche d'extraction": { "main": [[ { "node": "Modèle A (OpenAI)", "type": "main", "index": 0 }, { "node": "Modèle B (Anthropic)", "type": "main", "index": 0 }, { "node": "Modèle C (Google)", "type": "main", "index": 0 } ]] },
+    "Modèle A (OpenAI)": { "main": [[ { "node": "Contrôle de consistance", "type": "main", "index": 0 } ]] },
+    "Modèle B (Anthropic)": { "main": [[ { "node": "Contrôle de consistance", "type": "main", "index": 0 } ]] },
+    "Modèle C (Google)": { "main": [[ { "node": "Contrôle de consistance", "type": "main", "index": 0 } ]] },
+    "Contrôle de consistance": { "main": [[ { "node": "Consensus unanime ?", "type": "main", "index": 0 } ]] },
+    "Consensus unanime ?": { "main": [ [ { "node": "Charger (pré-validé consensus)", "type": "main", "index": 0 } ], [ { "node": "File de validation humaine", "type": "main", "index": 0 } ] ] }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "name": "Veille - Collecte A5 (Eurostat, pilote de la tranche verticale)",
+  "meta": {
+    "description": "Tranche verticale sur un indicateur : A5, production industrielle automobile UE (Eurostat, NACE C29, mensuelle). Chaîne complète et sans intervention humaine — ouverture de run, appel d'API, dépôt brut, normalisation JSON-stat, contrôles déterministes, écriture en base avec statut et référence d'audit, clôture de run. Pipeline ETL : aucun modèle de langage n'intervient, conformément à l'usage différencié du § 13.1."
+  },
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 6 2 * *" }] } },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 400],
+      "notes": "Le 2 du mois : Eurostat publie en début de mois. La fréquence du workflow suit celle de la source, elle ne la précède pas."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status) VALUES ('schedule', 'B', 'en_cours') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 400],
+      "notes": "Le run_id est ouvert AVANT la collecte : même une collecte qui échoue laisse une trace datée. Un run manquant serait un trou dans l'historique de l'outil vivant."
+    },
+    {
+      "parameters": {
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_inpr_m",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "format", "value": "JSON" },
+            { "name": "lang", "value": "FR" },
+            { "name": "nace_r2", "value": "C29" },
+            { "name": "unit", "value": "I21" },
+            { "name": "s_adj", "value": "SCA" },
+            { "name": "geo", "value": "EU27_2020" },
+            { "name": "sinceTimePeriod", "value": "2023-01" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "name": "API Eurostat (sts_inpr_m, NACE C29)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 400],
+      "notes": "À VÉRIFIER CONTRE L'API RÉELLE avant de conclure quoi que ce soit : le code de jeu de données (sts_inpr_m), la nomenclature (nace_r2=C29), l'unité (I21 = indice base 2021) et le code géographique (EU27_2020) sont plausibles mais n'ont pas été testés. Eurostat renomme périodiquement ses jeux de données."
+    },
+    {
+      "parameters": { "operation": "toJson", "mode": "all", "options": {} },
+      "name": "Sérialiser la réponse brute",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [700, 620]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/data/staging/A5_eurostat_run{{ $('Ouvrir le run').first().json.run_id }}.json",
+        "options": {}
+      },
+      "name": "Déposer en zone brute",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [940, 620],
+      "notes": "Exigence E6 : la réponse est conservée telle que reçue. Sans elle, une valeur affichée au tableau de bord n'est plus vérifiable une fois la source mise à jour. CE NŒUD PRÉCÈDE DÉLIBÉRÉMENT LE DÉCODAGE ET L'ÉCRITURE EN BASE : tant qu'il échoue, aucune valeur n'entre au registre. La version initiale plaçait les deux branches en parallèle, ce qui a produit le 06.08.2026 un run marqué « ok » dont les 41 valeurs référençaient un dépôt brut inexistant — une traçabilité affirmée sans pièce derrière. L'ordre est ici une contrainte, pas une commodité. Le nom du fichier ne porte que le run_id : la date figure dans runs.executed_at, et la construire deux fois avec deux fuseaux différents (UTC dans le code, Europe/Zurich dans ce nœud) faisait diverger la référence du fichier réel au passage de minuit."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Décodage JSON-stat 2.0 → une observation par ligne.\n// Le format encode les valeurs dans un objet plat dont la clé est un index\n// multidimensionnel aplati ; il faut le décomposer selon `size` pour retrouver\n// la période et la zone. Écrire ce décodage explicitement, plutôt que de\n// supposer une dimension unique, évite une erreur silencieuse le jour où le\n// filtre géographique s'élargit à plusieurs pays.\n// La réponse est lue par référence explicite au nœud d'appel, et non par $input :\n// ce nœud est désormais placé APRÈS le dépôt en zone brute, dont il reçoit la sortie.\nconst resp = $('API Eurostat (sts_inpr_m, NACE C29)').first().json;\nconst valeurs = resp.value ?? {};\nconst dims = resp.id ?? [];\nconst tailles = resp.size ?? [];\n\nconst posTemps = dims.indexOf('time');\nconst posGeo   = dims.indexOf('geo');\nif (posTemps < 0) {\n  throw new Error('Réponse Eurostat sans dimension temporelle : structure inattendue, collecte interrompue.');\n}\n\nfunction libelles(dimension) {\n  const index = resp.dimension?.[dimension]?.category?.index ?? {};\n  return Object.keys(index).sort((a, b) => index[a] - index[b]);\n}\nconst periodes = libelles('time');\nconst zones    = libelles('geo');\n\n// index plat → coordonnées, en base mixte définie par `size`\nfunction coordonnees(plat) {\n  const c = new Array(tailles.length);\n  for (let d = tailles.length - 1; d >= 0; d--) {\n    c[d] = plat % tailles[d];\n    plat = Math.floor(plat / tailles[d]);\n  }\n  return c;\n}\n\nconst runId  = $('Ouvrir le run').first().json.run_id;\n// Référence d'audit : identifiant de run seul. La date est portée par runs.executed_at ;\n// la construire ici en UTC alors que le nœud de dépôt la construit en Europe/Zurich\n// faisait diverger la référence du fichier réel au passage de minuit.\nconst rawRef = '/data/staging/A5_eurostat_run' + runId + '.json';\n\nconst out = [];\nfor (const [cle, v] of Object.entries(valeurs)) {\n  if (v === null || v === undefined) continue;          // Eurostat laisse des trous : ils restent des trous\n  const c = coordonnees(Number(cle));\n  const periode = periodes[c[posTemps]];\n  const zone    = posGeo >= 0 ? (zones[c[posGeo]] ?? 'EU27_2020') : 'EU27_2020';\n  if (!periode) continue;\n  out.push({ json: {\n    indicator_id: 'A5',\n    run_id: runId,\n    period: periode,\n    geo: zone,\n    value: Number(v),\n    obtained_by: 'etl',\n    validation_status: 'valide_source',\n    raw_ref: rawRef\n  } });\n}\n\nif (out.length === 0) {\n  throw new Error('Aucune observation extraite : vérifier les codes de dimension de la requête Eurostat.');\n}\nout.sort((a, b) => a.json.period.localeCompare(b.json.period));\nreturn out;"
+      },
+      "name": "Normaliser (JSON-stat → observations)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Contrôles qualité déterministes (§ 10.2, couche 3).\n// Une valeur qui échoue n'est pas corrigée ni devinée : elle est écartée et comptée.\n// Le pipeline ETL n'a pas le droit de produire une valeur qu'il n'a pas lue.\nconst FENETRE_DEBUT = '2023-01';\nconst SEUIL_VARIATION_ANORMALE = 50;   // en %, entre deux périodes consécutives\n\nconst obs = $input.all().map(i => i.json);\nconst retenues = [];\nconst ecartees = [];\n\nlet precedente = null;\nfor (const o of obs) {\n  const motifs = [];\n  if (!Number.isFinite(o.value))                          motifs.push('valeur non numérique');\n  if (!/^\\d{4}(-\\d{2})?$/.test(o.period))                 motifs.push('format de période invalide');\n  if (o.period < FENETRE_DEBUT)                           motifs.push(\"hors fenêtre d'historique de trois ans\");\n  if (o.value <= 0)                                       motifs.push('indice nul ou négatif');\n  if (precedente && precedente !== 0) {\n    const variation = Math.abs((o.value - precedente) / precedente * 100);\n    if (variation > SEUIL_VARIATION_ANORMALE)             motifs.push('variation anormale de ' + variation.toFixed(1) + ' %');\n  }\n  if (motifs.length) { ecartees.push({ ...o, motifs }); }\n  else { retenues.push(o); precedente = o.value; }\n}\n\nif (retenues.length === 0) {\n  throw new Error('Toutes les observations ont été écartées par les contrôles qualité : ' + JSON.stringify(ecartees.slice(0, 3)));\n}\n\n// Le bilan de contrôle voyage avec chaque observation : il sera consigné à la clôture du run.\nconst bilan = { retenues: retenues.length, ecartees: ecartees.length, detail_ecartees: ecartees };\nreturn retenues.map(o => ({ json: { ...o, _bilan: bilan } }));"
+      },
+      "name": "Contrôles qualité déterministes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO indicator_values (indicator_id, run_id, period, geo, value, obtained_by, validation_status, raw_ref)\nVALUES ($1, $2, $3, $4, $5, 'etl', 'valide_source', $6)\nON CONFLICT (indicator_id, run_id, period, geo) DO NOTHING\nRETURNING value_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.value, $json.raw_ref] }}"
+        }
+      },
+      "name": "Écrire au registre",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1180, 400],
+      "notes": "Statuts écrits en dur dans la requête, non calculés : par construction, ce pipeline ne peut produire que du 'etl' / 'valide_source'. La contrainte chk_hierarchie_controle rejetterait toute autre combinaison — la règle est tenue par la base, pas par la vigilance du workflow."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs\n   SET status = CASE WHEN $2::int = 0 THEN 'partiel' ELSE 'ok' END,\n       closed_at = now(),\n       note = $3\n WHERE run_id = $1\nRETURNING run_id, status, closed_at, note;",
+        "options": {
+          "queryReplacement": "={{ [ $('Ouvrir le run').first().json.run_id, $('Écrire au registre').all().length, 'A5 Eurostat — ' + $('Écrire au registre').all().length + ' observation(s) écrite(s), ' + ($('Contrôles qualité déterministes').first().json._bilan?.ecartees ?? 0) + ' écartée(s) par les contrôles qualité' ] }}"
+        }
+      },
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1420, 400],
+      "executeOnce": true,
+      "notes": "La note du run consigne le bilan des contrôles. Un run clos sans note d'écart est un run dont on ne sait pas s'il a tout collecté."
+    }
+  ],
+  "connections": {
+    "Déclencheur mensuel": { "main": [[ { "node": "Ouvrir le run", "type": "main", "index": 0 } ]] },
+    "Ouvrir le run": { "main": [[ { "node": "API Eurostat (sts_inpr_m, NACE C29)", "type": "main", "index": 0 } ]] },
+    "API Eurostat (sts_inpr_m, NACE C29)": { "main": [[ { "node": "Sérialiser la réponse brute", "type": "main", "index": 0 } ]] },
+    "Sérialiser la réponse brute": { "main": [[ { "node": "Déposer en zone brute", "type": "main", "index": 0 } ]] },
+    "Déposer en zone brute": { "main": [[ { "node": "Normaliser (JSON-stat → observations)", "type": "main", "index": 0 } ]] },
+    "Normaliser (JSON-stat → observations)": { "main": [[ { "node": "Contrôles qualité déterministes", "type": "main", "index": 0 } ]] },
+    "Contrôles qualité déterministes": { "main": [[ { "node": "Écrire au registre", "type": "main", "index": 0 } ]] },
+    "Écrire au registre": { "main": [[ { "node": "Clôturer le run", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

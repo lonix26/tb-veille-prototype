@@ -1,0 +1,9 @@
+# Zone de dépôt brut
+#
+# Les réponses d'API et les documents sont conservés ici tels que reçus,
+# sous data/staging/. Contenu exclu du versionnement (voir .gitignore) :
+# il gonfle vite et se régénère par ré-exécution.
+#
+# Exception : les fichiers bruts du run de référence cité dans le rapport
+# sont la preuve d'audit exigée par E6. Les archiver dans annexes/ au
+# moment de figer le rapport, avec `git add -f`.

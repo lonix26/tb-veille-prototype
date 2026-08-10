@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veille économique — maquette de conception</title>
+<style>
+  :root{
+    --fond:#f6f7f9; --carte:#fff; --trait:#e3e6ea; --texte:#1c2126; --doux:#6b7684;
+    --hausse:#1b7a4b; --baisse:#b23b3b; --plat:#8a6d1f;
+    --sr:#1b7a4b; --sr-f:#e8f3ec; --pc:#8a6d1f; --pc-f:#fbf3dd; --vh:#2f5fa8; --vh-f:#e8eef8; --at:#6b7684; --at-f:#eef0f2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fond);color:var(--texte);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .bandeau{background:#fff6e5;border-bottom:1px solid #e8d6ac;padding:10px 24px;font-size:13px;color:#6d5416}
+  header{background:#fff;border-bottom:1px solid var(--trait);padding:18px 24px 0}
+  h1{margin:0 0 2px;font-size:19px;font-weight:650}
+  .sous{color:var(--doux);font-size:13px;margin-bottom:14px}
+  nav{display:flex;gap:2px;flex-wrap:wrap}
+  nav button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 14px;
+             font:inherit;font-size:14px;color:var(--doux);cursor:pointer;border-radius:4px 4px 0 0}
+  nav button:hover{background:#f2f4f6;color:var(--texte)}
+  nav button.actif{color:var(--texte);border-bottom-color:var(--texte);font-weight:600}
+  main{padding:22px 24px 60px;max-width:1180px}
+  section{display:none} section.actif{display:block}
+  h2{font-size:16px;font-weight:650;margin:0 0 4px}
+  .intro{color:var(--doux);font-size:13.5px;margin:0 0 18px;max-width:760px}
+  .grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+  .carte{background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:16px}
+  .carte h3{margin:0 0 10px;font-size:15px;font-weight:650;display:flex;justify-content:space-between;align-items:center}
+  .dir{font-size:12.5px;font-weight:650;padding:3px 9px;border-radius:20px}
+  .dir.h{color:var(--hausse);background:#e8f3ec} .dir.b{color:var(--baisse);background:#f8eaea} .dir.p{color:var(--plat);background:#fbf3dd}
+  .pilote{font-size:24px;font-weight:660;letter-spacing:-.4px}
+  .unite{font-size:12.5px;color:var(--doux);margin-bottom:10px}
+  .ligne{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0;border-top:1px solid var(--trait)}
+  .ligne span:first-child{color:var(--doux)}
+  .chg{margin-top:10px;padding:9px 11px;background:#f6f7f9;border-radius:7px;font-size:12.5px;line-height:1.5}
+  .chg b{font-weight:620}
+  .b{display:inline-block;font-size:11px;font-weight:620;padding:2px 7px;border-radius:4px;white-space:nowrap}
+  .b.sr{color:var(--sr);background:var(--sr-f)} .b.pc{color:var(--pc);background:var(--pc-f)}
+  .b.vh{color:var(--vh);background:var(--vh-f)} .b.at{color:var(--at);background:var(--at-f)}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--trait);border-radius:10px;overflow:hidden;font-size:13.5px}
+  th{text-align:left;padding:10px 12px;background:#f2f4f6;font-weight:620;font-size:12.5px;color:var(--doux);border-bottom:1px solid var(--trait)}
+  td{padding:10px 12px;border-bottom:1px solid var(--trait);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .h{color:var(--hausse)} .ba{color:var(--baisse)}
+  a{color:var(--vh)}
+  .barre{height:7px;background:#eceef1;border-radius:4px;overflow:hidden;margin-top:5px}
+  .barre i{display:block;height:100%;background:var(--texte)}
+  .decomp{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;margin:14px 0 4px}
+  .decomp .bloc{background:#f6f7f9;border-radius:8px;padding:12px;text-align:center}
+  .decomp .op{font-size:19px;color:var(--doux);text-align:center}
+  .decomp .val{font-size:19px;font-weight:650} .decomp .lib{font-size:11.5px;color:var(--doux)}
+  .sig{background:#fff;border:1px solid var(--trait);border-radius:10px;padding:13px 15px;margin-bottom:9px}
+  .sig .haut{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:5px}
+  .sig .titre{font-weight:600;font-size:14px} .sig .meta{font-size:12px;color:var(--doux)}
+  .note{font-size:12.5px;color:var(--doux);margin-top:16px;padding-top:12px;border-top:1px solid var(--trait);max-width:820px}
+  .kpi{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:16px}
+  .kpi div span{display:block}
+  .kpi .v{font-size:23px;font-weight:660} .kpi .l{font-size:12.5px;color:var(--doux)}
+</style>
+</head>
+<body>
+
+<div class="bandeau">
+  <b>Maquette de conception.</b> Toutes les valeurs affichées sont <b>fictives et illustratives</b> — aucune n'a été collectée. Ce fichier sert à discuter la structure du tableau de bord, pas à présenter des résultats.
+</div>
+
+<header>
+  <h1>Veille économique — marchés cibles</h1>
+  <div class="sous">Profil : PME de mécanique de précision, sous-traitance multi-secteurs · Exécution n° 7 du 4 août 2026 · précédente : 4 mai 2026</div>
+  <nav>
+    <button class="actif" data-vue="verdict">Verdict</button>
+    <button data-vue="portefeuille">Arbitrage de portefeuille</button>
+    <button data-vue="demande">Demande adressable</button>
+    <button data-vue="clients">Donneurs d'ordre</button>
+    <button data-vue="signaux">Signaux</button>
+    <button data-vue="contexte">Socle transversal</button>
+    <button data-vue="fiabilite">Fiabilité</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============ VERDICT ============ -->
+<section id="verdict" class="actif">
+  <h2>Verdict par marché</h2>
+  <p class="intro">Un écran, quatre décisions. Chaque carte porte une direction, l'horizon sur lequel elle vaut, le niveau de confiance et sa base, puis ce qui a changé depuis l'exécution précédente. Le reste du tableau de bord est de la profondeur de consultation.</p>
+
+  <div class="grille">
+    <div class="carte">
+      <h3>Horlogerie <span class="dir p">→ Plateau</span></h3>
+      <div class="pilote">−1,7 %</div>
+      <div class="unite">Exportations en valeur, 12 mois glissants</div>
+      <div class="ligne"><span>Volume en unités</span><span class="ba">−7,4 %</span></div>
+      <div class="ligne"><span>Horizon du jugement</span><span>6 à 12 mois</span></div>
+      <div class="ligne"><span>Confiance</span><span><span class="b sr">Élevée</span></span></div>
+      <div class="ligne"><span>Base</span><span>3 indicateurs certifiés</span></div>
+      <div class="chg"><b>Depuis mai :</b> l'écart entre valeur et unités s'est creusé de 2,1 points. Le marché ne recule pas, il se déplace vers le haut de gamme — moins de pièces, plus complexes.</div>
+    </div>
+
+    <div class="carte">
+      <h3>Médical <span class="dir h">↗ Expansion</span></h3>
+      <div class="pilote">+6,2 %</div>
+      <div class="unite">Demande adressable estimée, glissement annuel</div>
+      <div class="ligne"><span>Autorisations de mise sur le marché</span><span class="h">+14 %</span></div>
+      <div class="ligne"><span>Horizon du jugement</span><span>12 à 24 mois</span></div>
+      <div class="ligne"><span>Confiance</span><span><span class="b sr">Élevée</span></span></div>
+      <div class="ligne"><span>Base</span><span>4 indicateurs, 2 avancés</span></div>
+      <div class="chg"><b>Depuis mai :</b> trois annonces d'investissement industriel en Irlande et au Costa Rica. Signal de demande de sous-traitance à 12-24 mois.</div>
+    </div>
+
+    <div class="carte">
+      <h3>Automobile <span class="dir b">↘ Contraction</span></h3>
+      <div class="pilote">−4,8 %</div>
+      <div class="unite">Demande adressable estimée, glissement annuel</div>
+      <div class="ligne"><span>Volume de véhicules</span><span class="h">+3,9 %</span></div>
+      <div class="ligne"><span>Contenu usiné par véhicule</span><span class="ba">−8,4 %</span></div>
+      <div class="ligne"><span>Confiance</span><span><span class="b pc">Moyenne</span></span></div>
+      <div class="ligne"><span>Base</span><span>hypothèse de contenu assumée</span></div>
+      <div class="chg"><b>Point d'attention :</b> le volume progresse mais la demande adressable recule. La bascule du mix de motorisation retire plus de pièces que la croissance n'en ajoute — <b>l'indicateur de volume donne ici le signal inverse du bon</b>.</div>
+    </div>
+
+    <div class="carte">
+      <h3>Aérospatial <span class="dir h">↗ Expansion</span></h3>
+      <div class="pilote">+11,3 %</div>
+      <div class="unite">Carnet de commandes consolidé, glissement annuel</div>
+      <div class="ligne"><span>Cadences annoncées</span><span class="h">en hausse</span></div>
+      <div class="ligne"><span>Horizon du jugement</span><span>24 à 60 mois</span></div>
+      <div class="ligne"><span>Confiance</span><span><span class="b sr">Élevée</span></span></div>
+      <div class="ligne"><span>Base</span><span>2 constructeurs, source primaire</span></div>
+      <div class="chg"><b>Depuis mai :</b> relèvement de cadence annoncé sur un programme monocouloir. Visibilité pluriannuelle sur la charge de la chaîne de sous-traitance.</div>
+    </div>
+  </div>
+
+  <p class="note">Conception : la direction affichée n'est jamais calculée par un modèle de langage. Elle résulte d'une règle déterministe appliquée aux indicateurs pilotes ; le commentaire, lui, est rédigé par un modèle à partir des seuls chiffres affichés, puis relu avant publication.</p>
+</section>
+
+<!-- ============ ARBITRAGE DE PORTEFEUILLE ============ -->
+<section id="portefeuille">
+  <h2>Arbitrage de portefeuille</h2>
+  <p class="intro">La transversalité sous son second visage. Le socle transversal sert à <em>interpréter</em> un mouvement sectoriel ; cet écran sert à <em>arbitrer entre</em> les secteurs. Pour une entreprise présente sur quatre marchés, c'est la décision de capacité et de prospection — celle qu'aucune vue sectorielle ne permet de prendre.</p>
+
+  <div class="carte" style="margin-bottom:14px">
+    <h3>Exposition actuelle confrontée à la dynamique du marché</h3>
+    <table style="border:0;border-radius:0">
+      <thead><tr><th>Marché</th><th class="num">Part du chiffre d'affaires</th><th class="num">Demande adressable</th><th>Lecture</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Automobile</b></td>
+          <td class="num">38 %<div class="barre"><i style="width:38%"></i></div></td>
+          <td class="num ba">−4,8 %</td>
+          <td><span class="b pc">Exposition à réduire</span> — première part du portefeuille sur le seul marché en contraction</td>
+        </tr>
+        <tr>
+          <td><b>Horlogerie</b></td>
+          <td class="num">31 %<div class="barre"><i style="width:31%"></i></div></td>
+          <td class="num">−1,7 %</td>
+          <td><span class="b at">Maintenir</span> — recul en valeur, mais montée en complexité favorable au métier</td>
+        </tr>
+        <tr>
+          <td><b>Médical</b></td>
+          <td class="num">19 %<div class="barre"><i style="width:19%"></i></div></td>
+          <td class="num h">+6,2 %</td>
+          <td><span class="b sr">Développer</span> — croissance structurelle, part encore faible</td>
+        </tr>
+        <tr>
+          <td><b>Aérospatial</b></td>
+          <td class="num">12 %<div class="barre"><i style="width:12%"></i></div></td>
+          <td class="num h">+11,3 %</td>
+          <td><span class="b sr">Développer</span> — plus forte dynamique, plus faible exposition, visibilité pluriannuelle</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="chg"><b>Lecture d'ensemble :</b> 69 % du chiffre d'affaires reposent sur les deux marchés les moins dynamiques, et 31 % sur les deux qui croissent. Le portefeuille est orienté à l'inverse des dynamiques observées — c'est le constat que quatre vues sectorielles séparées ne produisent jamais.</div>
+  </div>
+
+  <div class="carte" style="margin-bottom:14px">
+    <h3>Trajectoire sur les sept dernières exécutions</h3>
+    <p class="intro" style="margin-bottom:10px">Demande adressable, glissement annuel. C'est ici que l'accumulation d'exécutions datées produit sa valeur : une photographie ne dit rien, une trajectoire oriente une décision.</p>
+    <svg viewBox="0 0 640 190" style="width:100%;height:auto" role="img" aria-label="Trajectoire de la demande adressable par secteur sur sept exécutions">
+      <line x1="40" y1="95" x2="620" y2="95" stroke="#d7dbe0" stroke-width="1"/>
+      <text x="8" y="30" font-size="10" fill="#6b7684">+12 %</text>
+      <text x="14" y="99" font-size="10" fill="#6b7684">0</text>
+      <text x="8" y="170" font-size="10" fill="#6b7684">−12 %</text>
+      <polyline points="40,140 137,133 234,127 331,120 428,112 525,104 620,96" fill="none" stroke="#1b7a4b" stroke-width="2.5"/>
+      <polyline points="40,88 137,84 234,80 331,74 428,66 525,58 620,29" fill="none" stroke="#2f5fa8" stroke-width="2.5"/>
+      <polyline points="40,92 137,96 234,99 331,101 428,104 525,106 620,105" fill="none" stroke="#8a6d1f" stroke-width="2.5"/>
+      <polyline points="40,86 137,92 234,99 331,107 428,114 525,121 620,124" fill="none" stroke="#b23b3b" stroke-width="2.5"/>
+      <text x="628" y="99" font-size="10" fill="#1b7a4b" text-anchor="end" dy="-56">Médical</text>
+      <text x="628" y="33" font-size="10" fill="#2f5fa8" text-anchor="end">Aérospatial</text>
+      <text x="628" y="109" font-size="10" fill="#8a6d1f" text-anchor="end">Horlogerie</text>
+      <text x="628" y="128" font-size="10" fill="#b23b3b" text-anchor="end">Automobile</text>
+      <text x="40" y="185" font-size="10" fill="#6b7684">run 1</text>
+      <text x="600" y="185" font-size="10" fill="#6b7684">run 7</text>
+    </svg>
+    <div class="chg">Les quatre marchés divergent depuis le run 3. L'écartement entre l'aérospatial et l'automobile — près de vingt points — s'est constitué progressivement : aucune exécution isolée ne l'aurait rendu visible.</div>
+  </div>
+
+  <p class="note">Une réserve de conception à assumer : la colonne « part du chiffre d'affaires » ne relève pas de l'OSINT. C'est une donnée interne à l'entreprise, la seule de tout le dispositif. Elle est aussi ce qui transforme une veille de marché générique en veille <em>personnelle</em> — et l'écran le plus décisif du tableau de bord tient à cette unique saisie. Le compromis mérite d'être discuté explicitement : sans elle, on affiche des dynamiques ; avec elle, on affiche un risque.</p>
+</section>
+
+<!-- ============ DEMANDE ADRESSABLE ============ -->
+<section id="demande">
+  <h2>Demande adressable de pièces usinées</h2>
+  <p class="intro">L'écran qui distingue ce dispositif d'un tableau de bord sectoriel. La santé d'un secteur n'est pas la demande d'un sous-traitant : il faut multiplier le volume par le contenu usiné unitaire. Les deux termes évoluent souvent en sens contraire.</p>
+
+  <div class="carte" style="margin-bottom:14px">
+    <h3>Automobile — la décomposition qui change la lecture</h3>
+    <div class="decomp">
+      <div class="bloc"><div class="val">96,4 M</div><div class="lib">véhicules produits</div><div class="barre"><i style="width:78%"></i></div></div>
+      <div class="op">×</div>
+      <div class="bloc"><div class="val">indice 71</div><div class="lib">contenu usiné moyen<br>(base 100 en 2019)</div><div class="barre"><i style="width:51%"></i></div></div>
+      <div class="op">=</div>
+      <div class="bloc"><div class="val ba">−4,8 %</div><div class="lib">demande adressable<br>glissement annuel</div></div>
+    </div>
+    <div class="chg">Le contenu usiné recule parce que la part électrique passe de 18 % à 23 % du mix : une motorisation électrique mobilise sensiblement moins de pièces de précision qu'une motorisation thermique. <b>Hypothèse de conversion assumée et documentée</b> — c'est une estimation, affichée comme telle, et le niveau de confiance de la carte le reflète.</div>
+  </div>
+
+  <table>
+    <thead><tr><th>Secteur</th><th class="num">Volume</th><th class="num">Contenu unitaire</th><th class="num">Demande adressable</th><th>Fiabilité</th></tr></thead>
+    <tbody>
+      <tr><td>Horlogerie</td><td class="num ba">−7,4 %</td><td class="num h">+6,1 %</td><td class="num">−1,7 %</td><td><span class="b sr">Source</span></td></tr>
+      <tr><td>Médical</td><td class="num h">+4,8 %</td><td class="num h">+1,3 %</td><td class="num h">+6,2 %</td><td><span class="b sr">Source</span></td></tr>
+      <tr><td>Automobile</td><td class="num h">+3,9 %</td><td class="num ba">−8,4 %</td><td class="num ba">−4,8 %</td><td><span class="b pc">Estimé</span></td></tr>
+      <tr><td>Aérospatial</td><td class="num h">+9,7 %</td><td class="num">+1,5 %</td><td class="num h">+11,3 %</td><td><span class="b sr">Source</span></td></tr>
+    </tbody>
+  </table>
+  <p class="note">Lecture croisée : sur quatre marchés, un seul voit sa demande adressable évoluer dans le même sens que son volume. C'est l'argument central en faveur d'un indicateur d'intensité.</p>
+</section>
+
+<!-- ============ DONNEURS D'ORDRE ============ -->
+<section id="clients">
+  <h2>Donneurs d'ordre — signaux d'activité</h2>
+  <p class="intro">L'écran le plus directement actionnable : la veille ne s'achève que lorsqu'elle désigne une entreprise nommée, située, dont on sait qu'elle investit. Ce graphe est construit et entretenu par l'IA — aucune source structurée ne l'expose, et aucune PME ne le maintient à la main.</p>
+
+  <table>
+    <thead><tr><th>Entreprise</th><th>Secteur</th><th>Pays</th><th>Signal détecté</th><th>Horizon</th><th>Statut</th></tr></thead>
+    <tbody>
+      <tr><td>Fabricant medtech A</td><td>Médical</td><td>Irlande</td><td>Annonce d'extension de site de production</td><td>12-24 mois</td><td><span class="b vh">Validé</span></td></tr>
+      <tr><td>Équipementier rang 1 B</td><td>Automobile</td><td>Allemagne</td><td>Plan d'investissement transmission électrique</td><td>12-18 mois</td><td><span class="b vh">Validé</span></td></tr>
+      <tr><td>Groupe horloger C</td><td>Horlogerie</td><td>Suisse</td><td>Internalisation annoncée de composants</td><td>6-12 mois</td><td><span class="b pc">Consensus</span></td></tr>
+      <tr><td>Motoriste aéronautique D</td><td>Aérospatial</td><td>France</td><td>Relèvement de cadence sur programme</td><td>18-36 mois</td><td><span class="b vh">Validé</span></td></tr>
+      <tr><td>Fabricant medtech E</td><td>Médical</td><td>Costa Rica</td><td>Autorisation de mise sur le marché obtenue</td><td>6-18 mois</td><td><span class="b at">À valider</span></td></tr>
+    </tbody>
+  </table>
+  <p class="note">Le signal « internalisation annoncée » est un <b>risque</b>, pas une opportunité : le dispositif doit remonter les deux avec la même diligence. Un outil de veille qui ne détecte que de bonnes nouvelles n'est pas un outil de veille.</p>
+</section>
+
+<!-- ============ SIGNAUX ============ -->
+<section id="signaux">
+  <h2>Signaux qualitatifs</h2>
+  <p class="intro">Flux non structurés classés selon une taxonomie figée : nature, secteur, horizon, confiance. C'est la réponse directe à l'infobésité — le volume est le verrou que l'IA lève, et le tri est ce qu'aucun ETL ne sait faire.</p>
+
+  <div class="sig">
+    <div class="haut"><span class="titre">Relèvement de cadence annoncé sur un programme monocouloir</span><span class="b sr">Opportunité</span><span class="b vh">Validé</span></div>
+    <div class="meta">Aérospatial · horizon 18-36 mois · source primaire, conférence de résultats · 28.07.2026</div>
+  </div>
+  <div class="sig">
+    <div class="haut"><span class="titre">Durcissement du calendrier de certification européenne des dispositifs médicaux</span><span class="b pc">Risque</span><span class="b vh">Validé</span></div>
+    <div class="meta">Médical · horizon 6-12 mois · organisme notifié · 21.07.2026</div>
+  </div>
+  <div class="sig">
+    <div class="haut"><span class="titre">Trois annonces d'investissement industriel medtech en zone euro</span><span class="b sr">Opportunité</span><span class="b pc">Consensus 3 modèles</span></div>
+    <div class="meta">Médical · horizon 12-24 mois · communiqués d'entreprise · 15-24.07.2026</div>
+  </div>
+  <div class="sig">
+    <div class="haut"><span class="titre">Aucune publication du communiqué mensuel attendu d'une source suivie</span><span class="b at">Signal négatif</span><span class="b at">À vérifier</span></div>
+    <div class="meta">Transversal · détecté par absence · échéance dépassée de 9 jours</div>
+  </div>
+  <p class="note">Le dernier élément illustre la détection d'<b>absence de signal attendu</b> : une source qui cesse de publier, un client qui n'annonce plus rien. Rarement instrumenté, souvent le plus précoce.</p>
+</section>
+
+<!-- ============ CONTEXTE ============ -->
+<section id="contexte">
+  <h2>Socle transversal — attribution</h2>
+  <p class="intro">Indicateurs communs aux quatre secteurs. Sans référentiel partagé, un mouvement sectoriel est ininterprétable : un recul se lit différemment selon que le commerce mondial recule aussi ou progresse. Cet écran répond à une seule question — ce que j'observe est-il propre au secteur, ou général ?</p>
+
+  <table>
+    <thead><tr><th>Indicateur</th><th class="num">Valeur</th><th class="num">Variation</th><th>Rôle d'attribution</th><th>Fiabilité</th></tr></thead>
+    <tbody>
+      <tr><td>Commerce mondial de marchandises (volume)</td><td class="num">indice 104,2</td><td class="num h">+1,8 %</td><td>Référentiel sectoriel contre général</td><td><span class="b sr">Source</span></td></tr>
+      <tr><td>Indicateur composite avancé, zone OCDE</td><td class="num">99,4</td><td class="num ba">−0,3</td><td>Anticipation des retournements de cycle</td><td><span class="b sr">Source</span></td></tr>
+      <tr><td>Taux de change effectif réel du franc</td><td class="num">indice 112,7</td><td class="num h">+3,1 %</td><td>Compétitivité-prix face à l'ensemble des concurrents</td><td><span class="b sr">Source</span></td></tr>
+      <tr><td>Croissance du PIB mondial</td><td class="num">2,9 %</td><td class="num">stable</td><td>Toile de fond de la demande</td><td><span class="b sr">Source</span></td></tr>
+    </tbody>
+  </table>
+  <p class="note">Lecture du run : le commerce mondial progresse de 1,8 % pendant que les exportations horlogères reculent de 1,7 %. La sous-performance est donc <b>propre au secteur</b>, non imputable à la conjoncture — conclusion impossible à tirer d'une grille purement sectorielle.</p>
+</section>
+
+<!-- ============ FIABILITÉ ============ -->
+<section id="fiabilite">
+  <h2>Fiabilité du dispositif</h2>
+  <p class="intro">Rendre visible sa propre faillibilité est un choix de conception, non un aveu : c'est ce qui autorise un décideur à faire confiance au reste. Cet écran est le seul du tableau de bord qui parle du système lui-même.</p>
+
+  <div class="kpi">
+    <div><span class="v">87 %</span><span class="l">valeurs issues directement d'une source</span></div>
+    <div><span class="v">11 %</span><span class="l">extraites par IA, consensus unanime</span></div>
+    <div><span class="v">2 %</span><span class="l">arbitrées par validation humaine</span></div>
+    <div><span class="v">6 %</span><span class="l">taux de correction humaine observé</span></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Contrôle</th><th>Ce qu'il garantit</th><th class="num">Ce run</th></tr></thead>
+    <tbody>
+      <tr><td>Confrontation à la vérité terrain</td><td>Toute valeur disponible en source structurée est vérifiée contre elle</td><td class="num">42 / 42</td></tr>
+      <tr><td>Consensus multi-modèles</td><td>Mobilisé uniquement là où aucune vérité terrain n'existe</td><td class="num">9 / 11</td></tr>
+      <tr><td>Validation humaine</td><td>Tout désaccord entre modèles, tout commentaire publié</td><td class="num">2 arbitrages</td></tr>
+      <tr><td>Sources en défaut</td><td>Détection des sources qui cessent de publier</td><td class="num">1</td></tr>
+    </tbody>
+  </table>
+  <p class="note">La hiérarchie est lisible dans les chiffres : la vérité terrain d'abord, le consensus seulement à défaut, la validation humaine en dernier recours. Le taux de correction humaine est la métrique qui conditionne tout allègement futur de la supervision — tant qu'il n'est pas mesuré dans la durée, aucun contrôle n'est levé.</p>
+</section>
+
+</main>
+
+<script>
+  const onglets = document.querySelectorAll('nav button');
+  onglets.forEach(b => b.addEventListener('click', () => {
+    onglets.forEach(x => x.classList.remove('actif'));
+    document.querySelectorAll('main section').forEach(s => s.classList.remove('actif'));
+    b.classList.add('actif');
+    document.getElementById(b.dataset.vue).classList.add('actif');
+  }));
+</script>
+</body>
+</html>
