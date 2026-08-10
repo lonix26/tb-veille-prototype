@@ -140,6 +140,53 @@
   h2{font-size:15px;margin:26px 0 10px}
   h2:first-child{margin-top:0}
 </style>
+<style id="peau-v2">
+  /* Portage visuel de la maquette v2 (validée le 10.08.2026) — couche de
+     peau posée par-dessus les styles d'origine, sans toucher à la logique
+     de données. Référence : prototype/maquette_v2_tableau_de_bord.html. */
+  :root{
+    --encre:#16222E; --gris:#66717D; --gris-clair:#98A1AA; --filet:#E2E5E9;
+    --fond:#F4F5F7; --blanc:#FFFFFF;
+    --vert:#1F7A4D; --vert-fond:#E3F2E8;
+    --ambre:#8A6118; --ambre-fond:#FCF2DC;
+    --rouge:#A63A2B; --rouge-fond:#FAE3DF;
+    --violet:#54467B; --violet-fond:#ECE8F5;
+    --bleu:#2C5F8A; --bleu-fond:#E4EEF6;
+  }
+  body{font:13.5px/1.55 "Inter","Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif;
+       color:#2B3947}
+  header{background:var(--blanc);color:var(--encre);padding:22px 28px 12px}
+  header h1{font-size:19px;font-weight:650;letter-spacing:-.2px}
+  header .meta{color:var(--gris)}
+  .bandeau{margin:14px 28px 0;border:1px solid var(--filet);border-radius:12px;
+           box-shadow:0 1px 2px rgba(20,30,40,.04);padding:16px 20px}
+  nav{background:transparent;border-bottom:0;padding:14px 28px 2px;gap:6px}
+  nav button{border:1px solid var(--filet);background:var(--blanc);border-radius:99px;
+             padding:7px 15px;font-weight:550}
+  nav button.actif{background:var(--encre);border-color:var(--encre);color:#fff}
+  main{padding:20px 28px 60px;max-width:1240px}
+  .carte{border-radius:12px;padding:18px 20px 14px;box-shadow:0 1px 2px rgba(20,30,40,.04)}
+  .cartes{grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+  .c-titre{font-size:14.5px}
+  .c-quoi{font-size:11.5px;color:var(--gris);margin:3px 0 10px;line-height:1.5;max-width:640px}
+  .c-val{font-size:30px;letter-spacing:-.5px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .delta{font-size:12px;font-weight:650;padding:3px 9px;border-radius:99px;white-space:nowrap}
+  .d-hausse{background:var(--vert-fond);color:var(--vert)}
+  .d-baisse{background:var(--rouge-fond);color:var(--rouge)}
+  .d-neutre{background:#EEF0F2;color:var(--gris)}
+  .etiq{border-radius:99px}
+  .lecture{background:var(--bleu-fond);border:1px solid #CCDDEC;border-left:1px solid #CCDDEC;
+           border-radius:12px;padding:14px 18px}
+  .lecture .l-txt{color:var(--encre)}
+  .lecture .l-org{color:var(--bleu);opacity:.8}
+  .sig{border-radius:8px;padding:8px 12px;max-width:460px;color:#2B3947}
+  .sig strong{color:var(--encre)}
+  .qv-tete{border-left:0;padding-left:0}
+  .qv-q{font-size:14.5px}
+  .z-barre{height:18px;border-radius:4px}
+  .z-barre i{background:var(--bleu);opacity:.85;border-radius:4px}
+  svg.spark{margin-top:10px}
+</style>
 </head>
 <body>
 
@@ -182,6 +229,21 @@ const nbAuto = v => {
   return Number(v).toLocaleString("fr-CH", {minimumFractionDigits: d, maximumFractionDigits: d});
 };
 
+// POURCENTAGES SANS DÉCIMALES FORCÉES. nbAuto appliqué à un seuil de 5 %
+// produisait « 5,000 % » — trois décimales sous 10, lisible comme cinq mille
+// pour cent. Un formatage conçu pour les taux de change appliqué à un
+// pourcentage fabriquait une valeur fausse pour son lecteur : le défaut
+// exact que nbAuto devait corriger.
+const pctNu = v => v === null || v === undefined || isNaN(v) ? "—"
+  : Number(v).toLocaleString("fr-CH", {maximumFractionDigits: 1}) + " %";
+
+// AGRÉGATS MONDE. Un agrégat mondial glissé parmi les pays d'un classement
+// double le total et fausse toutes les parts. La liste est une convention de
+// la page ; la vraie résolution est la nomenclature géographique normalisée
+// notée en limite au § 10.6 — un attribut de la base, pas une devinette
+// d'affichage.
+const estAgregatMonde = g => ["WORLD", "W00", "OWID_WRL"].includes(String(g));
+
 // UNITÉ ADDITIVE OU NON. Une part de panier ne se calcule que sur une grandeur
 // extensive : additionner des exportations a un sens, additionner deux taux de
 // change ou deux indices n'en a aucun. La distinction commande la forme de
@@ -199,26 +261,63 @@ const estAdditive = unit => !/indice|taux|pourcentage|qualitatif/i.test(String(u
 // exemple — serait une meilleure lecture encore, mais il relève d'un attribut
 // du référentiel à saisir source par source, pas d'une convention devinée
 // dans la page. Limite énoncée, non contournée.
-function spark(serie, ref = null, L = 300, H = 42) {
+// Portage v2 (10.08.2026) : le sparkline de 42 px montrait une forme, pas
+// une évolution — ni axes, ni dates, ni valeurs. Le graphique porte
+// désormais une grille avec niveaux, les années aux mois de janvier, la
+// valeur du dernier point annotée, et la ligne de référence en pointillé.
+function spark(serie, ref = null, refLabel = "") {
   if (!serie || serie.length < 2) return "";
-  const v = serie.map(p => p.value);
+  const W = 620, H = 170, mg = {t: 14, r: 52, b: 22, l: 8};
+  const iw = W - mg.l - mg.r, ih = H - mg.t - mg.b;
   const refValide = ref !== null && ref !== undefined && !isNaN(ref);
-  const bornes = refValide ? v.concat([Number(ref)]) : v;
-  const min = Math.min(...bornes), max = Math.max(...bornes), amp = (max - min) || 1;
-  const y = val => H - 4 - ((val - min) / amp) * (H - 8);
-  const pts = serie.map((p, i) => [(i / (serie.length - 1)) * (L - 2) + 1, y(p.value)]);
-  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
-  const dernier = pts[pts.length - 1];
-  const ligneRef = refValide
-    ? `<line x1="1" x2="${L - 1}" y1="${y(Number(ref)).toFixed(1)}" y2="${y(Number(ref)).toFixed(1)}"
-             stroke="#8A9199" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`
-    : "";
-  return `<svg class="spark" width="100%" height="${H}" viewBox="0 0 ${L} ${H}" preserveAspectRatio="none"
-    role="img" aria-label="Évolution sur ${serie.length} périodes, de ${esc(serie[0].period)} à ${esc(serie[serie.length-1].period)}">
-    ${ligneRef}
-    <path d="${d}" fill="none" stroke="#1C2733" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
-    <circle cx="${dernier[0].toFixed(1)}" cy="${dernier[1].toFixed(1)}" r="2.6" fill="#1C2733"/>
+  const vals = serie.map(p => p.value);
+  let vmin = Math.min(...vals), vmax = Math.max(...vals);
+  if (refValide) { vmin = Math.min(vmin, Number(ref)); vmax = Math.max(vmax, Number(ref)); }
+  const pad = (vmax - vmin) * 0.12 || 1; vmin -= pad; vmax += pad;
+  const X = i => mg.l + (i / (serie.length - 1)) * iw;
+  const Y = v => mg.t + ih - ((v - vmin) / (vmax - vmin)) * ih;
+
+  let grille = "";
+  for (let k = 0; k <= 3; k++) {
+    const v = vmin + (vmax - vmin) * k / 3, y = Y(v);
+    grille += `<line x1="${mg.l}" x2="${mg.l + iw}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#EDF0F2" stroke-width="1"/>
+      <text x="${W - mg.r + 6}" y="${(y + 3.5).toFixed(1)}" font-size="9.5" fill="#98A1AA">${nbAuto(v)}</text>`;
+  }
+  let axesX = "";
+  serie.forEach((p, i) => {
+    const per = String(p.period);
+    if (per.endsWith("-01") || !per.includes("-")) {
+      axesX += `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${mg.t}" y2="${mg.t + ih}" stroke="#F2F4F6" stroke-width="1"/>
+        <text x="${(X(i) + 3).toFixed(1)}" y="${H - 7}" font-size="9.5" fill="#98A1AA">${esc(per.slice(0, 4))}</text>`;
+    }
+  });
+  let ligneRef = "";
+  if (refValide) {
+    const yr = Y(Number(ref));
+    ligneRef = `<line x1="${mg.l}" x2="${mg.l + iw}" y1="${yr.toFixed(1)}" y2="${yr.toFixed(1)}"
+        stroke="#98A1AA" stroke-width="1" stroke-dasharray="4 4"/>
+      ${refLabel ? `<text x="${mg.l + 2}" y="${(yr - 4).toFixed(1)}" font-size="9.5" fill="#98A1AA">${esc(refLabel)}</text>` : ""}`;
+  }
+  const d = serie.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.value).toFixed(1)).join(" ");
+  const aire = d + ` L ${X(serie.length - 1).toFixed(1)} ${mg.t + ih} L ${X(0).toFixed(1)} ${mg.t + ih} Z`;
+  const dp = serie[serie.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" width="100%" role="img"
+      aria-label="Évolution sur ${serie.length} périodes, de ${esc(serie[0].period)} à ${esc(dp.period)}">
+    ${grille}${axesX}${ligneRef}
+    <path d="${aire}" fill="#2C5F8A" opacity=".06"/>
+    <path d="${d}" fill="none" stroke="#2C5F8A" stroke-width="1.8"/>
+    <circle cx="${X(serie.length - 1).toFixed(1)}" cy="${Y(dp.value).toFixed(1)}" r="3.2" fill="#2C5F8A"/>
+    <text x="${(X(serie.length - 1) + 6).toFixed(1)}" y="${(Y(dp.value) + 3.5).toFixed(1)}" font-size="10.5" font-weight="650" fill="#16222E">${nbAuto(dp.value)}</text>
   </svg>`;
+}
+
+// Pastille de variation — le delta en couleur à côté de la valeur.
+function chipVar(met) {
+  if (!met) return "";
+  const v = met.glissement_annuel_pct ?? met.variation_periode_pct;
+  if (v === null || v === undefined || isNaN(v)) return "";
+  const cls = v > 0 ? "d-hausse" : v < 0 ? "d-baisse" : "d-neutre";
+  return `<span class="delta ${cls}">${v > 0 ? "▲" : v < 0 ? "▼" : "＝"} ${pct(v)}</span>`;
 }
 
 const badgeStatut = s => s === "certifie"
@@ -292,15 +391,15 @@ function ligneSeuil(met) {
       n'est calculable pour cet indicateur (RI4 inapplicable).</div>`;
   }
   if (ref === null || ref === undefined || isNaN(ref)) {
-    return `<div class="c-seuil">Seuil de matérialité <b>${nbAuto(seuil)} %</b> — variation
+    return `<div class="c-seuil">Seuil de matérialité <b>${pctNu(seuil)}</b> — variation
       indisponible, position au seuil indéterminable.</div>`;
   }
   const ecart = Math.abs(Number(ref)) - Number(seuil);
   return ecart >= 0
-    ? `<div class="c-seuil">Seuil de matérialité ${nbAuto(seuil)} % — <b class="baisse">franchi</b>,
-       ${nbAuto(Math.abs(ref))} % en valeur absolue.</div>`
-    : `<div class="c-seuil">Seuil de matérialité ${nbAuto(seuil)} % — <b>sous le seuil</b>,
-       à ${nbAuto(-ecart)} point(s) de son franchissement.</div>`;
+    ? `<div class="c-seuil">Seuil de matérialité ${pctNu(seuil)} — <b class="baisse">franchi</b>,
+       ${pctNu(Math.abs(ref))} en valeur absolue.</div>`
+    : `<div class="c-seuil">Seuil de matérialité ${pctNu(seuil)} — <b>sous le seuil</b>,
+       à ${pctNu(-ecart).replace(" %", "")} point(s) de son franchissement.</div>`;
 }
 
 // Classement multi-zones : barres horizontales triées, part du panier,
@@ -320,7 +419,7 @@ function ligneSeuil(met) {
 // manquants. La fraîcheur d'un indicateur multi-pays est celle de son
 // déclarant le plus lent.
 function classementZones(ind, zones) {
-  const zonesReelles = zones.filter(g => g !== "WORLD" && g !== "W00");
+  const zonesReelles = zones.filter(g => !estAgregatMonde(g));
   if (!zonesReelles.length) return "";
 
   // Périodes couvertes par chaque zone, puis dernière période commune.
@@ -405,7 +504,7 @@ function classementZones(ind, zones) {
 // La forme retenue compare des niveaux côte à côte, sans barre proportionnelle
 // et sans part, et énonce pourquoi.
 function comparaisonNiveaux(ind, zones) {
-  const zonesReelles = zones.filter(g => g !== "WORLD" && g !== "W00");
+  const zonesReelles = zones.filter(g => !estAgregatMonde(g));
   if (!zonesReelles.length) return "";
 
   const parZone = zonesReelles.map(g => {
@@ -459,13 +558,17 @@ function mentionRun(ind) {
 
 function carte(ind) {
   const zones = zonesDe(ind);
-  const multiZones = zones.filter(g => g !== "WORLD" && g !== "W00").length > 1;
+  const multiZones = zones.filter(g => !estAgregatMonde(g)).length > 1;
 
+  // La ligne « ce qu'il indique » vient de la base (indicators.description_metier,
+  // migration du 10.08). Si la colonne n'est pas encore servie par l'API, la
+  // ligne est simplement absente — jamais de texte métier en dur dans la page.
   const tete = `<div class="c-tete">
       <span class="c-code">${esc(ind.indicator_id)} · ${esc(ind.category === "hard" ? "donnée officielle" : "composite")}</span>
       ${badgeStatut(ind.status)}
     </div>
-    <div class="c-titre">${esc(ind.label)}</div>`;
+    <div class="c-titre">${esc(ind.label)}</div>
+    ${ind.description_metier ? `<div class="c-quoi">${esc(ind.description_metier)}</div>` : ""}`;
 
   const pied = `<div class="c-pied">
       <span>${esc(ind.source_organisation)} · ${esc(ind.frequency)}</span>
@@ -516,18 +619,20 @@ function carte(ind) {
   }
 
   // --- Série unique : valeur, courbe, métriques adaptées à la fréquence ---
-  const geoUnique = zones.length === 1 ? zones[0] : (zones.includes("WORLD") ? "WORLD" : zones[0]);
+  // Une zone pays + un agrégat monde : privilégier l'agrégat, c'est lui que la
+  // carte à valeur unique sait résumer sans choisir arbitrairement un pays.
+  const geoUnique = zones.length === 1 ? zones[0] : (zones.find(estAgregatMonde) ?? zones[0]);
   const serie = serieDe(ind, geoUnique);
   const derniere = serie[serie.length - 1];
-  const etiquetteZone = (geoUnique !== "WORLD" && geoUnique !== "W00" && geoUnique !== "EU27_2020")
-    ? geoUnique : ({WORLD: "monde", W00: "monde", EU27_2020: "UE27"}[geoUnique] ?? geoUnique);
+  const etiquetteZone = (!estAgregatMonde(geoUnique) && geoUnique !== "EU27_2020")
+    ? geoUnique
+    : ({WORLD: "monde", W00: "monde", OWID_WRL: "monde", EU27_2020: "UE27"}[geoUnique] ?? geoUnique);
   const repere = met ? met.moyenne_mobile_annuelle : null;
   const repereTrace = serie.length > 2 && repere !== null && repere !== undefined && !isNaN(repere);
 
   return `<div class="carte">${tete}
-    <div class="c-val">${nbAuto(met ? met.value : derniere.value)}<span class="c-unite">${esc(ind.unit)} · ${esc(etiquetteZone)}</span></div>
-    <div class="c-per">Période ${esc(met ? met.period : derniere.period)}</div>
-    ${serie.length > 2 ? spark(serie, repere) : ""}
+    <div class="c-val">${nbAuto(met ? met.value : derniere.value)}<span class="c-unite">${esc(ind.unit)} · ${esc(etiquetteZone)} · ${esc(met ? met.period : derniere.period)}</span>${chipVar(met)}</div>
+    ${serie.length > 2 ? spark(serie, repere, repereTrace ? "moyenne mobile" : "") : ""}
     ${repereTrace ? `<div class="c-legende">Ligne pointillée : moyenne mobile annuelle
       (${nbAuto(repere)}), seul repère calculé disponible pour cet indicateur.</div>` : ""}
     ${blocMetriques(met, serie)}
@@ -745,16 +850,48 @@ function blocSignaux() {
   }
   const diffusables = alertes.filter(a => a.diffusable);
   const retenues = alertes.filter(a => !a.diffusable);
-  const item = a => `<span class="sig ${a.diffusable ? "diffusable" : "retenu"}">
-      <strong>${esc(a.indicator_id)}</strong> ${esc(a.indicator_label)} ·
-      ${esc(a.geo)} ${esc(a.period)} ·
-      ${pct(a.glissement_annuel_pct ?? a.variation_periode_pct)} contre un seuil de ${nbAuto(a.seuil_materialite_pct)} %
-      ${a.diffusable ? "" : "· retenue : " + esc(a.motif_de_retenue)}
+
+  // REGROUPEMENT PAR INDICATEUR. La première exécution réelle a affiché
+  // trente-trois pastilles au même rang visuel : l'égalité de traitement
+  // détruisait le signal qu'elle devait porter. Le regroupement est
+  // déterministe — par indicateur, avec le nombre de zones, les extrêmes et
+  // la période — et le détail par zone reste accessible, replié. La
+  // hiérarchisation de fond — pourquoi 33 franchissements ? — ne se corrige
+  // pas ici : elle relève du calibrage des seuils en base (RI4), jamais
+  // confrontés aux données avant cette exécution. Un seuil que toutes les
+  // séries franchissent ne discrimine rien.
+  const parInd = new Map();
+  for (const a of alertes) {
+    if (!parInd.has(a.indicator_id)) parInd.set(a.indicator_id, []);
+    parInd.get(a.indicator_id).push(a);
+  }
+  const chips = [...parInd.entries()].map(([id, liste]) => {
+    const l0 = liste[0];
+    const vals = liste.map(a => Number(a.glissement_annuel_pct ?? a.variation_periode_pct));
+    const periodes = [...new Set(liste.map(a => String(a.period)))].sort();
+    const nbRet = liste.filter(a => !a.diffusable).length;
+    const detail = liste
+      .sort((a, b) => Math.abs(Number(b.glissement_annuel_pct ?? b.variation_periode_pct))
+                    - Math.abs(Number(a.glissement_annuel_pct ?? a.variation_periode_pct)))
+      .map(a => `${esc(a.geo)} ${esc(a.period)} : ${pct(a.glissement_annuel_pct ?? a.variation_periode_pct)}${
+        a.diffusable ? "" : " — retenue : " + esc(a.motif_de_retenue)}`).join("<br>");
+    return `<span class="sig ${nbRet === liste.length ? "retenu" : "diffusable"}">
+      <strong>${esc(id)}</strong> ${esc(l0.indicator_label)} ·
+      ${liste.length > 1
+        ? `${liste.length} zones, de ${pct(Math.min(...vals))} à ${pct(Math.max(...vals))}`
+        : `${esc(l0.geo)} ${pct(vals[0])}`} ·
+      seuil ${pctNu(l0.seuil_materialite_pct)} ·
+      ${periodes.length > 1 ? esc(periodes[0]) + " → " + esc(periodes[periodes.length - 1]) : esc(periodes[0])}
+      ${nbRet && nbRet < liste.length ? ` · ${nbRet} retenue${nbRet > 1 ? "s" : ""} (RI5)` : ""}
+      <details class="prov"><summary>détail par zone</summary><div class="p-corps">${detail}</div></details>
     </span>`;
+  }).join("");
+
   return `<strong>${alertes.length} franchissement${alertes.length > 1 ? "s" : ""} du seuil de matérialité</strong>
-    sur la dernière observation — ${diffusables.length} diffusable${diffusables.length > 1 ? "s" : ""} au décideur,
-    ${retenues.length} retenue${retenues.length > 1 ? "s" : ""} par la règle RI5 faute de statut de validation suffisant.
-    <div class="signaux">${alertes.map(item).join("")}</div>`;
+    sur la dernière observation, portés par ${parInd.size} indicateur${parInd.size > 1 ? "s" : ""} —
+    ${diffusables.length} diffusable${diffusables.length > 1 ? "s" : ""} au décideur,
+    ${retenues.length} retenue${retenues.length > 1 ? "s" : ""} par la règle RI5.
+    <div class="signaux">${chips}</div>`;
 }
 
 function bandeau() {
