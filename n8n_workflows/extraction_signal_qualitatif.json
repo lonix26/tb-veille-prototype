@@ -1,0 +1,217 @@
+{
+  "name": "Veille - Extraction de signal qualitatif (multi-IA, human-in-the-loop)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Déclencheur manuel (document choisi par le veilleur)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 400],
+      "notes": "La sélection du document est un acte HUMAIN : le veilleur choisit ce qui mérite lecture, l'IA lit et structure, l'humain valide. Pas de moissonnage autonome — scénario B."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual','B','en_cours','Extraction signal qualitatif (multi-IA)') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [200, 400],
+      "credentials": {
+        "postgres": { "id": "QdVRYX9pjTj9C8G3", "name": "postgres veille" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Paramètres du signal à extraire. Le veilleur renseigne ici le document\n// choisi, le secteur et la question de veille de rattachement (règle : pas\n// de signal sans question de veille).\n//\n// Document de démonstration : règlement (UE) 2023/851 — objectif 100 % de\n// voitures neuves zéro émission en 2035. Impulsion publique automobile par\n// excellence : c'est exactement le terrain de la lacune automobile/QV5 du\n// ch. 8 (acte réglementaire, pas série statistique). Si l'URL EUR-Lex ne\n// répond pas, remplacer par tout autre document réglementaire pertinent.\nconst runId = $('Ouvrir le run').first().json.run_id;\nreturn [{ json: {\n  sector_code: 'automobile',\n  watch_question_code: 'QV5',\n  source_doc: 'https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32023R0851',\n  run_id: runId,\n  raw_ref: '/data/staging/SIG_run' + runId + '.pdf'\n} }];"
+      },
+      "name": "Préparer la tâche",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 400]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.source_doc }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "name": "Télécharger le document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 400]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $('Préparer la tâche').item.json.raw_ref }}",
+        "options": {}
+      },
+      "name": "Déposer le document brut",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [800, 400],
+      "notes": "E6 : le document est conservé tel que reçu AVANT toute extraction."
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "name": "Extraire le texte",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prompt d'extraction ÉVÉNEMENT — même discipline que le pipeline A2 :\n// chaque champ est { valeur, extrait_source } avec recopie exacte du\n// fragment d'origine. Les champs sont FACTUELS uniquement. La portée pour\n// un sous-traitant est volontairement exclue du schéma : c'est une\n// interprétation, elle appartient au validateur humain (note_validation).\nconst t = $('Préparer la tâche').first().json;\nlet doc = $input.first().json.text || '';\n// Garde-fou de taille : les actes réglementaires peuvent être longs.\nconst TAILLE_MAX = 150000;\nconst tronque = doc.length > TAILLE_MAX;\nif (tronque) doc = doc.slice(0, TAILLE_MAX);\n\nconst schema = {\n  evenement: { valeur: '', extrait_source: '' },\n  acteur:    { valeur: '', extrait_source: '' },\n  echeance:  { valeur: '', extrait_source: '' },\n  zone:      { valeur: '', extrait_source: '' }\n};\n\nconst consigne = `Tu es un extracteur de données. À partir du DOCUMENT ci-dessous, renvoie STRICTEMENT un objet JSON valide conforme au SCHÉMA, sans aucun texte autour, sans balises de code.\nPour CHAQUE champ, renvoie un objet {\"valeur\": ..., \"extrait_source\": ...} où extrait_source est le fragment EXACT du document d'où provient la valeur, recopié à l'identique. Si une information est absente du document, écris \"ABSENT\" dans les deux champs. N'utilise AUCUNE source autre que le document.\nPrécisions :\n- evenement : le fait principal que ce document établit, en une phrase factuelle, sans appréciation.\n- acteur : l'institution ou l'organisation qui décide ou publie.\n- echeance : la ou les dates d'effet ou d'application principales (format AAAA ou AAAA-MM-JJ).\n- zone : le périmètre géographique d'application.\nSCHÉMA : ` + JSON.stringify(schema);\n\nreturn [{ json: {\n  ...t,\n  document_tronque: tronque,\n  prompt: consigne + '\\n\\nDOCUMENT :\\n' + doc\n} }];"
+      },
+      "name": "Consolider le contexte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.OPENAI_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt }] }) }}",
+        "options": { "timeout": 90000 }
+      },
+      "name": "Modèle A (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 200],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 1024, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt }] }) }}",
+        "options": { "timeout": 90000 }
+      },
+      "name": "Modèle B (Anthropic)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 400],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key={{ $env.GOOGLE_API_KEY }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $('Consolider le contexte').first().json.prompt }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) }}",
+        "options": { "timeout": 90000 }
+      },
+      "name": "Modèle C (Google)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 600],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalisation des trois réponses — identique au pipeline A2 : un appel en\n// échec devient une extraction vide et un incident tracé.\nfunction extraireTexte(rep, fournisseur) {\n  try {\n    if (fournisseur === 'openai') return rep.choices[0].message.content;\n    if (fournisseur === 'anthropic') return rep.content[0].text;\n    if (fournisseur === 'google') return rep.candidates[0].content.parts[0].text;\n  } catch (e) { return null; }\n  return null;\n}\nfunction parserJson(txt) {\n  if (!txt) return null;\n  let s = String(txt).trim();\n  s = s.replace(/^```(?:json)?/i, '').replace(/```$/,'').trim();\n  const i = s.indexOf('{'), j = s.lastIndexOf('}');\n  if (i >= 0 && j > i) s = s.slice(i, j + 1);\n  try { return JSON.parse(s); } catch (e) { return null; }\n}\n\nconst sources = [\n  { modele: 'gpt-4o',            fournisseur: 'openai',    node: 'Modèle A (OpenAI)' },\n  { modele: 'claude-opus-4-8',   fournisseur: 'anthropic', node: 'Modèle B (Anthropic)' },\n  { modele: 'gemini-pro-latest', fournisseur: 'google',    node: 'Modèle C (Google)' }\n];\n\nconst extractions = [];\nconst incidents = [];\nfor (const s of sources) {\n  let rep;\n  try { rep = $(s.node).first().json; } catch (e) { rep = null; }\n  const err = rep && rep.error ? JSON.stringify(rep.error).slice(0,200) : null;\n  const parsed = parserJson(extraireTexte(rep, s.fournisseur));\n  if (err) incidents.push(s.modele + ' : appel en échec (' + err + ')');\n  else if (!parsed) incidents.push(s.modele + ' : réponse non parsable en JSON');\n  extractions.push({ modele: s.modele, extraction: parsed || {} });\n}\n\nconst t = $('Consolider le contexte').first().json;\nreturn [{ json: {\n  sector_code: t.sector_code, watch_question_code: t.watch_question_code,\n  source_doc: t.source_doc, raw_ref: t.raw_ref, run_id: t.run_id,\n  document_tronque: t.document_tronque, extractions, incidents\n} }];"
+      },
+      "name": "Normaliser les extractions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// RECOUPEMENT — pas un consensus. Sur du texte libre, l'unanimité au\n// caractère près n'existe pas : deux formulations justes du même fait\n// diffèrent toujours. Le recoupement retient, champ par champ, la valeur\n// portée par AU MOINS DEUX modèles après normalisation grossière ; sinon\n// le champ reste NULL et l'humain tranche sur le détail conservé.\n// Le score qui en résulte est INDICATIF : quel que soit son niveau, le\n// signal part en statut « a_valider » — sur du qualitatif, la validation\n// humaine n'est pas une branche d'exception, c'est le chemin unique.\nconst j = $input.first().json;\nconst parsed = j.extractions.map(e => e.extraction || {});\nconst champs = ['evenement', 'acteur', 'echeance', 'zone'];\n\nconst norm = v => String(v ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');\nlet retenus = 0;\nconst proposition = {};\nconst detail = {};\nfor (const f of champs) {\n  const bruts = parsed.map(p => p[f]?.valeur ?? null);\n  const extraits = parsed.map(p => String(p[f]?.extrait_source ?? '').trim());\n  const normes = bruts.map(norm);\n  let valeur = null;\n  for (let a = 0; a < normes.length && !valeur; a++) {\n    for (let b = a + 1; b < normes.length && !valeur; b++) {\n      if (normes[a] && normes[a] !== 'absent' && normes[a] === normes[b]) valeur = bruts[a];\n    }\n  }\n  if (valeur) retenus++;\n  proposition[f] = valeur;\n  detail[f] = { valeurs: bruts, extraits_source: extraits, retenu: valeur !== null };\n}\n\nreturn [{ json: {\n  ...j,\n  proposition,\n  score_recoupement: champs.length ? +(retenus / champs.length).toFixed(2) : 0,\n  detail\n} }];"
+      },
+      "name": "Recouper les extractions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO signals (run_id, sector_code, watch_question_code, source_doc, raw_ref, evenement, acteur, echeance, zone, extraits, score_recoupement, statut)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, 'a_valider')\nRETURNING signal_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.run_id, $json.sector_code, $json.watch_question_code, $json.source_doc, $json.raw_ref, $json.proposition.evenement, $json.proposition.acteur, $json.proposition.echeance, $json.proposition.zone, JSON.stringify({detail: $json.detail, extractions: $json.extractions, incidents: $json.incidents, document_tronque: $json.document_tronque}), $json.score_recoupement] }}"
+        },
+        "additionalFields": {}
+      },
+      "name": "Écrire le signal (à valider)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2050, 400],
+      "credentials": {
+        "postgres": { "id": "QdVRYX9pjTj9C8G3", "name": "postgres veille" }
+      },
+      "notes": "Toujours « a_valider », quel que soit le recoupement : sur du qualitatif, la validation humaine est le chemin unique, pas une branche d'exception."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status = 'ok', closed_at = now(),\n    note = 'Extraction signal qualitatif — recoupement ' || round($2::numeric*100) || '%, signal n° ' || $3 || ' en attente de validation humaine'\nWHERE run_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$('Recouper les extractions').first().json.run_id, $('Recouper les extractions').first().json.score_recoupement, $json.signal_id] }}"
+        },
+        "additionalFields": {}
+      },
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2300, 400],
+      "credentials": {
+        "postgres": { "id": "QdVRYX9pjTj9C8G3", "name": "postgres veille" }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel (document choisi par le veilleur)": { "main": [[ { "node": "Ouvrir le run", "type": "main", "index": 0 } ]] },
+    "Ouvrir le run": { "main": [[ { "node": "Préparer la tâche", "type": "main", "index": 0 } ]] },
+    "Préparer la tâche": { "main": [[ { "node": "Télécharger le document", "type": "main", "index": 0 } ]] },
+    "Télécharger le document": { "main": [[ { "node": "Déposer le document brut", "type": "main", "index": 0 } ]] },
+    "Déposer le document brut": { "main": [[ { "node": "Extraire le texte", "type": "main", "index": 0 } ]] },
+    "Extraire le texte": { "main": [[ { "node": "Consolider le contexte", "type": "main", "index": 0 } ]] },
+    "Consolider le contexte": { "main": [[ { "node": "Modèle A (OpenAI)", "type": "main", "index": 0 } ]] },
+    "Modèle A (OpenAI)": { "main": [[ { "node": "Modèle B (Anthropic)", "type": "main", "index": 0 } ]] },
+    "Modèle B (Anthropic)": { "main": [[ { "node": "Modèle C (Google)", "type": "main", "index": 0 } ]] },
+    "Modèle C (Google)": { "main": [[ { "node": "Normaliser les extractions", "type": "main", "index": 0 } ]] },
+    "Normaliser les extractions": { "main": [[ { "node": "Recouper les extractions", "type": "main", "index": 0 } ]] },
+    "Recouper les extractions": { "main": [[ { "node": "Écrire le signal (à valider)", "type": "main", "index": 0 } ]] },
+    "Écrire le signal (à valider)": { "main": [[ { "node": "Clôturer le run", "type": "main", "index": 0 } ]] }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

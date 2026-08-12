@@ -178,7 +178,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={{ $env.GOOGLE_API_KEY }}",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key={{ $env.GOOGLE_API_KEY }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -206,7 +206,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extrait le JSON de la réponse de chaque fournisseur, quelle que soit sa forme.\n// Un modèle en échec (clé absente, quota, JSON illisible) devient une extraction\n// vide et un incident tracé — il ne fait pas échouer les autres.\nfunction extraireTexte(rep, fournisseur) {\n  try {\n    if (fournisseur === 'openai') return rep.choices[0].message.content;\n    if (fournisseur === 'anthropic') return rep.content[0].text;\n    if (fournisseur === 'google') return rep.candidates[0].content.parts[0].text;\n  } catch (e) { return null; }\n  return null;\n}\nfunction parserJson(txt) {\n  if (!txt) return null;\n  let s = String(txt).trim();\n  s = s.replace(/^```(?:json)?/i, '').replace(/```$/,'').trim(); // retire d'éventuelles balises\n  const i = s.indexOf('{'), j = s.lastIndexOf('}');\n  if (i >= 0 && j > i) s = s.slice(i, j + 1);\n  try { return JSON.parse(s); } catch (e) { return null; }\n}\n\nconst sources = [\n  { modele: 'gpt-4o',            fournisseur: 'openai',    node: 'Modèle A (OpenAI)' },\n  { modele: 'claude-opus-4-8',   fournisseur: 'anthropic', node: 'Modèle B (Anthropic)' },\n  { modele: 'gemini-2.5-pro',    fournisseur: 'google',    node: 'Modèle C (Google)' }\n];\n\nconst extractions = [];\nconst incidents = [];\nfor (const s of sources) {\n  let rep;\n  try { rep = $(s.node).first().json; } catch (e) { rep = null; }\n  const err = rep && rep.error ? JSON.stringify(rep.error).slice(0,200) : null;\n  const parsed = parserJson(extraireTexte(rep, s.fournisseur));\n  if (err) incidents.push(s.modele + ' : appel en échec (' + err + ')');\n  else if (!parsed) incidents.push(s.modele + ' : réponse non parsable en JSON');\n  extractions.push({ modele: s.modele, extraction: parsed || {} });\n}\n\nconst t = $('Consolider le contexte').first().json;\nreturn [{ json: {\n  indicator_id: t.indicator_id, run_id: t.run_id, period: t.period, geo: t.geo,\n  source_doc: t.source_doc, raw_ref: t.raw_ref, mode_desaccord: t.mode_desaccord,\n  extractions, incidents\n} }];"
+        "jsCode": "// Extrait le JSON de la réponse de chaque fournisseur, quelle que soit sa forme.\n// Un modèle en échec (clé absente, quota, JSON illisible) devient une extraction\n// vide et un incident tracé — il ne fait pas échouer les autres.\nfunction extraireTexte(rep, fournisseur) {\n  try {\n    if (fournisseur === 'openai') return rep.choices[0].message.content;\n    if (fournisseur === 'anthropic') return rep.content[0].text;\n    if (fournisseur === 'google') return rep.candidates[0].content.parts[0].text;\n  } catch (e) { return null; }\n  return null;\n}\nfunction parserJson(txt) {\n  if (!txt) return null;\n  let s = String(txt).trim();\n  s = s.replace(/^```(?:json)?/i, '').replace(/```$/,'').trim(); // retire d'éventuelles balises\n  const i = s.indexOf('{'), j = s.lastIndexOf('}');\n  if (i >= 0 && j > i) s = s.slice(i, j + 1);\n  try { return JSON.parse(s); } catch (e) { return null; }\n}\n\nconst sources = [\n  { modele: 'gpt-4o',            fournisseur: 'openai',    node: 'Modèle A (OpenAI)' },\n  { modele: 'claude-opus-4-8',   fournisseur: 'anthropic', node: 'Modèle B (Anthropic)' },\n  { modele: 'gemini-pro-latest', fournisseur: 'google',    node: 'Modèle C (Google)' }\n];\n\nconst extractions = [];\nconst incidents = [];\nfor (const s of sources) {\n  let rep;\n  try { rep = $(s.node).first().json; } catch (e) { rep = null; }\n  const err = rep && rep.error ? JSON.stringify(rep.error).slice(0,200) : null;\n  const parsed = parserJson(extraireTexte(rep, s.fournisseur));\n  if (err) incidents.push(s.modele + ' : appel en échec (' + err + ')');\n  else if (!parsed) incidents.push(s.modele + ' : réponse non parsable en JSON');\n  extractions.push({ modele: s.modele, extraction: parsed || {} });\n}\n\nconst t = $('Consolider le contexte').first().json;\nreturn [{ json: {\n  indicator_id: t.indicator_id, run_id: t.run_id, period: t.period, geo: t.geo,\n  source_doc: t.source_doc, raw_ref: t.raw_ref, mode_desaccord: t.mode_desaccord,\n  extractions, incidents\n} }];"
       },
       "name": "Normaliser les extractions",
       "type": "n8n-nodes-base.code",
@@ -250,9 +250,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO indicator_values (indicator_id, run_id, period, geo, value, obtained_by, validation_status, raw_ref)\nVALUES ($1, $2, $3, $4, $5, 'ia_extraction', 'pre_valide_consensus', $6)\nON CONFLICT (indicator_id, run_id, period, geo) DO NOTHING\nRETURNING value_id;",
+        "query": "INSERT INTO indicator_values (indicator_id, run_id, period, geo, value, obtained_by, validation_status, consensus_score, raw_ref)\nVALUES ($1, $2, $3, $4, $5, 'ia_extraction', 'pre_valide_consensus', $6, $7)\nON CONFLICT (indicator_id, run_id, period, geo) DO NOTHING\nRETURNING value_id;",
         "options": {
-          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.valeur_pivot, $json.raw_ref] }}"
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.valeur_pivot, $json.consensus_score, $json.raw_ref] }}"
         },
         "additionalFields": {}
       },

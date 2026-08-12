@@ -226,7 +226,9 @@ const nbAuto = v => {
   if (v === null || v === undefined || v === "" || isNaN(v)) return "—";
   const a = Math.abs(Number(v));
   const d = a === 0 ? 0 : a < 10 ? 3 : a < 1000 ? 1 : 0;
-  return Number(v).toLocaleString("fr-CH", {minimumFractionDigits: d, maximumFractionDigits: d});
+  // maximumFractionDigits sans minimum : 0,925 garde ses décimales, mais 3,4
+  // ne devient pas « 3,400 » — qui se lirait trois mille quatre cents.
+  return Number(v).toLocaleString("fr-CH", {maximumFractionDigits: d});
 };
 
 // POURCENTAGES SANS DÉCIMALES FORCÉES. nbAuto appliqué à un seuil de 5 %
@@ -367,15 +369,27 @@ const estInfraAnnuelle = serie => serie.some(p => /-/.test(String(p.period)));
 function blocMetriques(met, serie) {
   if (!met) return "";
   const infra = estInfraAnnuelle(serie);
-  const gl = met.glissement_annuel_pct;
   const vp = met.variation_periode_pct;
   const mm = met.moyenne_mobile_annuelle;
-  return `<div class="c-metr">
-      <div>${infra ? "glissement annuel" : "variation annuelle"}<b class="${signe(gl ?? vp)}">${pct(gl ?? vp)}</b></div>
-      ${infra ? `<div>période précédente<b class="${signe(vp)}">${pct(vp)}</b></div>` : ""}
-      ${infra && mm !== null && mm !== undefined ? `<div>moyenne mobile<b>${nbAuto(mm)}</b></div>` : ""}
-    </div>
+  // Sur une série annuelle, la pastille à côté de la valeur porte déjà la
+  // variation : le bloc n'ajouterait qu'une redite. Il ne s'affiche que
+  // pour l'infra-annuel, où il apporte la période précédente et la moyenne.
+  return `${infra ? `<div class="c-metr">
+      <div>période précédente<b class="${signe(vp)}">${pct(vp)}</b></div>
+      ${mm !== null && mm !== undefined ? `<div>moyenne mobile<b>${nbAuto(mm)}</b></div>` : ""}
+    </div>` : ""}
     ${ligneSeuil(met)}`;
+}
+
+// La colonne completude de v_metriques énonce toute métrique manquante.
+// Le segment sur le seuil de matérialité en est retiré à l'affichage —
+// ligneSeuil() le dit déjà, mieux : la vue reste exhaustive (c'est elle qui
+// fait foi), seule la redite à l'écran est évitée.
+function afficherCompletude(met) {
+  if (!met || !met.completude) return "";
+  const restant = String(met.completude).split(" · ")
+    .filter(s => !s.includes("materialite")).join(" · ");
+  return restant ? `<div class="c-manque">${esc(restant)}</div>` : "";
 }
 
 // POSITION AU SEUIL, TOUJOURS AFFICHÉE. La version précédente ne mentionnait le
@@ -636,7 +650,7 @@ function carte(ind) {
     ${repereTrace ? `<div class="c-legende">Ligne pointillée : moyenne mobile annuelle
       (${nbAuto(repere)}), seul repère calculé disponible pour cet indicateur.</div>` : ""}
     ${blocMetriques(met, serie)}
-    ${met && met.completude ? `<div class="c-manque">${esc(met.completude)}</div>` : ""}
+    ${afficherCompletude(met)}
     <div class="c-pied">
       <span>${badgeValidation(met ? met.validation_status : null)}</span>
       <span class="c-run">${mentionRun(ind)}</span>
@@ -708,6 +722,66 @@ function lectureSecteur(code, inds) {
   </div>`;
 }
 
+// ---------------------------------------------------------------------
+// SIGNAUX QUALITATIFS — le versant « veille » du dispositif (12.08.2026).
+//
+// Un signal n'est pas une observation de série : c'est un événement
+// structuré extrait d'un document non périodique (règlement, annonce),
+// par la chaîne multi-modèles démontrée sur A2, et validé humainement.
+// Trois règles de restitution :
+//   1. Seuls les signaux VALIDÉS s'affichent en clair — les « à valider »
+//      remontent en compteur (analogue de RI5 pour le qualitatif).
+//   2. La note de portée est signée : c'est un jugement humain, pas une
+//      production du modèle, et la carte le dit.
+//   3. Trois états : clé absente = « non interrogé », jamais « aucun
+//      signal » — même garde-fou que le bandeau des franchissements.
+// ---------------------------------------------------------------------
+function vueSignauxSecteur(code) {
+  if (D.signaux === undefined) {
+    return `<section class="qv"><div class="qv-tete"><div class="qv-q">Signaux qualitatifs</div></div>
+      <p class="note">Signaux non interrogés : l'interface de restitution ne renvoie pas la vue
+      <code>v_signaux</code>. Absence d'interrogation, non absence de signal.</p></section>`;
+  }
+  const tous = (D.signaux || []).filter(s => s.sector_code === code);
+  if (!tous.length) return "";
+  const valides = tous.filter(s => s.statut === "valide");
+  const enAttente = tous.filter(s => s.statut === "a_valider").length;
+
+  const carteSignal = s => `<div class="carte">
+      <div class="c-tete">
+        <span class="c-code">SIGNAL · ${esc(s.watch_question_code)}</span>
+        <span class="etiq e-vert">validé humainement</span>
+      </div>
+      <div class="c-titre">${esc(s.evenement ?? "(événement à préciser)")}</div>
+      <div class="c-quoi">${esc(s.acteur ?? "—")} · ${esc(s.zone ?? "—")} · échéance ${esc(s.echeance ?? "—")}</div>
+      ${s.note_validation ? `<div class="c-seuil"><b>Portée pour un sous-traitant</b> — ${esc(s.note_validation)}
+        <span style="color:var(--gris-clair)">(jugement du validateur, ${esc(s.validated_by)})</span></div>` : ""}
+      <details class="prov"><summary>provenance et extraction</summary>
+        <div class="p-corps">Document choisi par le veilleur, lu par trois modèles avec extraits
+          source obligatoires (recoupement ${s.score_recoupement !== null ? Math.round(s.score_recoupement * 100) + " %" : "—"}),
+          validé le ${esc(String(s.validated_at ?? "").slice(0, 10))} par ${esc(s.validated_by ?? "—")} · run ${esc(s.run_id)}.</div>
+      </details>
+      <div class="c-pied">
+        <span>signal qualitatif · hors registre des valeurs</span>
+        <a href="${esc(s.source_doc)}" target="_blank" rel="noopener">document source</a>
+      </div>
+    </div>`;
+
+  return `<section class="qv">
+    <div class="qv-tete">
+      <div class="qv-code">SIGNAUX QUALITATIFS — documents non périodiques</div>
+      <div class="qv-q">Événements réglementaires et annonces, extraits par la chaîne
+        multi-modèles et validés humainement</div>
+      <div class="qv-m">Un signal n'est pas une série : il n'entre ni au registre des valeurs
+        ni dans les métriques. ${enAttente ? `<strong>${enAttente} signal${enAttente > 1 ? "aux" : ""} en attente
+        de validation humaine</strong> — non affiché${enAttente > 1 ? "s" : ""} tant qu'il${enAttente > 1 ? "s ne sont" : " n'est"} pas tranché${enAttente > 1 ? "s" : ""}.` : ""}</div>
+    </div>
+    ${valides.length
+      ? `<div class="cartes">${valides.map(carteSignal).join("")}</div>`
+      : `<p class="note"><em>Aucun signal validé pour ce secteur à ce jour.</em></p>`}
+  </section>`;
+}
+
 function vueSecteur(code) {
   const inds = (D.referentiel || []).filter(i => i.sector_code === code);
   if (!inds.length) return `<p class="note">Aucun indicateur pour ce secteur.</p>`;
@@ -751,6 +825,7 @@ function vueSecteur(code) {
     html += `<section class="qv"><div class="qv-tete"><div class="qv-q">Autres indicateurs du secteur</div></div>
       <div class="cartes">${orphelins.map(carte).join("")}</div></section>`;
   }
+  html += vueSignauxSecteur(code);
   return html;
 }
 
