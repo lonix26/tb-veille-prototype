@@ -33,7 +33,29 @@
     },
     {
       "parameters": {
-        "jsCode": "// Paramètres de la tâche d'extraction composite pour A2.\n// mode_desaccord : quand true, le modèle C reçoit une consigne dégradée qui le\n// pousse à lire le cumul annuel au lieu du total mensuel. Cela fait diverger les\n// extractions et EXERCE la branche de désaccord — le chemin d'exception que le\n// § 10.4.1 décrit et que le dispositif n'avait jamais vu se déclencher.\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst MODE_DESACCORD = false; // basculer à true pour provoquer et tracer le désaccord\nconst source_doc = 'https://www.acea.auto/files/Press_release_car_registrations_November_2025.pdf';\nconst period = '2025-11';\nreturn [{ json: {\n  indicator_id: 'A2',\n  period,\n  geo: 'EU27',\n  source_doc,\n  run_id: runId,\n  mode_desaccord: MODE_DESACCORD,\n  raw_ref: '/data/staging/A2_run' + runId + '.pdf'\n} }];"
+        "operation": "executeQuery",
+        "query": "SELECT doc_id, indicator_id, period, geo, source_doc FROM composite_queue WHERE statut = 'a_traiter' ORDER BY period LIMIT 1;",
+        "options": {},
+        "additionalFields": {}
+      },
+      "name": "Prendre le prochain document",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        320,
+        550
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "notes": "Mise en série du 17.08.2026 : le document n'est plus une constante du workflow, il vient de la file composite_queue — le plus ancien au statut a_traiter. L'inscription et la vérification des documents en file sont l'acte humain de sélection (scénario B)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tâche d'extraction lue depuis la file (mise en série du 17.08.2026) —\n// plus aucune constante en dur. mode_desaccord inchangé : consigne dégradée\n// du modèle C pour exercer la branche de désaccord (§ 10.4.1).\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst MODE_DESACCORD = false; // basculer à true pour provoquer et tracer le désaccord\nconst d = $input.first().json;\nif (!d || !d.doc_id) throw new Error('File de documents vide : aucun document au statut a_traiter dans composite_queue. Inscrire et vérifier un document, puis relancer.');\nreturn [{ json: {\n  doc_id: d.doc_id,\n  indicator_id: d.indicator_id,\n  period: d.period,\n  geo: d.geo,\n  source_doc: d.source_doc,\n  run_id: runId,\n  mode_desaccord: MODE_DESACCORD,\n  raw_ref: '/data/staging/' + d.indicator_id + '_run' + runId + '.pdf'\n} }];"
       },
       "name": "Préparer tâche d'extraction",
       "type": "n8n-nodes-base.code",
@@ -95,7 +117,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Construit le prompt d'extraction et le texte du document en une seule charge,\n// soumise à l'identique aux trois modèles (sauf consigne dégradée du modèle C en\n// mode désaccord). Chaque champ attendu est { valeur, extrait_source } : le\n// modèle doit recopier le fragment EXACT du document d'où provient la valeur, ce\n// qui rend la validation humaine une comparaison de secondes plutôt qu'une\n// relecture (§ 10.4.1, rang 2).\nconst t = $('Préparer tâche d\\'extraction').first().json;\nconst doc = $input.first().json.text || '';\n\nconst schema = {\n  periode:                 { valeur: '', extrait_source: '' },\n  immatriculations_ue_mois:{ valeur: '', extrait_source: '' },\n  part_bev_pct:            { valeur: '', extrait_source: '' }\n};\n\nconst consigne = `Tu es un extracteur de données. À partir du DOCUMENT ci-dessous (communiqué de presse ACEA sur les immatriculations de voitures neuves), renvoie STRICTEMENT un objet JSON valide conforme au SCHÉMA, sans aucun texte autour, sans balises de code.\nPour CHAQUE champ, renvoie un objet {\"valeur\": ..., \"extrait_source\": ...} où extrait_source est le fragment EXACT du document d'où provient la valeur, recopié à l'identique. Si une valeur est absente, écris \"ABSENT\" dans les deux champs. N'utilise AUCUNE source autre que le document.\nPrécisions de lecture :\n- periode : le mois de référence du communiqué, au format AAAA-MM.\n- immatriculations_ue_mois : le total des immatriculations de l'Union européenne pour le MOIS de référence — la ligne « EUROPEAN UNION » du tableau mensuel, colonne du total. PAS le cumul annuel (year-to-date).\n- part_bev_pct : la part de marché des voitures 100% électriques à batterie, en pourcentage.\nSCHÉMA : ` + JSON.stringify(schema);\n\n// Variante dégradée pour le modèle C : on l'oriente vers le cumul annuel.\nconst consigne_C = t.mode_desaccord\n  ? consigne.replace('PAS le cumul annuel (year-to-date).', 'utilise le CUMUL ANNUEL (year-to-date) cumulé sur l\\'année.')\n  : consigne;\n\nconst enveloppe = (c) => c + '\\n\\nDOCUMENT :\\n' + doc;\n\nreturn [{ json: {\n  ...t,\n  prompt_A: enveloppe(consigne),\n  prompt_B: enveloppe(consigne),\n  prompt_C: enveloppe(consigne_C)\n} }];"
+        "jsCode": "// Construit le prompt d'extraction et le texte du document en une seule charge,\n// soumise à l'identique aux trois modèles (sauf consigne dégradée du modèle C en\n// mode désaccord). Chaque champ attendu est { valeur, extrait_source } : le\n// modèle doit recopier le fragment EXACT du document d'où provient la valeur, ce\n// qui rend la validation humaine une comparaison de secondes plutôt qu'une\n// relecture (§ 10.4.1, rang 2).\nconst t = $('Préparer tâche d\\'extraction').first().json;\nconst doc = $input.first().json.text || '';\n\nconst schema = {\n  periode:                 { valeur: '', extrait_source: '' },\n  immatriculations_ue_mois:{ valeur: '', extrait_source: '' },\n  part_bev_pct:            { valeur: '', extrait_source: '' }\n};\n\nconst consigne = `Tu es un extracteur de données. À partir du DOCUMENT ci-dessous (communiqué de presse ACEA sur les immatriculations de voitures neuves), renvoie STRICTEMENT un objet JSON valide conforme au SCHÉMA, sans aucun texte autour, sans balises de code.\nPour CHAQUE champ, renvoie un objet {\"valeur\": ..., \"extrait_source\": ...} où extrait_source est le fragment EXACT du document d'où provient la valeur, recopié à l'identique. Si une valeur est absente, écris \"ABSENT\" dans les deux champs. N'utilise AUCUNE source autre que le document.\nPrécisions de lecture :\n- periode : le mois de référence du communiqué, au format AAAA-MM.\n- immatriculations_ue_mois : le total des immatriculations de l'Union européenne pour le MOIS de référence — la ligne « EUROPEAN UNION » du tableau mensuel, colonne du total. Attention : cette ligne énumère d'abord des décomptes par motorisation (BEV, HEV, PHEV…) ; le total mensuel est la valeur suivie du total du même mois de l'année précédente puis d'une variation en pourcentage. Ce n'est PAS le premier nombre de la ligne (c'est le décompte BEV), et PAS le cumul annuel (year-to-date).\n- part_bev_pct : la part de marché des voitures 100% électriques à batterie, en pourcentage.\nSCHÉMA : ` + JSON.stringify(schema);\n\n// Variante dégradée pour le modèle C : on l'oriente vers le cumul annuel.\nconst consigne_C = t.mode_desaccord\n  ? consigne.replace('PAS le cumul annuel (year-to-date).', 'utilise le CUMUL ANNUEL (year-to-date) cumulé sur l\\'année.')\n  : consigne;\n\nconst enveloppe = (c) => c + '\\n\\nDOCUMENT :\\n' + doc;\n\nreturn [{ json: {\n  ...t,\n  prompt_A: enveloppe(consigne),\n  prompt_B: enveloppe(consigne),\n  prompt_C: enveloppe(consigne_C)\n} }];"
       },
       "name": "Consolider le contexte",
       "type": "n8n-nodes-base.code",
@@ -126,7 +148,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt_A }] }) }}",
         "options": {
-          "timeout": 90000
+          "timeout": 180000
         }
       },
       "name": "Modèle A (OpenAI)",
@@ -163,7 +185,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 1024, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt_B }] }) }}",
         "options": {
-          "timeout": 90000
+          "timeout": 180000
         }
       },
       "name": "Modèle B (Anthropic)",
@@ -192,7 +214,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $('Consolider le contexte').first().json.prompt_C }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) }}",
         "options": {
-          "timeout": 90000
+          "timeout": 180000
         }
       },
       "name": "Modèle C (Google)",
@@ -218,7 +240,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Consensus champ par champ sur la VALEUR. Une valeur unanime mais sans extrait\n// vérifiable ne compte pas comme consensus : l'accord sur une affirmation\n// invérifiable n'est pas une preuve (§ 6.3). Le consensus est une heuristique de\n// priorisation, jamais une vérité — la hiérarchie reste vérité terrain, puis\n// consensus, puis validation humaine.\nconst j = $input.first().json;\nconst parsed = j.extractions.map(e => e.extraction || {});\nconst champs = ['periode', 'immatriculations_ue_mois', 'part_bev_pct'];\n\nconst norm = (v) => String(v ?? '').trim().replace(/\\s|,/g, '').toLowerCase();\nlet accord = 0;\nconst detail = {};\nfor (const f of champs) {\n  const vals = parsed.map(p => norm(p[f]?.valeur ?? p[f]));\n  const extraits = parsed.map(p => String(p[f]?.extrait_source ?? '').trim());\n  const unanime = vals.every(v => v === vals[0] && v !== '' && v !== 'absent');\n  const tous_sources = extraits.every(e => e !== '' && e.toLowerCase() !== 'absent') || vals[0] === 'absent';\n  detail[f] = { valeurs: parsed.map(p => p[f]?.valeur ?? p[f] ?? null), extraits_source: extraits, unanime, tous_sources };\n  if (unanime && tous_sources) accord++;\n}\nconst consensus_score = champs.length ? accord / champs.length : 0;\nconst unanimous = consensus_score === 1;\n\n// Valeur pivot proposée : immatriculations mensuelles UE (numérique), si unanime.\nlet valeur_pivot = null;\nif (detail.immatriculations_ue_mois.unanime) {\n  const brut = String(parsed[0].immatriculations_ue_mois?.valeur ?? '').replace(/[^0-9]/g, '');\n  if (brut) valeur_pivot = Number(brut);\n}\n\nreturn [{ json: { ...j, consensus_score, unanimous, valeur_pivot, detail } }];"
+        "jsCode": "// Consensus champ par champ sur la VALEUR. Une valeur unanime mais sans extrait\n// vérifiable ne compte pas comme consensus : l'accord sur une affirmation\n// invérifiable n'est pas une preuve (§ 6.3). Le consensus est une heuristique de\n// priorisation, jamais une vérité — la hiérarchie reste vérité terrain, puis\n// consensus, puis validation humaine.\nconst j = $input.first().json;\nconst parsed = j.extractions.map(e => e.extraction || {});\nconst champs = ['periode', 'immatriculations_ue_mois', 'part_bev_pct'];\n\n// Le % est neutralisé : « 20 » et « 20% » sont la même valeur — le désaccord\n// constaté au run 57 entre ces deux formes était un artefact du contrôle,\n// pas un désaccord des modèles (corrigé le 17.08.2026).\nconst norm = (v) => String(v ?? '').trim().replace(/\\s|,|%/g, '').toLowerCase();\nlet accord = 0;\nconst detail = {};\nfor (const f of champs) {\n  const vals = parsed.map(p => norm(p[f]?.valeur ?? p[f]));\n  const extraits = parsed.map(p => String(p[f]?.extrait_source ?? '').trim());\n  const unanime = vals.every(v => v === vals[0] && v !== '' && v !== 'absent');\n  const tous_sources = extraits.every(e => e !== '' && e.toLowerCase() !== 'absent') || vals[0] === 'absent';\n  detail[f] = { valeurs: parsed.map(p => p[f]?.valeur ?? p[f] ?? null), extraits_source: extraits, unanime, tous_sources };\n  if (unanime && tous_sources) accord++;\n}\nconst consensus_score = champs.length ? accord / champs.length : 0;\nlet unanimous = consensus_score === 1;\n\n// Garde de concordance de période (17.08.2026) : la période extraite du\n// DOCUMENT doit être celle que la file ANNONCE. Un communiqué mal apparié\n// (décalage de nommage ACEA, cumul lu à la place du mensuel) écrirait une\n// valeur juste sous un mois faux — indétectable ensuite. En cas d'écart,\n// validation humaine forcée, jamais d'écriture directe.\nconst periodeExtraite = norm(parsed[0]?.periode?.valeur ?? parsed[0]?.periode);\nif (unanimous && periodeExtraite && periodeExtraite !== norm(j.period)) {\n  unanimous = false;\n  j.incidents = (j.incidents ?? []).concat('période extraite (' + periodeExtraite + ') != période attendue (' + j.period + ') — validation humaine forcée');\n}\n\n// Valeur pivot proposée : immatriculations mensuelles UE (numérique), si unanime.\nlet valeur_pivot = null;\nif (detail.immatriculations_ue_mois.unanime) {\n  const brut = String(parsed[0].immatriculations_ue_mois?.valeur ?? '').replace(/[^0-9]/g, '');\n  if (brut) valeur_pivot = Number(brut);\n}\n\nreturn [{ json: { ...j, consensus_score, unanimous, valeur_pivot, detail } }];"
       },
       "name": "Contrôle de consistance",
       "type": "n8n-nodes-base.code",
@@ -315,6 +337,30 @@
           "name": "postgres veille"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE composite_queue SET statut = 'traite', run_id = $1, traite_le = now() WHERE doc_id = $2 RETURNING doc_id, period, statut;",
+        "options": {
+          "queryReplacement": "={{ [$(\"Préparer tâche d'extraction\").first().json.run_id, $(\"Préparer tâche d'extraction\").first().json.doc_id] }}"
+        },
+        "additionalFields": {}
+      },
+      "name": "Marquer le document traité",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2750,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "notes": "La ligne de file passe à traite avec le run qui l'a consommée : le document ne sera pas retraité, et la file garde l'historique — quel run a traité quel document, et quand."
     }
   ],
   "connections": {
@@ -333,7 +379,29 @@
       "main": [
         [
           {
+            "node": "Prendre le prochain document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prendre le prochain document": {
+      "main": [
+        [
+          {
             "node": "Préparer tâche d'extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clôturer le run": {
+      "main": [
+        [
+          {
+            "node": "Marquer le document traité",
             "type": "main",
             "index": 0
           }
