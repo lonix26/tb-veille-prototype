@@ -191,7 +191,7 @@
           "batching": {
             "batch": {
               "batchSize": 1,
-              "batchInterval": 2500
+              "batchInterval": 5000
             }
           },
           "response": {
@@ -220,10 +220,6 @@
     {
       "parameters": {
         "url": "={{ $json.url_complete }}",
-        "method": "={{ $json.methode || 'GET' }}",
-        "sendBody": "={{ ($json.methode || 'GET') === 'POST' }}",
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.corps_requete || {}) }}",
         "options": {
           "timeout": 60000,
           "response": {
@@ -245,8 +241,55 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.methode }}",
+              "operation": "equal",
+              "value2": "POST"
+            }
+          ]
+        }
+      },
+      "name": "POST ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        900,
+        560
+      ],
+      "notes": "Aiguillage de transport ajouté le 17.08.2026 : les liaisons déclarant _methode=POST (OFS PX-Web) passent par un nœud d'appel dédié à configuration statique. Motif : une expression sur le champ booléen Send Body du nœud générique n'était pas évaluée de manière fiable — le POST partait sans corps, HTTP 400 (runs 36 à 39). Les GET restent sur le nœud générique, inchangé."
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url_complete }}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ typeof $json.corps_requete === 'string' ? JSON.parse($json.corps_requete) : $json.corps_requete }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "name": "Appeler la source (POST)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1010,
+        650
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Appel des sources en POST (OFS PX-Web). Configuration statique : méthode, envoi du corps et type de contenu en dur ; seul le corps est une expression, sérialisée depuis corps_requete (clé _corps de la liaison, donc au référentiel, donc auditable). Réponse en texte, même chaîne aval que les autres voies."
+    },
+    {
+      "parameters": {
         "mode": "append",
-        "numberInputs": 2,
+        "numberInputs": 3,
         "options": {}
       },
       "name": "Réunir les deux voies d'appel",
@@ -381,9 +424,38 @@
         ],
         [
           {
+            "node": "POST ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST ?": {
+      "main": [
+        [
+          {
+            "node": "Appeler la source (POST)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Appeler la source (générique)",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Appeler la source (POST)": {
+      "main": [
+        [
+          {
+            "node": "Réunir les deux voies d'appel",
+            "type": "main",
+            "index": 2
           }
         ]
       ]
