@@ -33,7 +33,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT binding_id, indicator_id, connecteur, url_base, params, mapping, geo_defaut FROM v_bindings_actifs;",
+        "query": "SELECT binding_id, indicator_id, connecteur, url_base, params, mapping, geo_defaut FROM v_bindings_actifs WHERE connecteur <> 'xlsx_indexe';",
         "options": {}
       },
       "name": "Lire les liaisons actives",
