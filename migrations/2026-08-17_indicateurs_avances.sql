@@ -41,9 +41,9 @@ BEGIN;
 
 -- 1. Nouvelle source : KOF (l'enquête DG ECFIN passe par la source
 --    eurostat existante, même API de dissémination).
-INSERT INTO sources (source_id, label, organisation, frequency, format, access, qualification_status, url, note)
-VALUES ('kof', 'Baromètre conjoncturel KOF', 'KOF ETH Zurich', 'mensuelle', 'API / CSV', 'libre', 'a_confirmer',
-        'https://data.kof.ethz.ch',
+INSERT INTO sources (source_id, name, organisation, url, frequency, format, access, qualification_status, qualified_by, qualified_at, notes)
+VALUES ('kof', 'Baromètre conjoncturel KOF', 'KOF ETH Zurich', 'https://data.kof.ethz.ch',
+        'mensuelle', 'API / CSV', 'libre', 'a_confirmer', 'N. Castillo', '2026-08-17',
         'API v2 publique sans clé (access_type=public), CSV date/valeur, mensuel depuis 1991. Vérifiée en réponse réelle le 17.08.2026. Ancienne API v1 hors service — motif du re-sourçage documenté.')
 ON CONFLICT (source_id) DO NOTHING;
 
