@@ -3,3 +3,4 @@ data/*
 !data/.gitkeep
 *.tar.gz
 .idea/
+.idea/
