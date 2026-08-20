@@ -2,6 +2,15 @@ import React, { useEffect, useRef } from "react";
 import * as echarts from "echarts";
 import { nb, nomZone } from "./api.jsx";
 
+// Format compact des axes : 180 000 000 000 se lit mal, « 180 mrd » se lit.
+const fmtAxe = v => {
+  const a = Math.abs(v);
+  if (a >= 1e9) return (v / 1e9).toLocaleString("fr-CH", { maximumFractionDigits: 1 }) + " mrd";
+  if (a >= 1e6) return (v / 1e6).toLocaleString("fr-CH", { maximumFractionDigits: 1 }) + " mio";
+  if (a >= 1e4) return (v / 1e3).toLocaleString("fr-CH", { maximumFractionDigits: 0 }) + " k";
+  return String(v);
+};
+
 // Graphique de séries temporelles — survol (valeurs exactes), zoom à la
 // molette et par glissière, légende cliquable pour comparer les zones.
 // props :
@@ -53,7 +62,7 @@ export default function Chart({ series, refLine, refLabel, zoom, hauteur = 240 }
       },
       yAxis: {
         type: "value", scale: true,
-        axisLabel: { fontSize: 10, color: "#7b8794" },
+        axisLabel: { fontSize: 10, color: "#7b8794", formatter: fmtAxe },
         splitLine: { lineStyle: { color: "#eef1f4" } }
       },
       dataZoom: zoom

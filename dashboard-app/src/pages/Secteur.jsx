@@ -243,9 +243,7 @@ function CarteIndicateur({ ind }) {
   const statut = m ? m.validation_status : (serieDe(D, ind.indicator_id)[0] || {}).validation_status;
   const top5 = parZone.slice(0, 5);
   const seriesTop = Object.fromEntries(top5.map(z => [z.g, serieDe(D, ind.indicator_id, z.g)]));
-  const PLAF = 8;
-  const zonesVisibles = voirToutesZones ? parZone : parZone.slice(0, PLAF);
-  const maxV = parZone[0]?.v ?? 1;
+  const PLAF = 10;
 
   return (
     <div className="carte ind">
@@ -288,27 +286,130 @@ function CarteIndicateur({ ind }) {
         </>
       )}
 
-      {pays.length > 1 && (
-        <div style={{ marginTop: zonePrincipale ? 14 : 4 }}>
-          {Object.values(seriesTop).some(s => s.length >= 3) && <Chart series={seriesTop} zoom />}
-          <div style={{ fontSize: 11, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em", margin: "10px 0 6px" }}>
-            Principales zones · dernière période, variation sur un an
-          </div>
-          {zonesVisibles.map(z => (
-            <div className="zl" key={z.g}>
-              <span className="zn">{nomZone(z.g)}</span>
-              <span className="zb"><i style={{ width: Math.max(2, (z.v / maxV) * 100) + "%" }} /></span>
-              <span className="zv">{nb(z.v)}</span>
-              <span className={"zp " + clsVar(z.variation)}>{pct(z.variation)}</span>
+      {pays.length > 1 && (() => {
+        /* Panneau de panier (21.08.2026). Parts et variation de PART en
+           points — le déplacement de la demande que QV2/QV3 demandent de
+           voir — calculées au titre de la dernière période COMMUNE (la
+           fraîcheur d'un panier est celle de son déclarant le plus lent),
+           et UNIQUEMENT pour les grandeurs additives : une part d'indices
+           ou de taux ne signifie rien (leçon T2). */
+        const additif = /USD|EUR|CHF|unité|appareil|nombre/i.test(ind.unit || "");
+        const periodesParZone = new Map(pays.map(z0 => [z0, new Set(serieDe(D, ind.indicator_id, z0).map(p => p.period))]));
+        const toutes = [...new Set(pays.flatMap(z0 => [...periodesParZone.get(z0)]))].sort();
+        const communes = toutes.filter(p => pays.every(z0 => periodesParZone.get(z0).has(p)));
+        const pRef = communes.length ? communes[communes.length - 1] : toutes[toutes.length - 1];
+        const pRecente = toutes[toutes.length - 1];
+        const pPrev = String(parseInt(pRef.slice(0, 4), 10) - 1) + pRef.slice(4);
+        const lignesRef = pays.map(z0 => {
+          const s = serieDe(D, ind.indicator_id, z0);
+          const v = s.find(x => x.period === pRef);
+          const vp = s.find(x => x.period === pPrev);
+          return v ? { g: z0, v: v.value, vp: vp ? vp.value : null } : null;
+        }).filter(Boolean).sort((a, b) => b.v - a.v);
+        if (!lignesRef.length) return null;
+        const sommePanier = lignesRef.reduce((s, z) => s + z.v, 0);
+        const sommePanierPrev = lignesRef.every(z => z.vp !== null)
+          ? lignesRef.reduce((s, z) => s + z.vp, 0) : null;
+        /* Dénominateur : le TOTAL MONDIAL publié par la source quand
+           l'indicateur en porte une ligne (H1 -> W00, A3 -> World…) —
+           avec un résidu « Autres marchés » ; sinon, le panier suivi,
+           seul dénominateur honnête pour un panier de déclarants. */
+        const serieMonde = additif && agregats.length ? serieDe(D, ind.indicator_id, agregats[0]) : [];
+        const vMonde = serieMonde.find(x => x.period === pRef);
+        const vMondePrev = serieMonde.find(x => x.period === pPrev);
+        const mondeOk = vMonde && vMonde.value >= sommePanier;
+        const total = mondeOk ? vMonde.value : sommePanier;
+        const totalPrev = mondeOk
+          ? (vMondePrev && sommePanierPrev !== null ? vMondePrev.value : null)
+          : sommePanierPrev;
+        const varTotal = totalPrev ? (total - totalPrev) / totalPrev * 100 : null;
+        const reste = mondeOk ? {
+          g: "__reste__", v: total - sommePanier,
+          vp: totalPrev !== null && sommePanierPrev !== null ? totalPrev - sommePanierPrev : null
+        } : null;
+        const manquants = pays.filter(z0 => !periodesParZone.get(z0).has(pRecente));
+        const affiche = voirToutesZones ? lignesRef : lignesRef.slice(0, PLAF);
+        const maxRef = lignesRef[0].v;
+        return (
+          <div style={{ marginTop: zonePrincipale ? 14 : 4 }}>
+            {Object.values(seriesTop).some(s => s.length >= 3) && <Chart series={seriesTop} zoom />}
+            {additif && total > 0 && !mondeOk && (
+              <div style={{ margin: "12px 0 2px" }}>
+                <span className="i-val" style={{ fontSize: 21 }}>{nb(total)}</span>
+                <span className="i-u">{ind.unit} · marché du panier suivi · {pRef}</span>
+                {varTotal !== null && (
+                  <span className={"etq " + (varTotal > 0 ? "e-vert" : varTotal < 0 ? "e-rouge" : "e-gris")} style={{ marginLeft: 8 }}>
+                    {pct(varTotal)} sur un an
+                  </span>
+                )}
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em", margin: "8px 0 6px" }}>
+              {additif
+                ? `Zones au titre de ${pRef} · valeur, part ${mondeOk ? "du marché total" : "du panier"}, gain ou perte de part, variation`
+                : `Niveaux au titre de ${pRef}, variation sur un an`}
             </div>
-          ))}
-          {parZone.length > PLAF && (
-            <button className="rafraichir" style={{ marginTop: 8 }} onClick={() => setVoirToutesZones(v => !v)}>
-              {voirToutesZones ? "Réduire" : `Afficher les ${parZone.length - PLAF} autres zones`}
-            </button>
-          )}
-        </div>
-      )}
+            {affiche.map(z => {
+              const part = additif && total > 0 ? z.v / total * 100 : null;
+              const partPrev = additif && totalPrev && z.vp !== null ? z.vp / totalPrev * 100 : null;
+              const dPart = part !== null && partPrev !== null ? part - partPrev : null;
+              const varAn = z.vp ? (z.v - z.vp) / z.vp * 100 : null;
+              return (
+                <div className="zl" key={z.g}
+                     style={additif ? { gridTemplateColumns: "56px 1fr 90px 58px 62px 62px" } : undefined}>
+                  <span className="zn">{nomZone(z.g)}</span>
+                  <span className="zb"><i style={{ width: Math.max(2, (z.v / maxRef) * 100) + "%" }} /></span>
+                  <span className="zv">{nb(z.v)}</span>
+                  {additif && <span className="zp">{part !== null ? nb(part, 1) + " %" : "—"}</span>}
+                  {additif && (
+                    <span className={"zp " + clsVar(dPart)}>
+                      {dPart !== null ? (dPart > 0 ? "+" : "") + nb(dPart, 1) + " pt" : "—"}
+                    </span>
+                  )}
+                  <span className={"zp " + clsVar(varAn)}>{pct(varAn)}</span>
+                </div>
+              );
+            })}
+            {reste && reste.v > 0 && (() => {
+              const part = reste.v / total * 100;
+              const partPrev = totalPrev && reste.vp !== null ? reste.vp / totalPrev * 100 : null;
+              const dPart = partPrev !== null ? part - partPrev : null;
+              const varAn = reste.vp ? (reste.v - reste.vp) / reste.vp * 100 : null;
+              return (
+                <div className="zl" style={{ gridTemplateColumns: "56px 1fr 90px 58px 62px 62px", opacity: .75 }}>
+                  <span className="zn" style={{ fontStyle: "italic" }}>Autres</span>
+                  <span className="zb"><i style={{ width: Math.max(2, (reste.v / maxRef) * 100) + "%", background: "#98a2b3" }} /></span>
+                  <span className="zv">{nb(reste.v)}</span>
+                  <span className="zp">{nb(part, 1)} %</span>
+                  <span className={"zp " + clsVar(dPart)}>{dPart !== null ? (dPart > 0 ? "+" : "") + nb(dPart, 1) + " pt" : "—"}</span>
+                  <span className={"zp " + clsVar(varAn)}>{pct(varAn)}</span>
+                </div>
+              );
+            })()}
+            {lignesRef.length > PLAF && (
+              <button className="rafraichir" style={{ marginTop: 8 }} onClick={() => setVoirToutesZones(v => !v)}>
+                {voirToutesZones ? "Réduire" : `Afficher les ${lignesRef.length - PLAF} autres zones`}
+              </button>
+            )}
+            {pRecente !== pRef && manquants.length > 0 && (
+              <div className="note">
+                {pRecente} est encore incomplète ({manquants.slice(0, 6).map(nomZone).join(", ")}{manquants.length > 6 ? "…" : ""} sans soumission) :
+                lecture au titre de {pRef}, la dernière période où tout le panier a déclaré — classer sur
+                l'année incomplète donnerait une part nulle aux retardataires.
+              </div>
+            )}
+            {additif && (
+              <div className="note">
+                {mondeOk
+                  ? `Parts du marché total tel que publié par la source (ligne monde) — les ${lignesRef.length} zones suivies en couvrent ${nb(sommePanier / total * 100, 1)} %, le reste est agrégé en « Autres ».`
+                  : `Parts du panier suivi (${lignesRef.length} zones) : la source publie par déclarant, sans ligne monde — le total mondial n'existe pas en une série, et le dire vaut mieux que l'estimer.`}
+                {" "}« pt » = variation de la part en points de pourcentage : le déplacement de la demande
+                entre zones — l'information que QV2 et QV3 demandent.
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="i-pied">
         <span>{ind.source_organisation} · {ind.frequency}</span>
