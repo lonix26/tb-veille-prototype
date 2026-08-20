@@ -1,8 +1,11 @@
 # Environnement du prototype de veille — TB « Exploration de l'IA pour les entreprises industrielles »
-# Deux services seulement : la contrainte E5 (coût de licence nul, reproductible par une PME) interdit d'en ajouter sans nécessité.
+# Contrainte E5 (révisée le 17.08.2026, décision N. Castillo — documentée en notes de rédaction) :
+# coût de licence nul et reproductibilité restent la règle ; les services et dépendances LIBRES
+# nécessaires à la restitution sont admis. Trois services applicatifs :
 #
 #   docker compose up -d
 #   n8n        → http://localhost:5678
+#   dashboard  → http://localhost:8080  (application de restitution, statique nginx — construire d'abord : cd dashboard-app && npm install && npm run build)
 #   adminer    → http://localhost:8081  (profil "outils" uniquement : docker compose --profile outils up -d)
 
 services:
@@ -75,6 +78,20 @@ services:
       - ./n8n_workflows:/workflows:ro
     ports:
       - "127.0.0.1:5678:5678"
+
+  dashboard:
+    image: nginx:1.27-alpine
+    container_name: veille_dashboard
+    restart: unless-stopped
+    depends_on:
+      - n8n
+    volumes:
+      # Le build Vite (dashboard-app/dist) est servi tel quel : nginx ne fait
+      # que distribuer des fichiers statiques, aucune logique côté serveur.
+      # L'application lit l'API de restitution n8n (lecture seule) côté client.
+      - ./dashboard-app/dist:/usr/share/nginx/html:ro
+    ports:
+      - "127.0.0.1:8080:80"
 
   adminer:
     image: adminer:latest
