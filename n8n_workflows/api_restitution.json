@@ -1,4 +1,5 @@
 {
+  "id": "apiRestitutionV4",
   "name": "Veille - API de restitution (lecture seule)",
   "nodes": [
     {
@@ -31,7 +32,13 @@
         260,
         300
       ],
-      "notes": "Une seule requête, en lecture seule. Elle assemble ce que le tableau de bord affiche (v_current), ce qui fait l'outil vivant (révisions constatées entre runs) et les vues de contrôle qui rendent calculables des affirmations du rapport (décompte du référentiel, couverture des questions de veille). Le nombre de comparaisons entre runs est renvoyé à part : sans lui, une liste de révisions vide serait ambiguë — elle peut signifier « aucune révision » comme « aucune comparaison possible ». La clé 'alertes' (ajoutée le 10.08.2026) restreint v_alertes_candidates à la dernière observation de chaque couple indicateur/zone, par jointure sur v_dernier_point : un franchissement de seuil sur une période ancienne relève de l'historique, pas du signal courant. La colonne diffusable de la vue applique RI5 et est restituée telle quelle, motif de retenue compris — le tableau de bord affiche les retenues au lieu de les filtrer."
+      "notes": "Une seule requête, en lecture seule. Elle assemble ce que le tableau de bord affiche (v_current), ce qui fait l'outil vivant (révisions constatées entre runs) et les vues de contrôle qui rendent calculables des affirmations du rapport (décompte du référentiel, couverture des questions de veille). Le nombre de comparaisons entre runs est renvoyé à part : sans lui, une liste de révisions vide serait ambiguë — elle peut signifier « aucune révision » comme « aucune comparaison possible ». La clé 'alertes' (ajoutée le 10.08.2026) restreint v_alertes_candidates à la dernière observation de chaque couple indicateur/zone, par jointure sur v_dernier_point : un franchissement de seuil sur une période ancienne relève de l'historique, pas du signal courant. La colonne diffusable de la vue applique RI5 et est restituée telle quelle, motif de retenue compris — le tableau de bord affiche les retenues au lieu de les filtrer.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -92,7 +99,12 @@
         240,
         520
       ],
-      "credentials": {}
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -149,7 +161,12 @@
         240,
         720
       ],
-      "credentials": {}
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -206,7 +223,12 @@
         240,
         920
       ],
-      "credentials": {}
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -263,7 +285,12 @@
         240,
         1120
       ],
-      "credentials": {}
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {

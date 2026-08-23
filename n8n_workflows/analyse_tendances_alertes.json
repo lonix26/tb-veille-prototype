@@ -1,4 +1,5 @@
 {
+  "id": "commentaireExecV2",
   "name": "Veille - Commentaire exécutif (RI0-RI10, validation avant diffusion)",
   "meta": {
     "description": "Rédaction déléguée du § 10.4.1 (rang 4), exécutable. Remplace le squelette initial qui parlait à un service loader:8080 inexistant : la présente version lit l'objet compact v_dernier_point (les chiffres par le code — aucune métrique n'est calculée ici ni par le modèle), soumet UN commentaire par secteur à un modèle sous les règles d'interprétation RI0-RI10 (§ 10.4.3), et stocke le résultat en table commentaries au statut a_valider avec la charge exacte soumise (input_payload). Rien n'est diffusé sans validation humaine : le tableau de bord n'affiche que les commentaires validés. Les alertes, elles, sont portées par v_alertes_candidates et la restitution — plus par ce workflow."

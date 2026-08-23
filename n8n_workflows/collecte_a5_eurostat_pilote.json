@@ -5,11 +5,23 @@
   },
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 6 2 * *" }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 2 * *"
+            }
+          ]
+        }
+      },
       "name": "Déclencheur mensuel",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 400],
+      "position": [
+        0,
+        400
+      ],
       "notes": "Le 2 du mois : Eurostat publie en début de mois. La fréquence du workflow suit celle de la source, elle ne la précède pas."
     },
     {
@@ -21,8 +33,17 @@
       "name": "Ouvrir le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [220, 400],
-      "notes": "Le run_id est ouvert AVANT la collecte : même une collecte qui échoue laisse une trace datée. Un run manquant serait un trou dans l'historique de l'outil vivant."
+      "position": [
+        220,
+        400
+      ],
+      "notes": "Le run_id est ouvert AVANT la collecte : même une collecte qui échoue laisse une trace datée. Un run manquant serait un trou dans l'historique de l'outil vivant.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -30,29 +51,62 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "format", "value": "JSON" },
-            { "name": "lang", "value": "FR" },
-            { "name": "nace_r2", "value": "C29" },
-            { "name": "unit", "value": "I21" },
-            { "name": "s_adj", "value": "SCA" },
-            { "name": "geo", "value": "EU27_2020" },
-            { "name": "sinceTimePeriod", "value": "2023-01" }
+            {
+              "name": "format",
+              "value": "JSON"
+            },
+            {
+              "name": "lang",
+              "value": "FR"
+            },
+            {
+              "name": "nace_r2",
+              "value": "C29"
+            },
+            {
+              "name": "unit",
+              "value": "I21"
+            },
+            {
+              "name": "s_adj",
+              "value": "SCA"
+            },
+            {
+              "name": "geo",
+              "value": "EU27_2020"
+            },
+            {
+              "name": "sinceTimePeriod",
+              "value": "2023-01"
+            }
           ]
         },
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "name": "API Eurostat (sts_inpr_m, NACE C29)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 400],
+      "position": [
+        460,
+        400
+      ],
       "notes": "À VÉRIFIER CONTRE L'API RÉELLE avant de conclure quoi que ce soit : le code de jeu de données (sts_inpr_m), la nomenclature (nace_r2=C29), l'unité (I21 = indice base 2021) et le code géographique (EU27_2020) sont plausibles mais n'ont pas été testés. Eurostat renomme périodiquement ses jeux de données."
     },
     {
-      "parameters": { "operation": "toJson", "mode": "all", "options": {} },
+      "parameters": {
+        "operation": "toJson",
+        "mode": "all",
+        "options": {}
+      },
       "name": "Sérialiser la réponse brute",
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
-      "position": [700, 620]
+      "position": [
+        700,
+        620
+      ]
     },
     {
       "parameters": {
@@ -63,7 +117,10 @@
       "name": "Déposer en zone brute",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [940, 620],
+      "position": [
+        940,
+        620
+      ],
       "notes": "Exigence E6 : la réponse est conservée telle que reçue. Sans elle, une valeur affichée au tableau de bord n'est plus vérifiable une fois la source mise à jour. CE NŒUD PRÉCÈDE DÉLIBÉRÉMENT LE DÉCODAGE ET L'ÉCRITURE EN BASE : tant qu'il échoue, aucune valeur n'entre au registre. La version initiale plaçait les deux branches en parallèle, ce qui a produit le 06.08.2026 un run marqué « ok » dont les 41 valeurs référençaient un dépôt brut inexistant — une traçabilité affirmée sans pièce derrière. L'ordre est ici une contrainte, pas une commodité. Le nom du fichier ne porte que le run_id : la date figure dans runs.executed_at, et la construire deux fois avec deux fuseaux différents (UTC dans le code, Europe/Zurich dans ce nœud) faisait diverger la référence du fichier réel au passage de minuit."
     },
     {
@@ -73,7 +130,10 @@
       "name": "Normaliser (JSON-stat → observations)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [700, 400]
+      "position": [
+        700,
+        400
+      ]
     },
     {
       "parameters": {
@@ -82,7 +142,10 @@
       "name": "Contrôles qualité déterministes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [940, 400]
+      "position": [
+        940,
+        400
+      ]
     },
     {
       "parameters": {
@@ -95,8 +158,17 @@
       "name": "Écrire au registre",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1180, 400],
-      "notes": "Statuts écrits en dur dans la requête, non calculés : par construction, ce pipeline ne peut produire que du 'etl' / 'valide_source'. La contrainte chk_hierarchie_controle rejetterait toute autre combinaison — la règle est tenue par la base, pas par la vigilance du workflow."
+      "position": [
+        1180,
+        400
+      ],
+      "notes": "Statuts écrits en dur dans la requête, non calculés : par construction, ce pipeline ne peut produire que du 'etl' / 'valide_source'. La contrainte chk_hierarchie_controle rejetterait toute autre combinaison — la règle est tenue par la base, pas par la vigilance du workflow.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -109,20 +181,111 @@
       "name": "Clôturer le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1420, 400],
+      "position": [
+        1420,
+        400
+      ],
       "executeOnce": true,
-      "notes": "La note du run consigne le bilan des contrôles. Un run clos sans note d'écart est un run dont on ne sait pas s'il a tout collecté."
+      "notes": "La note du run consigne le bilan des contrôles. Un run clos sans note d'écart est un run dont on ne sait pas s'il a tout collecté.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     }
   ],
   "connections": {
-    "Déclencheur mensuel": { "main": [[ { "node": "Ouvrir le run", "type": "main", "index": 0 } ]] },
-    "Ouvrir le run": { "main": [[ { "node": "API Eurostat (sts_inpr_m, NACE C29)", "type": "main", "index": 0 } ]] },
-    "API Eurostat (sts_inpr_m, NACE C29)": { "main": [[ { "node": "Sérialiser la réponse brute", "type": "main", "index": 0 } ]] },
-    "Sérialiser la réponse brute": { "main": [[ { "node": "Déposer en zone brute", "type": "main", "index": 0 } ]] },
-    "Déposer en zone brute": { "main": [[ { "node": "Normaliser (JSON-stat → observations)", "type": "main", "index": 0 } ]] },
-    "Normaliser (JSON-stat → observations)": { "main": [[ { "node": "Contrôles qualité déterministes", "type": "main", "index": 0 } ]] },
-    "Contrôles qualité déterministes": { "main": [[ { "node": "Écrire au registre", "type": "main", "index": 0 } ]] },
-    "Écrire au registre": { "main": [[ { "node": "Clôturer le run", "type": "main", "index": 0 } ]] }
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "API Eurostat (sts_inpr_m, NACE C29)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Eurostat (sts_inpr_m, NACE C29)": {
+      "main": [
+        [
+          {
+            "node": "Sérialiser la réponse brute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sérialiser la réponse brute": {
+      "main": [
+        [
+          {
+            "node": "Déposer en zone brute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déposer en zone brute": {
+      "main": [
+        [
+          {
+            "node": "Normaliser (JSON-stat → observations)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser (JSON-stat → observations)": {
+      "main": [
+        [
+          {
+            "node": "Contrôles qualité déterministes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contrôles qualité déterministes": {
+      "main": [
+        [
+          {
+            "node": "Écrire au registre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire au registre": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

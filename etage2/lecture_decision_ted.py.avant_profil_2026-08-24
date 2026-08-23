@@ -55,9 +55,7 @@ logiciels, des prestations de service (maintenance, nettoyage, transport, consei
 formation), du mobilier, des matières premières brutes, ou des équipements qu'elle
 revendrait sans les produire."""
 
-PROFIL_REFERENCE = 'A_metier_declare'
-
-QUESTION = """
+CONSIGNE = PROFIL + """
 
 Pour CHAQUE avis de marché public de la liste, réponds à une seule question :
 cet appel est-il exécutable par cet atelier, et que faut-il faire maintenant ?
@@ -91,15 +89,6 @@ Réponds UNIQUEMENT par un JSON strict, sans texte autour :
 "action_proposee": "", "justification": ""}]}"""
 
 
-def construire_consigne(profil_texte):
-    """La question est invariante, le profil change. C'est la condition pour que
-    l'écart mesuré entre deux profils soit imputable au profil et à rien d'autre."""
-    return profil_texte + QUESTION
-
-
-CONSIGNE = construire_consigne(PROFIL)
-
-
 def charger_cles():
     c = {}
     for l in FICHIER_CLES.read_text().splitlines():
@@ -109,8 +98,8 @@ def charger_cles():
     return c
 
 
-def appel(cles, lot, consigne=None):
-    contenu = (consigne or CONSIGNE) + "\n\nAvis :\n" + "\n".join(
+def appel(cles, lot):
+    contenu = CONSIGNE + "\n\nAvis :\n" + "\n".join(
         f'- {a["num"]} [{a["secteur"]}, {a["pays"]}, CPV {a["cpv"]}, '
         f'{a["jours"]} jours restants] : {a["titre"]}' for a in lot)
     corps = {"contents": [{"parts": [{"text": contenu}]}],
@@ -144,7 +133,7 @@ def main():
             WHERE a.est_appel_ouvert AND a.date_limite >= CURRENT_DATE
               AND NOT EXISTS (SELECT 1 FROM ted_lecture_ia l
                               WHERE l.publication_number = a.publication_number
-                                AND l.modele = %s AND l.profil = 'A_metier_declare')
+                                AND l.modele = %s)
             ORDER BY a.date_limite LIMIT %s""", (modele, args.limite))
         attente = [{"num": r[0], "secteur": r[1], "pays": r[2], "cpv": r[3],
                     "jours": r[4], "titre": (r[5] or "")[:260]} for r in cur.fetchall()]
@@ -169,11 +158,11 @@ def main():
                 if l.get("publication_number") not in valides: continue
                 if l.get("adressable") not in (0, 1, 2): continue
                 cur.execute("""
-                    INSERT INTO ted_lecture_ia (publication_number, modele, profil, adressable,
+                    INSERT INTO ted_lecture_ia (publication_number, modele, adressable,
                         piece_concernee, action_proposee, justification)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s)
-                    ON CONFLICT (publication_number, modele, profil) DO NOTHING""",
-                    (l["publication_number"], modele, PROFIL_REFERENCE, l["adressable"],
+                    VALUES (%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (publication_number, modele) DO NOTHING""",
+                    (l["publication_number"], modele, l["adressable"],
                      (l.get("piece_concernee") or "")[:300] or None,
                      (l.get("action_proposee") or "")[:400] or None,
                      (l.get("justification") or "")[:400]))

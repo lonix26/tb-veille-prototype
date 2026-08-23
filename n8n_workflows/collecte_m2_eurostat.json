@@ -5,11 +5,23 @@
   },
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 6 15 1,4,7,10 *" }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 15 1,4,7,10 *"
+            }
+          ]
+        }
+      },
       "name": "Déclencheur trimestriel",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 400],
+      "position": [
+        0,
+        400
+      ],
       "notes": "Mi-janvier, avril, juillet, octobre : les indices trimestriels Eurostat paraissent avec environ six semaines de délai sur le trimestre clos."
     },
     {
@@ -21,7 +33,16 @@
       "name": "Ouvrir le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [220, 400]
+      "position": [
+        220,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -29,29 +50,62 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "format", "value": "JSON" },
-            { "name": "lang", "value": "FR" },
-            { "name": "nace_r2", "value": "C325" },
-            { "name": "unit", "value": "I21" },
-            { "name": "s_adj", "value": "SCA" },
-            { "name": "geo", "value": "EU27_2020" },
-            { "name": "sinceTimePeriod", "value": "2023" }
+            {
+              "name": "format",
+              "value": "JSON"
+            },
+            {
+              "name": "lang",
+              "value": "FR"
+            },
+            {
+              "name": "nace_r2",
+              "value": "C325"
+            },
+            {
+              "name": "unit",
+              "value": "I21"
+            },
+            {
+              "name": "s_adj",
+              "value": "SCA"
+            },
+            {
+              "name": "geo",
+              "value": "EU27_2020"
+            },
+            {
+              "name": "sinceTimePeriod",
+              "value": "2023"
+            }
           ]
         },
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "name": "API Eurostat (sts_inpr_q, NACE C32.5)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 400],
+      "position": [
+        460,
+        400
+      ],
       "notes": "À VÉRIFIER PAR CURL AVANT LA PREMIÈRE EXÉCUTION : le jeu trimestriel (sts_inpr_q) et le code NACE C325 sont plausibles mais non testés — même discipline que pour le pilote A5, dont les codes n'ont été confirmés que le 06.08.2026. Si C325 n'est pas publié en trimestriel, replier sur le jeu mensuel (sts_inpr_m) et consigner l'écart avec la fréquence annoncée au référentiel."
     },
     {
-      "parameters": { "operation": "toJson", "mode": "all", "options": {} },
+      "parameters": {
+        "operation": "toJson",
+        "mode": "all",
+        "options": {}
+      },
       "name": "Sérialiser la réponse brute",
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
-      "position": [700, 400]
+      "position": [
+        700,
+        400
+      ]
     },
     {
       "parameters": {
@@ -62,7 +116,10 @@
       "name": "Déposer en zone brute",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [940, 400],
+      "position": [
+        940,
+        400
+      ],
       "notes": "Exigence E6. Précède délibérément toute écriture en base (enseignement du run 4, journal du 06.08.2026)."
     },
     {
@@ -72,7 +129,10 @@
       "name": "Normaliser (JSON-stat → observations)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1180, 400]
+      "position": [
+        1180,
+        400
+      ]
     },
     {
       "parameters": {
@@ -81,7 +141,10 @@
       "name": "Contrôles qualité déterministes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1420, 400]
+      "position": [
+        1420,
+        400
+      ]
     },
     {
       "parameters": {
@@ -94,7 +157,16 @@
       "name": "Écrire au registre",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1660, 400]
+      "position": [
+        1660,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -107,18 +179,107 @@
       "name": "Clôturer le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1900, 400],
-      "executeOnce": true
+      "position": [
+        1900,
+        400
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     }
   ],
   "connections": {
-    "Déclencheur trimestriel": { "main": [[ { "node": "Ouvrir le run", "type": "main", "index": 0 } ]] },
-    "Ouvrir le run": { "main": [[ { "node": "API Eurostat (sts_inpr_q, NACE C32.5)", "type": "main", "index": 0 } ]] },
-    "API Eurostat (sts_inpr_q, NACE C32.5)": { "main": [[ { "node": "Sérialiser la réponse brute", "type": "main", "index": 0 } ]] },
-    "Sérialiser la réponse brute": { "main": [[ { "node": "Déposer en zone brute", "type": "main", "index": 0 } ]] },
-    "Déposer en zone brute": { "main": [[ { "node": "Normaliser (JSON-stat → observations)", "type": "main", "index": 0 } ]] },
-    "Normaliser (JSON-stat → observations)": { "main": [[ { "node": "Contrôles qualité déterministes", "type": "main", "index": 0 } ]] },
-    "Contrôles qualité déterministes": { "main": [[ { "node": "Écrire au registre", "type": "main", "index": 0 } ]] },
-    "Écrire au registre": { "main": [[ { "node": "Clôturer le run", "type": "main", "index": 0 } ]] }
+    "Déclencheur trimestriel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "API Eurostat (sts_inpr_q, NACE C32.5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Eurostat (sts_inpr_q, NACE C32.5)": {
+      "main": [
+        [
+          {
+            "node": "Sérialiser la réponse brute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sérialiser la réponse brute": {
+      "main": [
+        [
+          {
+            "node": "Déposer en zone brute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déposer en zone brute": {
+      "main": [
+        [
+          {
+            "node": "Normaliser (JSON-stat → observations)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser (JSON-stat → observations)": {
+      "main": [
+        [
+          {
+            "node": "Contrôles qualité déterministes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contrôles qualité déterministes": {
+      "main": [
+        [
+          {
+            "node": "Écrire au registre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire au registre": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   }
 }

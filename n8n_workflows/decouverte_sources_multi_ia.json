@@ -1,4 +1,5 @@
 {
+  "id": "decouverteMultiIA1",
   "name": "Veille - Découverte de sources multi-IA (couche amont, human-in-the-loop)",
   "meta": {
     "description": "Couche 0 de l'architecture (§ 10.2) : outille l'entretien du référentiel de sources. Quatre modèles proposent des sources candidates pour une question de veille ; le workflow normalise, recoupe (indice de recouvrement), vérifie objectivement l'existence de chaque URL, écarte les doublons du référentiel, puis dépose une fiche de qualification pré-remplie en file humaine. Le workflow ne décide jamais de l'inscription d'une source : la qualification reste non délégable (§ 10.4, § 10.4.2). — Portage du 22.08.2026 : les quatre appels d'API sont ceux testés à la vague 3 du protocole multi-IA (annexe 3), recherche web activée pour les quatre. Lecture et écritures par nœuds Postgres natifs, le service `loader` du câblage initial n'ayant jamais existé dans le compose."
@@ -42,7 +43,12 @@
         400
       ],
       "notes": "Sert au dédoublonnage : une source déjà qualifiée ne repasse pas en file humaine.",
-      "credentials": {}
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -295,7 +301,12 @@
         160
       ],
       "notes": "Seul point de sortie vers le référentiel : l'inscription d'une source suppose une décision humaine tracée (E6, E7).",
-      "credentials": {}
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -325,7 +336,12 @@
         2300,
         560
       ],
-      "credentials": {}
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {

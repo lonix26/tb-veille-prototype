@@ -1,4 +1,5 @@
 {
+  "id": "collecteGeneriqueV2",
   "name": "Veille - Collecteur générique (piloté par source_bindings)",
   "meta": {
     "description": "Collecteur unique pour tous les indicateurs dont la liaison est vérifiée et active. Il ne connaît aucun indicateur : il lit la table source_bindings, appelle chaque source, dépose la réponse brute, décode selon le connecteur déclaré, applique les contrôles déterministes et écrit au registre. Ajouter un indicateur au flux est une insertion en base, pas une modification de ce workflow. Pipeline ETL : aucun modèle de langage n'intervient. Généralisation du pilote A5 du 06.08.2026, dont il reprend la structure et l'ordre des nœuds — notamment le dépôt brut AVANT l'écriture en base."
@@ -28,7 +29,13 @@
         220,
         400
       ],
-      "notes": "Le run est ouvert AVANT toute collecte : même une collecte qui échoue laisse une trace datée."
+      "notes": "Le run est ouvert AVANT toute collecte : même une collecte qui échoue laisse une trace datée.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -43,7 +50,13 @@
         440,
         400
       ],
-      "notes": "La vue ne renvoie que les liaisons dont les paramètres ont été vérifiés contre l'API réelle par une personne nommée. Une liaison 'a_verifier' n'est PAS collectée : l'absence de donnée est préférable à une donnée dont on ignore la provenance. C'est la transposition, au niveau de la collecte, de la règle de qualification du § 8.2.1."
+      "notes": "La vue ne renvoie que les liaisons dont les paramètres ont été vérifiés contre l'API réelle par une personne nommée. Une liaison 'a_verifier' n'est PAS collectée : l'absence de donnée est préférable à une donnée dont on ignore la provenance. C'est la transposition, au niveau de la collecte, de la règle de qualification du § 8.2.1.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -140,7 +153,13 @@
         2200,
         400
       ],
-      "notes": "Statuts écrits en dur : par construction ce pipeline ne peut produire que du 'etl' / 'valide_source'. Toute autre combinaison serait rejetée par chk_hierarchie_controle — la règle est tenue par la base, non par la vigilance du workflow."
+      "notes": "Statuts écrits en dur : par construction ce pipeline ne peut produire que du 'etl' / 'valide_source'. Toute autre combinaison serait rejetée par chk_hierarchie_controle — la règle est tenue par la base, non par la vigilance du workflow.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {
@@ -158,7 +177,13 @@
         400
       ],
       "executeOnce": true,
-      "notes": "Le statut du run reflète la réalité de la collecte : 'ok' si toutes les liaisons ont abouti, 'partiel' si au moins un incident est survenu, 'echec' si rien n'a été écrit. La note consigne les indicateurs collectés ET les incidents — un run clos sans mention de ses échecs est un run dont on ne sait pas s'il a tout collecté."
+      "notes": "Le statut du run reflète la réalité de la collecte : 'ok' si toutes les liaisons ont abouti, 'partiel' si au moins un incident est survenu, 'echec' si rien n'a été écrit. La note consigne les indicateurs collectés ET les incidents — un run clos sans mention de ses échecs est un run dont on ne sait pas s'il a tout collecté.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
     },
     {
       "parameters": {

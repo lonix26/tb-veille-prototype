@@ -1,4 +1,5 @@
 {
+  "id": "extractionSignalV2",
   "name": "Veille - Extraction de signal qualitatif (multi-IA, human-in-the-loop)",
   "nodes": [
     {
