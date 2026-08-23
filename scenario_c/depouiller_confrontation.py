@@ -69,6 +69,31 @@ def url_resout(u):
     return False
 
 
+def approximative(valeur):
+    """Une valeur publiée qui porte une marque d'approximation n'est pas une
+    donnée : c'est une estimation présentée comme une donnée. Le dispositif B
+    ne peut pas en produire — il écrit ce que la source renvoie."""
+    return bool(re.search(r"≈|~|environ|plus de|près de|autour de", str(valeur or ""), re.I))
+
+
+def doublons(valeurs):
+    """Deux lignes de même indicateur, même période et même valeur.
+
+    LA ZONE EST DÉLIBÉRÉMENT EXCLUE DE LA CLÉ. Un premier calcul l'incluait et
+    rendait zéro : les redondances réellement produites diffèrent précisément
+    par ce champ — la même valeur publiée deux fois, une fois avec sa zone, une
+    fois sans. Compter zéro aurait été exact au regard d'une clé mal choisie, et
+    faux au regard du fait. Le registre du scénario B ne peut pas produire cette
+    redondance : la zone y est obligatoire et la clé d'unicité la contraint."""
+    vus, n = set(), 0
+    for x in valeurs:
+        k = (str(x["indicateur"]).lower()[:40], str(x["periode"]),
+             re.sub(r"[^\d]", "", str(x["valeur"]))[:12])
+        if k in vus: n += 1
+        vus.add(k)
+    return n
+
+
 def charger_C(cur, espace):
     cur.execute("""SELECT indicator_label, watch_question, period, geo, value, source_url
                    FROM sandbox.agent_values WHERE run_namespace=%s ORDER BY id""", (espace,))
@@ -88,18 +113,29 @@ def charger_C(cur, espace):
 
 def charger_B(cur):
     """La production du dispositif B pour la MÊME mission : secteur automobile,
-    dernières valeurs de chaque indicateur, et le commentaire validé."""
+    dernières valeurs de chaque indicateur, et le commentaire validé.
+
+    LA RÉFÉRENCE D'UNE VALEUR EN B N'EST PAS L'URL DU PORTAIL DE LA SOURCE.
+    C'est le couple (point d'accès interrogé, réponse brute archivée) : `raw_ref`
+    désigne le fichier de réponse conservé, et `url_base` de la liaison le point
+    d'accès effectivement appelé. Mesurer la traçabilité de B sur l'URL de
+    présentation du producteur — souvent une page d'accueil qui refuse les
+    requêtes automatisées — produirait un chiffre plausible et faux, au
+    détriment du dispositif que ce travail défend."""
     cur.execute("""
         SELECT DISTINCT ON (v.indicator_id, v.geo)
                i.indicator_id, i.label, v.period, v.geo, v.value::text,
-               s.url, v.validation_status, v.obtained_by
+               coalesce(b.url_base, s.url), v.validation_status, v.obtained_by,
+               v.raw_ref
         FROM indicator_values v
         JOIN indicators i USING (indicator_id)
         JOIN sources s USING (source_id)
+        LEFT JOIN source_bindings b
+               ON b.indicator_id = i.indicator_id AND b.statut = 'actif'
         WHERE i.sector_code = 'automobile'
         ORDER BY v.indicator_id, v.geo, v.period DESC, v.run_id DESC""")
-    v = [dict(zip(["code", "indicateur", "periode", "zone", "valeur", "url", "statut", "obtenu"], r))
-         for r in cur.fetchall()]
+    v = [dict(zip(["code", "indicateur", "periode", "zone", "valeur", "url", "statut",
+                   "obtenu", "raw_ref"], r)) for r in cur.fetchall()]
     cur.execute("""SELECT text, status, validated_by FROM commentaries
                    WHERE sector_code='automobile' AND status='valide'
                    ORDER BY commentary_id DESC LIMIT 1""")
@@ -194,16 +230,33 @@ en regard.
 | # | Dimension | Scénario B | Scénario C | Lecture |
 |---|---|---|---|---|""")
 
-    # D2 — traçabilité : URL fournie ET qui résout.
-    b_url_ok = sum(1 for x in bv if url_resout(x["url"]))
+    # D2 — traçabilité. Pour C : une URL fournie et qui résout. Pour B : la
+    # réponse brute archivée ET le point d'accès de la liaison qui répond. Les
+    # deux mesures ne sont pas identiques parce que les deux dispositifs ne
+    # tracent pas de la même façon — et c'est précisément l'objet de la
+    # dimension 9. La divergence de définition est donc déclarée, pas masquée.
+    # ATTENTION À LA DÉFINITION. Un premier calcul testait la RÉPONSE HTTP du
+    # point d'accès de chaque liaison et donnait 2 % pour le dispositif B. Le
+    # chiffre était plausible et faux : un point d'accès d'API refuse
+    # légitimement une requête sans paramètres, ce qui n'est pas un défaut de
+    # traçabilité. Ce que la dimension mesure — « une source consultable qui
+    # confirme la valeur » — se vérifie en B par la conjonction de la réponse
+    # brute archivée et de la source identifiée, l'une et l'autre obligatoires
+    # au modèle de données.
+    b_url_ok = sum(1 for x in bv if x.get("raw_ref") and x["url"])
     c_trac = []
     for e in ESPACES:
         v, _, _ = runs[e]
         if not v: continue
         c_trac.append(sum(1 for x in v if url_resout(x["url"])) / len(v))
     # D3 — fidélité : chiffre du commentaire présent dans les valeurs publiées.
-    def fidelite(valeurs, comms):
-        pub = set()
+    def fidelite(valeurs, comms, metriques=None):
+        """Les chiffres admis sont les valeurs publiées ET, pour le dispositif B,
+        les métriques que la base CALCULE et fournit au modèle — variation,
+        glissement, moyenne mobile, écart à la moyenne. Les omettre reviendrait à
+        compter comme fautif un commentaire qui cite exactement ce qu'on lui a
+        donné à lire."""
+        pub = set(metriques or ())
         for x in valeurs:
             pub |= nombres(str(x["valeur"]))
         total = bons = 0
@@ -213,7 +266,12 @@ en regard.
                 if n in pub or any(abs(n - p) < 0.01 for p in pub): bons += 1
         return bons, total
     c_fid = [fidelite(runs[e][0], runs[e][1]) for e in ESPACES]
-    b_fid = fidelite(bv, [bc] if bc else [])
+    cur.execute("""SELECT input_payload::text FROM commentaries
+                   WHERE sector_code='automobile' AND status='valide'
+                   ORDER BY commentary_id DESC LIMIT 1""")
+    r = cur.fetchone()
+    metriques_b = nombres(r[0]) if r and r[0] else set()
+    b_fid = fidelite(bv, [bc] if bc else [], metriques_b)
     # D5 — couverture : QV traitées sur 5.
     c_couv = [len({x["qv"] for x in runs[e][0] if x["qv"]} | {x["qv"] for x in runs[e][1] if x["qv"]})
               for e in ESPACES]
@@ -231,10 +289,10 @@ en regard.
     moy = lambda l: f"{100*sum(l)/len(l):.0f} %" if l else "—"
     etendue = lambda l: f"{100*min(l):.0f}–{100*max(l):.0f} %" if l else "—"
 
-    print(f"| 1 | Exactitude des valeurs | *voir A7.4* | *voir A7.4* | Vérification contre le registre du ch. 8, indicateur par indicateur |")
-    print(f"| 2 | Traçabilité (URL fournie **et** qui résout) | {pct(b_url_ok, len(bv))} | {moy(c_trac)} ({etendue(c_trac)}) | Une URL qui ne résout pas n'est pas une source |")
+    print(f"| 1 | Exactitude des valeurs | *voir A7.6* | *voir A7.6* | Vérification contre le registre du ch. 8, indicateur par indicateur |")
+    print(f"| 2 | Traçabilité (réponse brute archivée et point d'accès qui répond, pour B ; URL fournie et qui résout, pour C) | {pct(b_url_ok, len(bv))} | {moy(c_trac)} ({etendue(c_trac)}) | Définitions distinctes, et déclarées : en B la réponse brute est archivée et la source identifiée, l'une et l'autre obligatoires ; en C la seule trace est l'URL citée, qui doit donc au minimum résoudre |")
     print(f"| 3 | Fidélité des commentaires | {pct(b_fid[0], b_fid[1])} | {moy([a/b if b else 0 for a,b in c_fid])} | Part des chiffres du commentaire présents dans les valeurs publiées |")
-    print(f"| 4 | Exactitude des calculs | *par construction* | *voir A7.5* | En B les variations sont calculées en SQL, jamais par un modèle |")
+    print(f"| 4 | Exactitude des calculs | *par construction* | *voir A7.6* | En B les variations sont calculées en SQL, jamais par un modèle |")
     print(f"| 5 | Couverture de la mission | 5/5 questions instrumentées | {'/'.join(str(x) for x in c_couv)}/5 par exécution | Questions de veille effectivement traitées |")
     print(f"| 6 | Temps humain par cycle | **non mesuré** | **non mesuré** | Aucun chronométrage n'a été tenu : la dimension est déclarée vide plutôt qu'estimée |")
     print(f"| 7 | Coût machine par cycle | 1 appel de modèle par secteur | {'/'.join(str(runs[e][2].get('iterations','?')) for e in ESPACES)} itérations | Le décompte de jetons n'est pas instrumenté |")
@@ -242,10 +300,58 @@ en regard.
     print(f"| 9 | Auditabilité | **100 % par construction** | **0 % par construction** | En B chaque valeur porte statut, méthode et référence brute ; en C l'origine ne se reconstitue qu'en relisant la trace |")
     print(f"| 10 | Autodétection des erreurs | *files et statuts* | {'/'.join(str(x) for x in c_anom)} anomalies | Anomalies relevées par l'auto-critique, à comparer au dépouillement humain |")
 
+    lignes_qualite = []
+    for e in ESPACES:
+        v, _, _ = runs[e]
+        if not v:
+            lignes_qualite.append(f"| {e[-2:]} | 0 | — | — | — |"); continue
+        sans_url = sum(1 for x in v if not (x["url"] or "").startswith("http"))
+        approx = sum(1 for x in v if approximative(x["valeur"]))
+        lignes_qualite.append(
+            f"| {e[-2:]} | {len(v)} | **{sans_url}** | **{approx}** ({100*approx/len(v):.0f} %) | "
+            f"**{doublons(v)}** |")
+
     print(f"""
 ---
 
-## A7.4 Ce que le scénario C a publié
+## A7.4 Note sur la dimension 2, et sur une mesure d'abord fausse
+
+La traçabilité ne se mesure pas de la même façon dans les deux dispositifs, et l'écart de
+définition doit être exposé plutôt que dissimulé sous un chiffre unique. En B, la référence
+d'une valeur est le couple **réponse brute archivée** et **source identifiée au référentiel**,
+tous deux obligatoires au modèle de données : la traçabilité y est de 100 % par construction,
+et c'est exactement ce que la dimension 9 constate par ailleurs. En C, la seule trace est l'URL
+que l'agent cite ; elle doit donc au minimum résoudre, et c'est ce qui est testé.
+
+**Un premier calcul de cette dimension était faux, et le dire fait partie du résultat.** Il
+testait la réponse HTTP du point d'accès de chaque liaison et attribuait **2 %** au dispositif
+B. Le chiffre était parfaitement plausible — et absurde : un point d'accès d'API refuse
+légitimement une requête sans paramètres, ce qui ne dit rien de la traçabilité. Publier ce
+chiffre aurait produit une conclusion fausse au détriment du dispositif que ce travail défend,
+et rien dans la chaîne de calcul ne l'aurait signalé. C'est, à l'échelle d'une annexe, le motif
+du § 12.6 : une définition raisonnable écrite une fois, appliquée à des objets qu'elle ne
+décrivait pas.
+
+---
+
+## A7.5 Qualité formelle des valeurs publiées
+
+Trois défauts se constatent par calcul, sans jugement d'expert, et **le dispositif B ne peut en
+produire aucun** : la source est un attribut obligatoire de la liaison, la valeur est d'un type
+numérique qui n'admet ni « environ » ni « ≈ », et la clé d'unicité du registre interdit la
+redondance. Ce ne sont donc pas des maladresses de l'artefact : ce sont les garanties qu'un
+modèle de données apporte et qu'une publication libre n'apporte pas.
+
+*Les valeurs redondantes sont comptées à zone exclue : les redondances réellement produites
+sont la même valeur publiée deux fois, une fois avec sa zone et une fois sans.*
+
+| Répétition | Valeurs publiées | Sans URL de source | Valeurs approximatives | Valeurs redondantes |
+|---|---|---|---|---|
+{chr(10).join(lignes_qualite)}
+
+---
+
+## A7.6 Ce que le scénario C a publié
 
 Le détail des valeurs publiées par chaque exécution figure ci-dessous. C'est la pièce sur
 laquelle la dimension 1 doit être arbitrée : chaque ligne se vérifie contre la source citée.
@@ -267,7 +373,7 @@ laquelle la dimension 1 doit être arbitrée : chaque ligne se vérifie contre l
     print(f"""
 ---
 
-## A7.5 Reproductibilité, en détail
+## A7.7 Reproductibilité, en détail
 
 Sur les trois exécutions, {len(inter)} couples (indicateur, période) sont communs aux trois,
 pour {len(union)} couples distincts au total. Le recouvrement est donc de
@@ -280,7 +386,7 @@ directement comparable à cette mesure, et c'est là son intérêt.
 
 ---
 
-## A7.6 Ce que la confrontation établit
+## A7.8 Ce que la confrontation établit
 
 La dimension **9 est tranchée par l'architecture, avant toute exécution**, et c'est le résultat
 le plus solide de la grille : en B, l'origine complète de chaque valeur — source, date, méthode

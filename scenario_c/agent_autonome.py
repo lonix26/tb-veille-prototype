@@ -293,19 +293,28 @@ class Agent:
         r = requests.post("https://api.anthropic.com/v1/messages",
             headers={"x-api-key": self.cles["ANTHROPIC_API_KEY"],
                      "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": MODELE, "max_tokens": 2048,
+            # 2048 jetons, valeur de la spécification, se sont révélés insuffisants :
+            # la première exécution est revenue avec un contenu vide et un arrêt sur
+            # plafond. Porté à 8000. La divergence est mineure et va dans le sens
+            # FAVORABLE au scénario C — on donne à l'auto-critique les moyens de
+            # relever davantage d'anomalies, pas moins.
+            json={"model": MODELE, "max_tokens": 8000,
                   "messages": [{"role": "user", "content": CONSIGNE_AUTOCRITIQUE
                                 + json.dumps(production, ensure_ascii=False)[:60000]}]},
             timeout=TIMEOUT)
         if r.status_code >= 400:
-            return {"erreur": f"HTTP {r.status_code}"}
-        txt = "\n".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
+            return {"erreur": f"HTTP {r.status_code}", "detail": r.text[:400]}
+        j = r.json()
+        txt = "\n".join(b.get("text", "") for b in j.get("content", []) if b.get("type") == "text")
         import re
         m = re.search(r"\{.*\}", txt, re.S)
         try:
-            return json.loads(m.group(0) if m else txt)
+            resultat = json.loads(m.group(0) if m else txt)
+            resultat["_stop_reason"] = j.get("stop_reason")
+            return resultat
         except Exception:
-            return {"erreur": "réponse non parsable", "brut": txt[:800]}
+            return {"erreur": "réponse non parsable", "stop_reason": j.get("stop_reason"),
+                    "blocs": [b.get("type") for b in j.get("content", [])], "brut": txt[:800]}
 
 
 def main():
