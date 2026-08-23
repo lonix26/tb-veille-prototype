@@ -1,0 +1,224 @@
+{
+  "_note": "Descripteurs des flux de la vague A (CONCEPTION_ETAGE2.md § 3). Ce fichier est la PROPOSITION de semis de flux_sources : tout flux naît 'a_verifier' et ne passe 'actif' qu'après vue d'une réponse réelle par l'étudiant (acte de qualification nominatif, contrainte chk_flux_qualifie_trace). Les codes CPV marqués a_verifier se contrôlent par une requête de décompte TED avant activation — méthode M7 du 20.08.2026. | 23.08.2026 : requêtes GDELT médical et aérospatial simplifiées ; ted_automobile_v2 ajouté au CPV affiné, ted_automobile conservé en preuve ; famille marches_financiers écartée en base (migration dédiée), ses descripteurs restent ici pour mémoire. | 23.08.2026 (soir) : chantier des signaux faibles — ajout de la famille « reglementaire » (openFDA 510(k) et rappels) et de la famille « communications » (Boeing). Reconnaissances négatives conservées dans les notes de chaque flux.",
+  "flux": [
+    {
+      "flux_id": "ted_medical",
+      "famille": "marches_publics",
+      "sector_code": "medical",
+      "libelle": "Avis TED — équipements et fournitures médicaux (CPV 33)",
+      "url_base": "https://api.ted.europa.eu/v3/notices/search",
+      "parametres": {
+        "cpv": "33100000",
+        "cpv_statut": "verifie_20.08.2026_via_M7",
+        "fenetre_jours": 7,
+        "limite": 50
+      }
+    },
+    {
+      "flux_id": "ted_aerospatial",
+      "famille": "marches_publics",
+      "sector_code": "aerospatial",
+      "libelle": "Avis TED — aéronefs, engins spatiaux et équipements associés",
+      "url_base": "https://api.ted.europa.eu/v3/notices/search",
+      "parametres": {
+        "cpv": "34700000",
+        "cpv_statut": "a_verifier",
+        "fenetre_jours": 7,
+        "limite": 50
+      }
+    },
+    {
+      "flux_id": "ted_automobile",
+      "famille": "marches_publics",
+      "sector_code": "automobile",
+      "libelle": "Avis TED — véhicules et pièces (division 34.3)",
+      "url_base": "https://api.ted.europa.eu/v3/notices/search",
+      "parametres": {
+        "cpv": "34300000",
+        "cpv_statut": "a_verifier",
+        "fenetre_jours": 7,
+        "limite": 50,
+        "_note": "CONSERVÉ EN PREUVE (décision du 23.08.2026). Le CPV 34300000 capte l'ensemble de la branche « parties et accessoires », y compris les pneumatiques et — surtout — les marchés d'entretien de flottes où il n'est qu'un code secondaire derrière 50110000/50100000. Triage du 22.08 : 49 items sur 50 notés 0, taux de rétention 2 %. Ce flux n'est pas corrigé : il documente la vigilance F3 du protocole OSINT (« bruit élevé, tri indispensable ») confirmée sur pièces. Remplacé en exploitation par ted_automobile_v2."
+      }
+    },
+    {
+      "flux_id": "ted_automobile_v2",
+      "famille": "marches_publics",
+      "sector_code": "automobile",
+      "libelle": "Avis TED — moteurs et pièces mécaniques automobiles (CPV 34310/34312/34320)",
+      "url_base": "https://api.ted.europa.eu/v3/notices/search",
+      "parametres": {
+        "cpv": "34310000, 34312000, 34320000",
+        "cpv_statut": "affine_23.08.2026_verifie_en_intitules",
+        "fenetre_jours": 7,
+        "limite": 50,
+        "_note": "CPV affiné le 23.08.2026 (décision d'étudiant). Analyse de 250 avis sur 30 jours : sous 34300000, les pneumatiques (34350/34351/34352) pèsent 82 avis et l'entretien de flottes 38 — ni l'un ni l'autre ne relève de l'usinage de précision. Le jeu retenu cible les pièces mécaniques usinées : 34310000 moteurs et pièces de moteurs, 34312000 pièces de moteurs, 34320000 pièces de rechange mécaniques hors moteurs. Volume divisé par six (11 avis sur 7 jours contre 70) et intitulés vérifiés en réponse réelle : « Moteurs et pièces de moteurs (véhicules) », « Pièces de moteurs », « Pièces de rechange mécaniques, excepté moteurs et parties de moteurs ». LEVIER LAISSÉ OUVERT : ajouter 34330000 (pièces de rechange pour véhicules) porterait le volume à 20 avis sur 7 jours, au prix d'un élargissement générique — non retenu, à rouvrir si le flux se révèle trop maigre."
+      }
+    },
+    {
+      "flux_id": "gdelt_horlogerie",
+      "famille": "actualite",
+      "sector_code": "horlogerie",
+      "libelle": "GDELT — actualité mondiale de l'industrie horlogère",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": {
+        "requete": "(\"swiss watch industry\" OR \"watch exports\" OR \"horlogerie suisse\")",
+        "fenetre": "7d",
+        "limite": 50
+      }
+    },
+    {
+      "flux_id": "gdelt_medical",
+      "famille": "actualite",
+      "sector_code": "medical",
+      "libelle": "GDELT — actualité medtech (réglementation, investissements)",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": {
+        "requete": "(\"medical device\" OR \"medical devices\" OR medtech)",
+        "fenetre": "7d",
+        "limite": 50,
+        "requete_statut": "simplifiee_23.08.2026",
+        "requete_anterieure": "(\"medical device\" (regulation OR investment OR manufacturing OR recall))",
+        "_note": "Requête simplifiée le 23.08.2026 (décision d'étudiant, notes de rédaction). L'ancienne, à parenthèses imbriquées, était refusée en permanence par la limite de cadence de GDELT (« larger queries »), après quatre paliers d'attente 20/40/60/90 s. La simplifiée répond 200 avec 50 articles, vérifié en réponse réelle le 23.08.2026."
+      }
+    },
+    {
+      "flux_id": "gdelt_automobile",
+      "famille": "actualite",
+      "sector_code": "automobile",
+      "libelle": "GDELT — actualité de la filière automobile (production, électrification)",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": {
+        "requete": "(\"car production\" OR \"auto parts\" OR \"vehicle manufacturing\" OR \"EV production\")",
+        "fenetre": "7d",
+        "limite": 50
+      }
+    },
+    {
+      "flux_id": "gdelt_aerospatial",
+      "famille": "actualite",
+      "sector_code": "aerospatial",
+      "libelle": "GDELT — actualité aérospatiale (commandes, cadences, lancements)",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": {
+        "requete": "(\"aircraft orders\" OR \"aerospace supplier\" OR \"aircraft production\")",
+        "fenetre": "7d",
+        "limite": 50,
+        "requete_statut": "simplifiee_23.08.2026",
+        "requete_anterieure": "(aerospace (orders OR \"production rate\" OR supplier) OR \"aircraft orders\")",
+        "_note": "Requête simplifiée le 23.08.2026, même motif que gdelt_medical. Répond 200 avec 49 articles, vérifié en réponse réelle le 23.08.2026. Bruit visible dans les intitulés (aviation de loisir, analyse boursière) : c'est au triage de le trancher, et le taux constaté sera une mesure."
+      }
+    },
+    {
+      "flux_id": "marches_horlogerie",
+      "famille": "marches_financiers",
+      "sector_code": "horlogerie",
+      "libelle": "Cours des donneurs d'ordre horlogers — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": {
+        "tickers": [
+          "uhr.sw",
+          "cfr.sw"
+        ],
+        "tickers_statut": "a_verifier_symboles_stooq",
+        "seuil_variation_pct": 5.0,
+        "fenetre_seances": 5
+      }
+    },
+    {
+      "flux_id": "marches_medical",
+      "famille": "marches_financiers",
+      "sector_code": "medical",
+      "libelle": "Cours des donneurs d'ordre medtech — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": {
+        "tickers": [
+          "syk.us",
+          "mdt.us"
+        ],
+        "tickers_statut": "a_verifier_symboles_stooq",
+        "seuil_variation_pct": 5.0,
+        "fenetre_seances": 5
+      }
+    },
+    {
+      "flux_id": "marches_automobile",
+      "famille": "marches_financiers",
+      "sector_code": "automobile",
+      "libelle": "Cours des donneurs d'ordre automobiles — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": {
+        "tickers": [
+          "vow3.de",
+          "stla.us"
+        ],
+        "tickers_statut": "a_verifier_symboles_stooq",
+        "seuil_variation_pct": 5.0,
+        "fenetre_seances": 5
+      }
+    },
+    {
+      "flux_id": "marches_aerospatial",
+      "famille": "marches_financiers",
+      "sector_code": "aerospatial",
+      "libelle": "Cours des donneurs d'ordre aérospatiaux — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": {
+        "tickers": [
+          "air.fr",
+          "saf.fr",
+          "ba.us"
+        ],
+        "tickers_statut": "a_verifier_symboles_stooq",
+        "seuil_variation_pct": 5.0,
+        "fenetre_seances": 5
+      }
+    },
+    {
+      "flux_id": "fda_510k_medical",
+      "famille": "reglementaire",
+      "sector_code": "medical",
+      "libelle": "openFDA — autorisations 510(k) de dispositifs médicaux",
+      "url_base": "https://api.fda.gov/device/510k.json",
+      "parametres": {
+        "champ_date": "decision_date",
+        "champ_id": "k_number",
+        "champ_libelle": "device_name",
+        "champ_acteur": "applicant",
+        "prefixe": "FDA 510(k)",
+        "fenetre_jours": 30,
+        "limite": 50,
+        "url_detail": "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID={ident}",
+        "_note": "Ajouté le 23.08.2026, chantier des signaux faibles. AMONT AU SENS STRICT : une autorisation de mise sur le marché précède la montée en cadence de production, donc la charge d'usinage, donc toute statistique qui la constatera. Vérifié en réponse réelle le 23.08 : 161 autorisations sur 30 jours, API libre et sans clé. Fenêtre portée de 7 à 30 jours le 23.08 : sur 7 jours la recherche est vide, les décisions étant publiées avec retard."
+      }
+    },
+    {
+      "flux_id": "fda_rappels_medical",
+      "famille": "reglementaire",
+      "sector_code": "medical",
+      "libelle": "openFDA — rappels de dispositifs médicaux",
+      "url_base": "https://api.fda.gov/device/recall.json",
+      "parametres": {
+        "champ_date": "event_date_initiated",
+        "champ_id": "product_res_number",
+        "champ_libelle": "product_description",
+        "champ_acteur": "recalling_firm",
+        "prefixe": "FDA rappel",
+        "fenetre_jours": 30,
+        "limite": 50,
+        "url_detail": "",
+        "_note": "Ajouté le 23.08.2026. Un rappel signale une défaillance de conception ou de fabrication : c'est un signal de contrainte technique en amont des exigences qui se répercuteront sur les sous-traitants. Volume faible (3 sur 30 jours au 23.08) : fenêtre portée à 30 jours à dessein."
+      }
+    },
+    {
+      "flux_id": "boeing_communiques",
+      "famille": "communications",
+      "sector_code": "aerospatial",
+      "libelle": "Boeing — communiqués de presse (fil RSS)",
+      "url_base": "https://boeing.mediaroom.com/news-releases-statements?pagetemplate=rss",
+      "parametres": {
+        "_note": "Ajouté le 23.08.2026 — famille F2 du protocole OSINT, prévue en vague A par CONCEPTION_ETAGE2.md mais jamais implémentée : aucun descripteur ne la portait. Vérifié en réponse réelle le 23.08 (fil RSS valide, communiqués datés). AIRBUS ÉCARTÉ à la reconnaissance : son /rss.xml répond 200 mais ne sert que la navigation du site (« Environment », « Society »), pas les communiqués — un flux qui répond n'est pas pour autant un flux exploitable. Safran 403, Stryker 404, Medtronic sert du HTML, Swatch Group en délai d'attente, ACEA rend un fil vide."
+      }
+    }
+  ]
+}

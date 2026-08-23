@@ -4,7 +4,7 @@ import {
   useDonnees, nb, pct, clsVar, dateCH, estAgregat, nomZone,
   serieDe, zonesDe, metrDe, BadgeStatut, MarkdownLeger
 } from "../api.jsx";
-import Chart from "../Chart.jsx";
+import Chart, { TreemapParts } from "../Chart.jsx";
 
 /* ---------- bandeau de lecture calculée (aucun modèle n'écrit ceci) ---------- */
 function Lecture({ code, inds }) {
@@ -319,17 +319,68 @@ function CarteIndicateur({ ind }) {
         const vMondePrev = serieMonde.find(x => x.period === pPrev);
         const mondeOk = vMonde && vMonde.value >= sommePanier;
         const total = mondeOk ? vMonde.value : sommePanier;
+        /* Total de l'an passé : la ligne monde quand elle existe — chaque
+           zone calcule alors son Δpart indépendamment des autres. Exiger
+           que TOUS les partenaires aient une valeur homologue éteignait
+           toute la colonne dès qu'un micro-partenaire manquait :
+           l'unanimité au niveau de l'affichage, corrigée le 21.08. */
         const totalPrev = mondeOk
-          ? (vMondePrev && sommePanierPrev !== null ? vMondePrev.value : null)
+          ? (vMondePrev ? vMondePrev.value : null)
           : sommePanierPrev;
         const varTotal = totalPrev ? (total - totalPrev) / totalPrev * 100 : null;
         const reste = mondeOk ? {
-          g: "__reste__", v: total - sommePanier,
-          vp: totalPrev !== null && sommePanierPrev !== null ? totalPrev - sommePanierPrev : null
+          g: "__reste__", v: total - sommePanier, vp: null
         } : null;
         const manquants = pays.filter(z0 => !periodesParZone.get(z0).has(pRecente));
-        const affiche = voirToutesZones ? lignesRef : lignesRef.slice(0, PLAF);
         const maxRef = lignesRef[0].v;
+        /* Enrichissement en une passe, puis LECTURE D'ANALYSTE (21.08) :
+           personne ne lit 99 lignes — on lit la concentration (treemap),
+           les mouvements de part (gagnants/perdants), et le classement
+           complet seulement sur demande, replié. */
+        const lignes = lignesRef.map(z => {
+          const part = additif && total > 0 ? z.v / total * 100 : null;
+          const partPrev = additif && totalPrev && z.vp !== null ? z.vp / totalPrev * 100 : null;
+          return {
+            ...z, part,
+            dPart: part !== null && partPrev !== null ? part - partPrev : null,
+            varAn: z.vp ? (z.v - z.vp) / z.vp * 100 : null,
+            nda: /^[SXF]\d/.test(String(z.g))
+          };
+        });
+        const top3Part = additif && total > 0
+          ? lignes.slice(0, 3).reduce((s, z) => s + (z.part || 0), 0) : null;
+        const mouvants = lignes.filter(z => z.dPart !== null && !z.nda);
+        const gagnants = [...mouvants].sort((a, b) => b.dPart - a.dPart).filter(z => z.dPart > 0.05).slice(0, 5);
+        const perdants = [...mouvants].sort((a, b) => a.dPart - b.dPart).filter(z => z.dPart < -0.05).slice(0, 5);
+        const resteTreemap = (reste && reste.v > 0 ? reste.v : 0) + lignes.slice(12).reduce((s, z) => s + z.v, 0);
+        const treemapItems = additif && total > 0
+          ? [...lignes.slice(0, 12).map(z => ({ name: nomZone(z.g), value: z.v, part: z.part, dPart: z.dPart })),
+             ...(resteTreemap > 0 ? [{ name: "Autres", value: resteTreemap, part: resteTreemap / total * 100, dPart: null }] : [])]
+          : null;
+        const ligneBar = z => (
+          <div className="zl" key={z.g}
+               style={additif ? { gridTemplateColumns: "110px 1fr 90px 58px 62px 62px" } : undefined}>
+            <span className="zn">{nomZone(z.g)}</span>
+            <span className="zb"><i style={{ width: Math.max(2, (z.v / maxRef) * 100) + "%" }} /></span>
+            <span className="zv">{nb(z.v)}</span>
+            {additif && <span className="zp">{z.part !== null ? nb(z.part, 1) + " %" : "—"}</span>}
+            {additif && (
+              <span className={"zp " + clsVar(z.dPart)}>
+                {z.dPart !== null ? (z.dPart > 0 ? "+" : "") + nb(z.dPart, 1) + " pt" : "—"}
+              </span>
+            )}
+            <span className={"zp " + clsVar(z.varAn)}>{pct(z.varAn)}</span>
+          </div>
+        );
+        const mvt = z => (
+          <div key={z.g} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, padding: "3px 0" }}>
+            <span style={{ fontWeight: 600 }}>{nomZone(z.g)}</span>
+            <span>
+              <span className={clsVar(z.dPart)}>{(z.dPart > 0 ? "+" : "") + nb(z.dPart, 1)} pt</span>
+              <span style={{ color: "var(--gris)", marginLeft: 8 }}>{pct(z.varAn)}</span>
+            </span>
+          </div>
+        );
         return (
           <div style={{ marginTop: zonePrincipale ? 14 : 4 }}>
             {Object.values(seriesTop).some(s => s.length >= 3) && <Chart series={seriesTop} zoom />}
@@ -344,52 +395,66 @@ function CarteIndicateur({ ind }) {
                 )}
               </div>
             )}
-            <div style={{ fontSize: 11, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em", margin: "8px 0 6px" }}>
-              {additif
-                ? `Zones au titre de ${pRef} · valeur, part ${mondeOk ? "du marché total" : "du panier"}, gain ou perte de part, variation`
-                : `Niveaux au titre de ${pRef}, variation sur un an`}
-            </div>
-            {affiche.map(z => {
-              const part = additif && total > 0 ? z.v / total * 100 : null;
-              const partPrev = additif && totalPrev && z.vp !== null ? z.vp / totalPrev * 100 : null;
-              const dPart = part !== null && partPrev !== null ? part - partPrev : null;
-              const varAn = z.vp ? (z.v - z.vp) / z.vp * 100 : null;
-              return (
-                <div className="zl" key={z.g}
-                     style={additif ? { gridTemplateColumns: "56px 1fr 90px 58px 62px 62px" } : undefined}>
-                  <span className="zn">{nomZone(z.g)}</span>
-                  <span className="zb"><i style={{ width: Math.max(2, (z.v / maxRef) * 100) + "%" }} /></span>
-                  <span className="zv">{nb(z.v)}</span>
-                  {additif && <span className="zp">{part !== null ? nb(part, 1) + " %" : "—"}</span>}
-                  {additif && (
-                    <span className={"zp " + clsVar(dPart)}>
-                      {dPart !== null ? (dPart > 0 ? "+" : "") + nb(dPart, 1) + " pt" : "—"}
-                    </span>
-                  )}
-                  <span className={"zp " + clsVar(varAn)}>{pct(varAn)}</span>
+
+            {additif && treemapItems ? (
+              <>
+                {top3Part !== null && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, margin: "12px 0 2px" }}>
+                    <div style={{ background: "#f6f8fa", borderRadius: 10, padding: "9px 12px" }}>
+                      <div style={{ fontSize: 10.5, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em" }}>Concentration</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{nb(top3Part, 0)} %</div>
+                      <div style={{ fontSize: 11, color: "var(--encre2)" }}>sur les 3 premières zones</div>
+                    </div>
+                    {gagnants[0] && (
+                      <div style={{ background: "#f6f8fa", borderRadius: 10, padding: "9px 12px" }}>
+                        <div style={{ fontSize: 10.5, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em" }}>Gagne du terrain</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{nomZone(gagnants[0].g)}</div>
+                        <div style={{ fontSize: 11 }} className="hausse">+{nb(gagnants[0].dPart, 1)} pt de part sur un an</div>
+                      </div>
+                    )}
+                    {perdants[0] && (
+                      <div style={{ background: "#f6f8fa", borderRadius: 10, padding: "9px 12px" }}>
+                        <div style={{ fontSize: 10.5, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em" }}>Cède du terrain</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{nomZone(perdants[0].g)}</div>
+                        <div style={{ fontSize: 11 }} className="baisse">{nb(perdants[0].dPart, 1)} pt de part sur un an</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <TreemapParts items={treemapItems} />
+                {(gagnants.length > 0 || perdants.length > 0) && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 10.5, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>
+                        Gagnent du terrain · {pRef} vs {pPrev}
+                      </div>
+                      {gagnants.length ? gagnants.map(mvt) : <div className="note">aucun gain matériel</div>}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10.5, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>
+                        Cèdent du terrain · {pRef} vs {pPrev}
+                      </div>
+                      {perdants.length ? perdants.map(mvt) : <div className="note">aucun recul matériel</div>}
+                    </div>
+                  </div>
+                )}
+                <details style={{ marginTop: 10 }}>
+                  <summary>Classement complet ({lignes.length} zones) · valeur, part, Δ part, variation</summary>
+                  <div style={{ marginTop: 8 }}>{lignes.map(ligneBar)}</div>
+                </details>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, color: "var(--gris)", textTransform: "uppercase", letterSpacing: ".05em", margin: "8px 0 6px" }}>
+                  Niveaux au titre de {pRef}, variation sur un an
                 </div>
-              );
-            })}
-            {reste && reste.v > 0 && (() => {
-              const part = reste.v / total * 100;
-              const partPrev = totalPrev && reste.vp !== null ? reste.vp / totalPrev * 100 : null;
-              const dPart = partPrev !== null ? part - partPrev : null;
-              const varAn = reste.vp ? (reste.v - reste.vp) / reste.vp * 100 : null;
-              return (
-                <div className="zl" style={{ gridTemplateColumns: "56px 1fr 90px 58px 62px 62px", opacity: .75 }}>
-                  <span className="zn" style={{ fontStyle: "italic" }}>Autres</span>
-                  <span className="zb"><i style={{ width: Math.max(2, (reste.v / maxRef) * 100) + "%", background: "#98a2b3" }} /></span>
-                  <span className="zv">{nb(reste.v)}</span>
-                  <span className="zp">{nb(part, 1)} %</span>
-                  <span className={"zp " + clsVar(dPart)}>{dPart !== null ? (dPart > 0 ? "+" : "") + nb(dPart, 1) + " pt" : "—"}</span>
-                  <span className={"zp " + clsVar(varAn)}>{pct(varAn)}</span>
-                </div>
-              );
-            })()}
-            {lignesRef.length > PLAF && (
-              <button className="rafraichir" style={{ marginTop: 8 }} onClick={() => setVoirToutesZones(v => !v)}>
-                {voirToutesZones ? "Réduire" : `Afficher les ${lignesRef.length - PLAF} autres zones`}
-              </button>
+                {(voirToutesZones ? lignes : lignes.slice(0, PLAF)).map(ligneBar)}
+                {lignes.length > PLAF && (
+                  <button className="rafraichir" style={{ marginTop: 8 }} onClick={() => setVoirToutesZones(v => !v)}>
+                    {voirToutesZones ? "Réduire" : `Afficher les ${lignes.length - PLAF} autres zones`}
+                  </button>
+                )}
+              </>
             )}
             {pRecente !== pRef && manquants.length > 0 && (
               <div className="note">

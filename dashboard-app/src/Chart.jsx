@@ -19,6 +19,43 @@ const fmtAxe = v => {
 //   refLabel : libellé de la référence
 //   zoom     : afficher la glissière de zoom
 //   hauteur  : px (défaut 240)
+// Treemap des parts — la lecture de concentration d'un marché en un
+// coup d'œil : la surface EST la part. Survol : valeur, part, Δ part.
+export function TreemapParts({ items, hauteur = 250 }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current || !items || !items.length) return;
+    const ch = echarts.init(ref.current);
+    ch.setOption({
+      tooltip: {
+        formatter: p => {
+          const d = p.data || {};
+          let t = "<b>" + p.name + "</b><br/>" + nb(d.value);
+          if (d.part !== null && d.part !== undefined) t += "<br/>part : " + nb(d.part, 1) + " %";
+          if (d.dPart !== null && d.dPart !== undefined) t += "<br/>Δ part : " + (d.dPart > 0 ? "+" : "") + nb(d.dPart, 1) + " pt";
+          return t;
+        }
+      },
+      series: [{
+        type: "treemap", roam: false, nodeClick: false, width: "100%", height: "100%",
+        breadcrumb: { show: false },
+        itemStyle: { borderColor: "#fff", borderWidth: 2, gapWidth: 2, borderRadius: 4 },
+        label: {
+          formatter: p => (p.data.part !== null && p.data.part !== undefined)
+            ? p.name + "\n" + nb(p.data.part, 1) + " %" : p.name,
+          fontSize: 11, lineHeight: 15
+        },
+        levels: [{ color: ["#0e7490", "#155e75", "#0f766e", "#2286a5", "#b54708", "#5925dc", "#475467", "#7b8794", "#98a2b3"] }],
+        data: items.map(i => ({ name: i.name, value: Math.max(i.value, 0), part: i.part, dPart: i.dPart }))
+      }]
+    });
+    const ro = new ResizeObserver(() => ch.resize());
+    ro.observe(ref.current);
+    return () => { ro.disconnect(); ch.dispose(); };
+  }, [items]);
+  return <div ref={ref} style={{ height: hauteur, marginTop: 10 }} />;
+}
+
 export default function Chart({ series, refLine, refLabel, zoom, hauteur = 240 }) {
   const ref = useRef(null);
 
@@ -42,7 +79,8 @@ export default function Chart({ series, refLine, refLabel, zoom, hauteur = 240 }
             markLine: {
               silent: true, symbol: "none",
               lineStyle: { type: "dashed", color: "#98a2b3" },
-              label: { formatter: refLabel || "moyenne mobile", fontSize: 10, color: "#7b8794" },
+              label: { formatter: refLabel || "moyenne mobile", position: "insideStartTop",
+                       fontSize: 10, color: "#7b8794" },
               data: [{ yAxis: refLine }]
             }
           }

@@ -66,6 +66,7 @@ button.rafraichir[disabled]{opacity:.5;cursor:wait}
 .e-ambre{background:var(--ambre-bg);color:var(--ambre)}
 .e-gris{background:#eef1f4;color:var(--encre2)}
 .e-violet{background:var(--violet-bg);color:var(--violet)}
+.e-bleu{background:#e3edfa;color:#1b4f91}
 .hausse{color:var(--vert);font-weight:600}
 .baisse{color:var(--rouge);font-weight:600}
 .neutre{color:var(--gris)}
@@ -130,3 +131,181 @@ input.filtre:focus{outline:2px solid var(--accent);border-color:transparent}
 @keyframes scintille{from{background-position:200% 0}to{background-position:-200% 0}}
 
 @media (max-width:860px){aside{display:none}main{padding:16px}}
+
+/* =====================================================================
+   Restitution v4 — écrans de décision (23.08.2026)
+   Le langage visuel de la v3 est conservé ; seules les formes propres
+   aux quatre écrans sont ajoutées.
+   ===================================================================== */
+
+.s-titre{font-size:15px;font-weight:600;color:var(--encre);margin:26px 0 10px}
+.k-t{font-size:11px;color:var(--gris);margin-top:6px;letter-spacing:.02em}
+.k-v.base-insuffisante{font-size:19px;font-weight:600;color:var(--ambre);line-height:1.3}
+.carte.cliquable{cursor:pointer;transition:box-shadow .15s,transform .15s}
+.carte.cliquable:hover{box-shadow:0 4px 12px rgba(16,24,40,.10);transform:translateY(-1px)}
+
+.src{color:var(--accent);text-decoration:none;font-size:12px;white-space:nowrap}
+.src:hover{text-decoration:underline}
+.src-absente{color:var(--gris);font-size:12px;font-style:italic}
+.src-inline{color:var(--accent);font-size:12px;cursor:pointer;margin-left:auto}
+.src-inline:hover{text-decoration:underline}
+.mention-triage{font-size:11px;color:var(--gris);font-style:italic}
+
+.liste-signaux{display:flex;flex-direction:column;gap:6px}
+.ligne-signal{display:flex;align-items:center;gap:9px;background:var(--carte);
+  border:1px solid var(--ligne);border-radius:10px;padding:9px 12px;font-size:13px}
+.sig-evt{color:var(--encre);flex:1}
+.sig-act,.sig-ech{color:var(--encre2);font-size:12px}
+.sig-ech{background:var(--bg);border-radius:6px;padding:2px 7px}
+
+.compteur-attente{margin-top:22px;background:var(--bg);border:1px dashed var(--ligne);
+  border-radius:10px;padding:12px 14px;font-size:13px;color:var(--encre2)}
+.compteur-attente small{display:block;color:var(--gris);font-size:11px;margin-top:3px}
+
+.qv-section{margin:26px 0 6px;padding-top:16px;border-top:1px solid var(--ligne)}
+.qv-titre{font-size:16px;font-weight:600;color:var(--encre);display:flex;
+  align-items:baseline;gap:10px;margin:0 0 4px}
+.qv-code{font-size:11px;font-weight:700;color:var(--accent);background:var(--bg);
+  border-radius:6px;padding:2px 7px;letter-spacing:.04em}
+.qv-mecanisme{font-size:12.5px;color:var(--gris);margin:0 0 12px;max-width:78ch}
+.qv-reponse{background:var(--carte);border-left:3px solid var(--vert);border-radius:0 10px 10px 0;
+  padding:12px 14px;margin-bottom:12px;font-size:13.5px;color:var(--encre)}
+.vide.non-couvert{border-style:dashed;color:var(--encre2)}
+
+.preuve{padding:13px}
+.p-tete{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.p-titre{font-size:13.5px;font-weight:600;color:var(--encre)}
+.p-meta{font-size:11px;color:var(--gris);margin-top:3px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.p-val{font-size:18px;font-weight:600;white-space:nowrap}
+.p-var{font-size:12px;margin-left:7px}
+.p-pied{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:11px;
+  color:var(--gris);margin-top:9px;padding-top:8px;border-top:1px solid var(--ligne)}
+.etq.lat-avance{background:var(--violet-bg);color:var(--violet)}
+.etq.lat-coincident{background:var(--bg);color:var(--encre2)}
+.etq.lat-retarde{background:var(--ambre-bg);color:var(--ambre)}
+.etq.lat-flux{background:var(--vert-bg);color:var(--vert)}
+
+.filtres{display:flex;gap:7px;margin:14px 0}
+.filtre{border:1px solid var(--ligne);background:var(--carte);border-radius:999px;
+  padding:5px 13px;font-size:12.5px;cursor:pointer;color:var(--encre2)}
+.filtre.actif{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.ligne-temps{position:relative;height:150px;margin:22px 0 10px;background:var(--carte);
+  border:1px solid var(--ligne);border-radius:var(--r)}
+.lt-axe{position:absolute;left:24px;right:24px;top:50%;height:2px;background:var(--ligne)}
+.lt-point{position:absolute;top:50%;transform:translate(-50%,-50%);background:var(--carte);
+  border:2px solid var(--accent);border-radius:10px;padding:7px 10px;max-width:190px;
+  cursor:pointer;text-align:center;box-shadow:var(--ombre)}
+.lt-ech{display:block;font-size:11px;font-weight:600;color:var(--encre)}
+.lt-lib{display:block;font-size:11px;color:var(--encre2);margin-top:2px;line-height:1.3}
+.lt-stat{display:block;font-size:10px;color:var(--gris);margin-top:3px;font-style:italic}
+
+.detail-signal{position:relative;background:var(--carte);border:1px solid var(--ligne);
+  border-radius:var(--r);padding:18px;margin-top:14px;box-shadow:var(--ombre)}
+.detail-signal h3{margin:0 0 12px;font-size:15px;color:var(--encre);padding-right:30px}
+.fermer{position:absolute;top:12px;right:12px;border:none;background:var(--bg);
+  border-radius:8px;width:26px;height:26px;cursor:pointer;font-size:16px;color:var(--encre2)}
+.d-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.d-grille div{font-size:13px;color:var(--encre)}
+.d-grille span{display:block;font-size:11px;color:var(--gris);margin-bottom:1px}
+.d-note{font-style:italic;color:var(--encre2);font-size:13px;margin:12px 0 0}
+.d-triage{margin-top:12px;padding:9px 11px;background:var(--bg);border-radius:9px;font-size:12px;color:var(--encre2)}
+.d-item{margin-top:4px;color:var(--gris);font-size:11px}
+.d-confirm{margin-top:14px;padding-top:12px;border-top:1px solid var(--ligne);font-size:13px}
+.d-liste{margin:8px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.d-liste li{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--encre)}
+.d-pied{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:14px;
+  padding-top:10px;border-top:1px solid var(--ligne);font-size:11px;color:var(--gris)}
+
+.tableau{width:100%;border-collapse:collapse;background:var(--carte);
+  border:1px solid var(--ligne);border-radius:var(--r);overflow:hidden;font-size:13px}
+.tableau th{text-align:left;background:var(--bg);color:var(--encre2);font-size:11px;
+  font-weight:600;padding:10px 12px;text-transform:uppercase;letter-spacing:.03em}
+.tableau td{padding:11px 12px;border-top:1px solid var(--ligne);vertical-align:top;color:var(--encre)}
+.td-titre{max-width:420px}
+.td-note{font-size:11px;color:var(--gris);font-style:italic;margin-top:4px}
+.nowrap{white-space:nowrap}
+.mention-permanente{margin-top:16px;padding:12px 14px;background:var(--bg);
+  border-left:3px solid var(--accent);border-radius:0 10px 10px 0;font-size:12.5px;color:var(--encre2)}
+.etq.crit-haute{background:var(--rouge-bg);color:var(--rouge)}
+.etq.crit-moyenne{background:var(--ambre-bg);color:var(--ambre)}
+.etq.crit-basse{background:var(--bg);color:var(--encre2)}
+.avert-serie{font-size:11px;color:var(--ambre);font-style:italic;margin:4px 0 0;padding:0 2px}
+.ligne-temps{height:190px}
+.lt-grad{position:absolute;top:14%;bottom:26%;width:1px;background:var(--ligne)}
+.lt-annee{position:absolute;bottom:6px;transform:translateX(-50%);font-size:10px;color:var(--gris)}
+.lt-point{transform:translate(-50%,-50%);max-width:170px}
+.hors-axe{margin-top:12px;background:var(--carte);border:1px dashed var(--ligne);
+  border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--encre2)}
+.tamis{display:flex;align-items:stretch;gap:8px;margin:16px 0 22px;flex-wrap:wrap}
+.t-etape{flex:1;min-width:150px;background:var(--carte);border:1px solid var(--ligne);
+  border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.t-etape b{font-size:24px;color:var(--encre2);line-height:1.1}
+.t-etape span{font-size:12px;color:var(--encre2)}
+.t-etape small{display:block;font-size:11px;color:var(--gris);margin-top:2px}
+.t-etape.fort{border-color:var(--accent);background:linear-gradient(0deg,#f0fdfa,#fff)}
+.t-etape.fort b{color:var(--accent);font-size:28px}
+.t-fleche{align-self:center;color:var(--gris);font-size:18px}
+.liste-actions{display:flex;flex-direction:column;gap:12px}
+.carte.action{padding:16px;border-left:4px solid var(--ligne)}
+.carte.action.a-2{border-left-color:var(--vert)}
+.carte.action.a-1{border-left-color:var(--ambre)}
+.a-tete{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:10px}
+.a-gauche{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.a-echeance{text-align:right;white-space:nowrap}
+.a-echeance strong{display:block;font-size:15px;color:var(--encre)}
+.a-echeance small{font-size:10px;color:var(--gris)}
+.a-titre{font-size:14px;font-weight:600;color:var(--encre);margin-bottom:10px;line-height:1.4}
+.a-action{background:#f0fdfa;border-left:3px solid var(--vert);border-radius:0 9px 9px 0;
+  padding:10px 13px;font-size:13.5px;color:var(--encre);margin-bottom:11px}
+.a-action-l{display:block;font-size:10px;font-weight:700;color:var(--vert);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.a-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;
+  padding-top:10px;border-top:1px solid var(--ligne)}
+.a-grille div{font-size:13px;color:var(--encre)}
+.a-grille span{display:block;font-size:10px;color:var(--gris);text-transform:uppercase;letter-spacing:.04em}
+.a-pied{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px;
+  padding-top:10px;border-top:1px solid var(--ligne);font-size:12px}
+.a-justif{margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:9px;
+  font-size:12.5px;font-style:italic;color:var(--encre2)}
+.a-ecartes{margin-top:22px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.c-consequence{margin-top:10px;padding:10px 12px;background:#f0fdfa;border-left:3px solid var(--vert);
+  border-radius:0 9px 9px 0;font-size:13px;color:var(--encre)}
+.c-cons-l{display:block;font-size:10px;font-weight:700;color:var(--vert);
+  text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.c-surveiller{margin-top:9px;font-size:12.5px;color:var(--encre2)}
+.c-reserves{margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:9px;
+  font-size:11.5px;color:var(--gris);line-height:1.5}
+.c-reserves p{margin:0 0 6px}
+
+/* Répartition des appels adressables par marché (écran Actions) */
+.repartition{background:var(--carte);border:1px solid var(--trait);border-radius:10px;
+  padding:14px 16px;margin:0 0 18px}
+.r-titre{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--encre2);margin-bottom:10px}
+.r-ligne{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.r-ligne .etq{flex:0 0 165px;text-align:center}
+.r-piste{flex:1;height:9px;background:#eef1f4;border-radius:99px;overflow:hidden}
+.r-jauge{height:100%;background:#1b4f91;border-radius:99px}
+.r-ligne b{flex:0 0 26px;text-align:right;font-size:13px}
+.r-constat{font-size:12.5px;line-height:1.55;color:var(--encre2);margin:12px 0 0;
+  border-top:1px solid var(--trait);padding-top:10px}
+.r-constat code{background:#eef1f4;padding:1px 5px;border-radius:4px;font-size:11.5px}
+
+/* Règle de lecture du score de santé (écran Cette semaine) */
+.k-mot{font-size:12.5px;font-weight:600;margin:-2px 0 8px}
+.t-bon{color:var(--vert)} .t-faible{color:var(--rouge)} .t-neutre{color:var(--encre2)}
+.regle{position:relative;height:8px;background:#eef1f4;border-radius:99px;margin:0 0 4px}
+.r-zone-norme{position:absolute;left:37.5%;width:25%;top:0;bottom:0;background:#dfe4ea;border-radius:2px}
+.r-zero{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--encre2);opacity:.5}
+.r-aiguille{position:absolute;top:-3px;width:3px;height:14px;background:var(--encre);
+  border-radius:2px;transform:translateX(-1.5px)}
+.regle-bornes{display:flex;justify-content:space-between;font-size:9.5px;color:var(--encre2);
+  opacity:.75;margin-bottom:8px}
+
+/* Note de base sous les mini-graphiques (écran secteur) */
+.base-note{font-size:11px;color:var(--encre2);opacity:.9;margin:4px 0 0;line-height:1.5}
+
+/* Indicateur certifié sans observation (écran secteur) */
+.non-collecte{font-size:12px;line-height:1.55;color:var(--encre2);background:#fdf6ec;
+  border-left:3px solid var(--ambre);border-radius:0 6px 6px 0;padding:9px 12px;margin:2px 0 10px}

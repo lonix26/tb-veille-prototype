@@ -6,7 +6,10 @@
       "name": "Déclencheur manuel (document choisi par le veilleur)",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 400],
+      "position": [
+        0,
+        400
+      ],
       "notes": "La sélection du document est un acte HUMAIN : le veilleur choisit ce qui mérite lecture, l'IA lit et structure, l'humain valide. Pas de moissonnage autonome — scénario B."
     },
     {
@@ -18,32 +21,48 @@
       "name": "Ouvrir le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [200, 400],
+      "position": [
+        200,
+        400
+      ],
       "credentials": {
-        "postgres": { "id": "QdVRYX9pjTj9C8G3", "name": "postgres veille" }
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Paramètres du signal à extraire. Le veilleur renseigne ici le document\n// choisi, le secteur et la question de veille de rattachement (règle : pas\n// de signal sans question de veille).\n//\n// Document de démonstration : règlement (UE) 2023/851 — objectif 100 % de\n// voitures neuves zéro émission en 2035. Impulsion publique automobile par\n// excellence : c'est exactement le terrain de la lacune automobile/QV5 du\n// ch. 8 (acte réglementaire, pas série statistique). Si l'URL EUR-Lex ne\n// répond pas, remplacer par tout autre document réglementaire pertinent.\nconst runId = $('Ouvrir le run').first().json.run_id;\nreturn [{ json: {\n  sector_code: 'automobile',\n  watch_question_code: 'QV5',\n  source_doc: 'https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32023R0851',\n  run_id: runId,\n  raw_ref: '/data/staging/SIG_run' + runId + '.pdf'\n} }];"
+        "jsCode": "// Paramètres du signal à extraire. Le veilleur renseigne ici le document\n// choisi, le secteur et la question de veille de rattachement (règle : pas\n// de signal sans question de veille).\n//\n// EXÉCUTION DU 23.08.2026 — promotion de l'item de flux 759, décidée par\n// N. Castillo après examen : autorisation FDA 510(k) K262290, cupule\n// acétabulaire REMEDY POLY+PLUS (Osteoremedies). Le document extrait est le\n// RÉSUMÉ 510(k) publié par la FDA, pas la fiche d'enregistrement : la chaîne\n// signals exige des extraits, et une fiche de quatre champs n'en fournit pas.\n//\n// Rattachement QV2 (demande et débouchés) : les deux doctrines de triage\n// divergeaient — « événement » proposait QV5, « signal » QV2. Une autorisation\n// de mise sur le marché ouvre un débouché ; c'est QV2. Divergence signalée au\n// validateur, qui tranche.\n//\n// Exécution antérieure conservée en mémoire : règlement (UE) 2023/851\n// (https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32023R0851),\n// automobile/QV5 — à l'origine du signal 2, validé le 12.08.2026.\nconst runId = $('Ouvrir le run').first().json.run_id;\nreturn [{ json: {\n  sector_code: 'medical',\n  watch_question_code: 'QV2',\n  source_doc: 'https://www.accessdata.fda.gov/cdrh_docs/pdf26/K262290.pdf',\n  item_flux_id: 759,\n  run_id: runId,\n  raw_ref: '/data/staging/SIG_run' + runId + '.pdf'\n} }];"
       },
       "name": "Préparer la tâche",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [400, 400]
+      "position": [
+        400,
+        400
+      ]
     },
     {
       "parameters": {
         "url": "={{ $json.source_doc }}",
         "options": {
           "timeout": 60000,
-          "response": { "response": { "responseFormat": "file" } }
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
         }
       },
       "name": "Télécharger le document",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [600, 400]
+      "position": [
+        600,
+        400
+      ]
     },
     {
       "parameters": {
@@ -54,7 +73,10 @@
       "name": "Déposer le document brut",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [800, 400],
+      "position": [
+        800,
+        400
+      ],
       "notes": "E6 : le document est conservé tel que reçu AVANT toute extraction."
     },
     {
@@ -65,7 +87,10 @@
       "name": "Extraire le texte",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
-      "position": [1000, 400]
+      "position": [
+        1000,
+        400
+      ]
     },
     {
       "parameters": {
@@ -74,7 +99,10 @@
       "name": "Consolider le contexte",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1200, 400]
+      "position": [
+        1200,
+        400
+      ]
     },
     {
       "parameters": {
@@ -83,19 +111,30 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.OPENAI_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt }] }) }}",
-        "options": { "timeout": 90000 }
+        "jsonBody": "={{ JSON.stringify({ model: $env.MODELE_OPENAI || 'gpt-5.6', response_format: { type: 'json_object' }, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt }] }) }}",
+        "options": {
+          "timeout": 90000
+        }
       },
       "name": "Modèle A (OpenAI)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1400, 200],
+      "position": [
+        1400,
+        200
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -105,51 +144,80 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 1024, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt }] }) }}",
-        "options": { "timeout": 90000 }
+        "jsonBody": "={{ JSON.stringify({ model: $env.MODELE_ANTHROPIC || 'claude-opus-5', max_tokens: 16000, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt }] }) }}",
+        "options": {
+          "timeout": 90000
+        }
       },
       "name": "Modèle B (Anthropic)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1400, 400],
+      "position": [
+        1400,
+        400
+      ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key={{ $env.GOOGLE_API_KEY }}",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.MODELE_GOOGLE || 'gemini-3.7-flash' }}:generateContent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GOOGLE_API_KEY }}"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $('Consolider le contexte').first().json.prompt }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) }}",
-        "options": { "timeout": 90000 }
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $('Consolider le contexte').first().json.prompt }] }], generationConfig: { responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "timeout": 90000
+        }
       },
       "name": "Modèle C (Google)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1400, 600],
+      "position": [
+        1400,
+        600
+      ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Normalisation des trois réponses — identique au pipeline A2 : un appel en\n// échec devient une extraction vide et un incident tracé.\nfunction extraireTexte(rep, fournisseur) {\n  try {\n    if (fournisseur === 'openai') return rep.choices[0].message.content;\n    if (fournisseur === 'anthropic') return rep.content[0].text;\n    if (fournisseur === 'google') return rep.candidates[0].content.parts[0].text;\n  } catch (e) { return null; }\n  return null;\n}\nfunction parserJson(txt) {\n  if (!txt) return null;\n  let s = String(txt).trim();\n  s = s.replace(/^```(?:json)?/i, '').replace(/```$/,'').trim();\n  const i = s.indexOf('{'), j = s.lastIndexOf('}');\n  if (i >= 0 && j > i) s = s.slice(i, j + 1);\n  try { return JSON.parse(s); } catch (e) { return null; }\n}\n\nconst sources = [\n  { modele: 'gpt-4o',            fournisseur: 'openai',    node: 'Modèle A (OpenAI)' },\n  { modele: 'claude-opus-4-8',   fournisseur: 'anthropic', node: 'Modèle B (Anthropic)' },\n  { modele: 'gemini-pro-latest', fournisseur: 'google',    node: 'Modèle C (Google)' }\n];\n\nconst extractions = [];\nconst incidents = [];\nfor (const s of sources) {\n  let rep;\n  try { rep = $(s.node).first().json; } catch (e) { rep = null; }\n  const err = rep && rep.error ? JSON.stringify(rep.error).slice(0,200) : null;\n  const parsed = parserJson(extraireTexte(rep, s.fournisseur));\n  if (err) incidents.push(s.modele + ' : appel en échec (' + err + ')');\n  else if (!parsed) incidents.push(s.modele + ' : réponse non parsable en JSON');\n  extractions.push({ modele: s.modele, extraction: parsed || {} });\n}\n\nconst t = $('Consolider le contexte').first().json;\nreturn [{ json: {\n  sector_code: t.sector_code, watch_question_code: t.watch_question_code,\n  source_doc: t.source_doc, raw_ref: t.raw_ref, run_id: t.run_id,\n  document_tronque: t.document_tronque, extractions, incidents\n} }];"
+        "jsCode": "// Normalisation des trois réponses — identique au pipeline A2 : un appel en\n// échec devient une extraction vide et un incident tracé.\nfunction extraireTexte(rep, fournisseur) {\n  try {\n    if (fournisseur === 'openai') return rep.choices[0].message.content;\n    if (fournisseur === 'anthropic') return rep.content[0].text;\n    if (fournisseur === 'google') return rep.candidates[0].content.parts[0].text;\n  } catch (e) { return null; }\n  return null;\n}\nfunction parserJson(txt) {\n  if (!txt) return null;\n  let s = String(txt).trim();\n  s = s.replace(/^```(?:json)?/i, '').replace(/```$/,'').trim();\n  const i = s.indexOf('{'), j = s.lastIndexOf('}');\n  if (i >= 0 && j > i) s = s.slice(i, j + 1);\n  try { return JSON.parse(s); } catch (e) { return null; }\n}\n\n// CORRECTION DU 23.08.2026 — les identifiants de modèles étaient écrits EN DUR\n// ici ('gpt-4o', 'claude-opus-4-8', 'gemini-pro-latest'), indépendamment du\n// modèle réellement appelé par les nœuds HTTP. Après le portage des appels vers\n// $env.MODELE_*, l'archive du signal 3 nommait « gpt-4o » un appel fait avec\n// « gpt-5.6 » : une pièce d'audit qui désigne un modèle n'ayant pas tourné.\n// Dans un travail dont la thèse est la traçabilité, c'est la faute à ne pas\n// commettre.\n//\n// L'identifiant est désormais lu DANS LA RÉPONSE DE L'API — ce que le\n// fournisseur déclare avoir exécuté, et non ce qu'on lui a demandé. Les deux\n// peuvent différer (alias, routage interne : `gpt-5.6` répond `gpt-5.6-sol`).\n// Repli sur la variable d'environnement, puis sur une mention explicite\n// d'inconnu — jamais sur une constante qui aurait l'air d'un fait.\nfunction modeleServi(rep, fournisseur, defaut) {\n  try {\n    if (fournisseur === 'openai')    return rep.model || defaut;\n    if (fournisseur === 'anthropic') return rep.model || defaut;\n    if (fournisseur === 'google')    return rep.modelVersion || defaut;\n  } catch (e) { /* réponse absente ou en erreur */ }\n  return defaut;\n}\n\nconst sources = [\n  { fournisseur: 'openai',    node: 'Modèle A (OpenAI)',\n    demande: $env.MODELE_OPENAI    || 'gpt-5.6' },\n  { fournisseur: 'anthropic', node: 'Modèle B (Anthropic)',\n    demande: $env.MODELE_ANTHROPIC || 'claude-opus-5' },\n  { fournisseur: 'google',    node: 'Modèle C (Google)',\n    demande: $env.MODELE_GOOGLE    || 'gemini-3.7-flash' }\n];\n\nconst extractions = [];\nconst incidents = [];\nfor (const s of sources) {\n  let rep;\n  try { rep = $(s.node).first().json; } catch (e) { rep = null; }\n  const err = rep && rep.error ? JSON.stringify(rep.error).slice(0,200) : null;\n  // Sur appel en échec, aucun modèle n'a tourné : le dire, ne pas nommer.\n  const servi = err || !rep ? '(aucun — appel en échec)'\n                           : modeleServi(rep, s.fournisseur, s.demande);\n  const parsed = parserJson(extraireTexte(rep, s.fournisseur));\n  if (err) incidents.push(s.demande + ' : appel en échec (' + err + ')');\n  else if (!parsed) incidents.push(servi + ' : réponse non parsable en JSON');\n  extractions.push({ modele_demande: s.demande, modele_servi: servi,\n                     extraction: parsed || {} });\n}\n\nconst t = $('Consolider le contexte').first().json;\nreturn [{ json: {\n  sector_code: t.sector_code, watch_question_code: t.watch_question_code,\n  source_doc: t.source_doc, raw_ref: t.raw_ref, run_id: t.run_id,\n  document_tronque: t.document_tronque, extractions, incidents\n} }];"
       },
       "name": "Normaliser les extractions",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1600, 400]
+      "position": [
+        1600,
+        400
+      ]
     },
     {
       "parameters": {
@@ -158,7 +226,10 @@
       "name": "Recouper les extractions",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1800, 400]
+      "position": [
+        1800,
+        400
+      ]
     },
     {
       "parameters": {
@@ -172,9 +243,15 @@
       "name": "Écrire le signal (à valider)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2050, 400],
+      "position": [
+        2050,
+        400
+      ],
       "credentials": {
-        "postgres": { "id": "QdVRYX9pjTj9C8G3", "name": "postgres veille" }
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
       },
       "notes": "Toujours « a_valider », quel que soit le recoupement : sur du qualitatif, la validation humaine est le chemin unique, pas une branche d'exception."
     },
@@ -190,28 +267,167 @@
       "name": "Clôturer le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2300, 400],
+      "position": [
+        2300,
+        400
+      ],
       "credentials": {
-        "postgres": { "id": "QdVRYX9pjTj9C8G3", "name": "postgres veille" }
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
       }
     }
   ],
   "connections": {
-    "Déclencheur manuel (document choisi par le veilleur)": { "main": [[ { "node": "Ouvrir le run", "type": "main", "index": 0 } ]] },
-    "Ouvrir le run": { "main": [[ { "node": "Préparer la tâche", "type": "main", "index": 0 } ]] },
-    "Préparer la tâche": { "main": [[ { "node": "Télécharger le document", "type": "main", "index": 0 } ]] },
-    "Télécharger le document": { "main": [[ { "node": "Déposer le document brut", "type": "main", "index": 0 } ]] },
-    "Déposer le document brut": { "main": [[ { "node": "Extraire le texte", "type": "main", "index": 0 } ]] },
-    "Extraire le texte": { "main": [[ { "node": "Consolider le contexte", "type": "main", "index": 0 } ]] },
-    "Consolider le contexte": { "main": [[ { "node": "Modèle A (OpenAI)", "type": "main", "index": 0 } ]] },
-    "Modèle A (OpenAI)": { "main": [[ { "node": "Modèle B (Anthropic)", "type": "main", "index": 0 } ]] },
-    "Modèle B (Anthropic)": { "main": [[ { "node": "Modèle C (Google)", "type": "main", "index": 0 } ]] },
-    "Modèle C (Google)": { "main": [[ { "node": "Normaliser les extractions", "type": "main", "index": 0 } ]] },
-    "Normaliser les extractions": { "main": [[ { "node": "Recouper les extractions", "type": "main", "index": 0 } ]] },
-    "Recouper les extractions": { "main": [[ { "node": "Écrire le signal (à valider)", "type": "main", "index": 0 } ]] },
-    "Écrire le signal (à valider)": { "main": [[ { "node": "Clôturer le run", "type": "main", "index": 0 } ]] }
+    "Déclencheur manuel (document choisi par le veilleur)": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Préparer la tâche",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer la tâche": {
+      "main": [
+        [
+          {
+            "node": "Télécharger le document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Télécharger le document": {
+      "main": [
+        [
+          {
+            "node": "Déposer le document brut",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déposer le document brut": {
+      "main": [
+        [
+          {
+            "node": "Extraire le texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire le texte": {
+      "main": [
+        [
+          {
+            "node": "Consolider le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolider le contexte": {
+      "main": [
+        [
+          {
+            "node": "Modèle A (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle A (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Modèle B (Anthropic)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle B (Anthropic)": {
+      "main": [
+        [
+          {
+            "node": "Modèle C (Google)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle C (Google)": {
+      "main": [
+        [
+          {
+            "node": "Normaliser les extractions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser les extractions": {
+      "main": [
+        [
+          {
+            "node": "Recouper les extractions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recouper les extractions": {
+      "main": [
+        [
+          {
+            "node": "Écrire le signal (à valider)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire le signal (à valider)": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "settings": {
     "executionOrder": "v1"
+  },
+  "meta": {
+    "description": " — PORTAGE DU 23.08.2026, mêmes corrections que la couche 0 : identifiants de modèles périmés (gpt-4o, claude-opus-4-8, gemini-pro-latest — ce dernier renvoie 404) remplacés par les variables d'environnement MODELE_*, avec repli sur les identifiants vérifiés le 22.08 ; max_tokens Anthropic porté de 1024 à 16000 (le raisonnement adaptatif s'impute dessus) ; clé Google déplacée de la chaîne de requête vers l'en-tête x-goog-api-key (une clé dans l'URL se retrouve dans les journaux) ; paramètre temperature retiré des trois appels — il est refusé hors valeur par défaut sur les modèles courants."
   }
 }

@@ -1,11 +1,6 @@
 import React from "react";
 import { Routes, Route, NavLink, Navigate } from "react-router-dom";
-import { FournisseurDonnees, useDonnees, API_URL, heureCH, alertesSignificatives } from "./api.jsx";
-import CetteSemaine from "./pages/CetteSemaine.jsx";
-import Actions from "./pages/Actions.jsx";
-import SecteurQV from "./pages/SecteurQV.jsx";
-import Radar from "./pages/Radar.jsx";
-import Opportunites from "./pages/Opportunites.jsx";
+import { FournisseurDonnees, useDonnees, API_URL, heureCH } from "./api.jsx";
 import Accueil from "./pages/Accueil.jsx";
 import Secteur from "./pages/Secteur.jsx";
 import Referentiel from "./pages/Referentiel.jsx";
@@ -16,10 +11,8 @@ function Navigation() {
   const r = D?.referentiel || [];
   const secteurs = [...new Map(r.map(i => [i.sector_code, i.sector_label])).entries()]
     .filter(([c]) => c !== "transversal");
-  // Même règle que l'écran « Cette semaine » : les franchissements portant sur
-  // des marchés négligeables ne sont pas comptés ici non plus.
-  const retenues = alertesSignificatives(D).retenues;
-  const nbAlertes = c => retenues.filter(a => a.sector_code === c).length;
+  const nbAlertes = c =>
+    (D?.alertes || []).filter(a => a.sector_code === c && a.diffusable).length;
 
   const lien = (vers, libelle, pastille) => (
     <NavLink to={vers} className={({ isActive }) => "nav" + (isActive ? " actif" : "")}>
@@ -34,25 +27,17 @@ function Navigation() {
         Veille économique
         <small>CODEC SA · cas d'illustration</small>
       </div>
-      {/* v4 — quatre écrans organisés par question de décision. */}
-      {lien("/cette-semaine", "Cette semaine")}
-      {lien("/actions", "Actions")}
-      {lien("/radar", "Radar")}
-      {lien("/opportunites", "Opportunités")}
-      <div className="nav-titre">Marchés</div>
+      {lien("/accueil", "Vue d'ensemble")}
+      {lien("/secteur/transversal", "Contexte mondial")}
+      <div className="nav-titre">Secteurs</div>
       {secteurs.map(([c, l]) => (
-        <React.Fragment key={c}>{lien("/qv/" + c, l, nbAlertes(c) || null)}</React.Fragment>
+        <React.Fragment key={c}>{lien("/secteur/" + c, l, nbAlertes(c) || null)}</React.Fragment>
       ))}
-      {lien("/qv/transversal", "Socle transversal")}
-      {/* v3 conservée : la restitution est à sa quatrième itération, et les
-          précédentes restent atteignables — l'historique fait partie du résultat. */}
       <div className="nav-titre">Dispositif</div>
       {lien("/referentiel", "Référentiel")}
       {lien("/executions", "Exécutions")}
-      <div className="nav-titre">Itération précédente</div>
-      {lien("/accueil", "Vue d'ensemble (v3)")}
       <div className="nav-pied">
-        Restitution v4 · organisée par décisions<br />Scénario B · human-in-the-loop<br />
+        Scénario B · human-in-the-loop<br />
         Sources ouvertes uniquement<br />
         Prototype de travail de bachelor — HEG Arc
       </div>
@@ -96,17 +81,12 @@ function Coquille() {
       <Navigation />
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/cette-semaine" replace />} />
-          <Route path="/cette-semaine" element={<CetteSemaine />} />
-          <Route path="/actions" element={<Actions />} />
-          <Route path="/qv/:code" element={<SecteurQV />} />
-          <Route path="/radar" element={<Radar />} />
-          <Route path="/opportunites" element={<Opportunites />} />
+          <Route path="/" element={<Navigate to="/accueil" replace />} />
           <Route path="/accueil" element={<Accueil />} />
           <Route path="/secteur/:code" element={<Secteur />} />
           <Route path="/referentiel" element={<Referentiel />} />
           <Route path="/executions" element={<Executions />} />
-          <Route path="*" element={<Navigate to="/cette-semaine" replace />} />
+          <Route path="*" element={<Navigate to="/accueil" replace />} />
         </Routes>
         <div className="note" style={{ marginTop: 30, display: "flex", gap: 12, alignItems: "center" }}>
           <button className="rafraichir" disabled={chargement} onClick={recharger}>

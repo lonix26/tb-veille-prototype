@@ -1,0 +1,231 @@
+{
+  "name": "Veille - Découverte de sources multi-IA (couche amont, human-in-the-loop)",
+  "meta": {
+    "description": "Couche 0 de l'architecture (§ 10.2) : outille l'entretien du référentiel de sources. Quatre modèles proposent des sources candidates pour une question de veille ; le workflow normalise, recoupe (indice de recouvrement), vérifie objectivement l'existence de chaque URL, écarte les doublons du référentiel, puis dépose une fiche de qualification pré-remplie en file humaine. Le workflow ne décide jamais de l'inscription d'une source : la qualification reste non délégable (§ 10.4, § 10.4.2)."
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Déclencheur (entretien du référentiel)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 400],
+      "notes": "Déclenchement manuel ou trimestriel : la découverte de sources n'appartient pas au run périodique de collecte."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Cadrage figé du besoin : la découverte est pilotée par la question de veille, jamais par la source.\n// Les critères d'admissibilité reprennent la qualification du ch. 8 (fréquence, format, accès).\nreturn [{ json: {\n  secteur: 'automobile',\n  question_veille: 'QV5',\n  intitule_besoin: \"Impulsions et soutiens publics à l'électrification de la filière automobile\",\n  perimetre_geo: 'UE, Chine, États-Unis',\n  profondeur_historique_ans: 3,\n  criteres_admissibilite: [\n    'Producteur institutionnel, statistique officiel, organisation internationale ou association de branche reconnue',\n    'Accès gratuit et sans authentification',\n    'Publication périodique et datée (mensuelle à annuelle)',\n    'Format exploitable : API, CSV/Excel, ou document structuré récurrent',\n    'Série disponible sur au moins trois exercices'\n  ],\n  prompt: \"Tu assistes la constitution d'un référentiel de sources pour une veille économique sectorielle. Propose au maximum 8 sources répondant au besoin décrit, en respectant STRICTEMENT les critères d'admissibilité fournis. Règles impératives : (1) ne propose que des sources dont tu es certain qu'elles existent ; (2) ne propose aucune URL que tu ne peux pas justifier ; (3) si tu n'as pas de proposition fiable, renvoie une liste vide plutôt qu'une proposition incertaine ; (4) réponds UNIQUEMENT par un JSON strict, sans texte autour, au format {\\\"sources\\\":[{\\\"nom\\\":\\\"\\\",\\\"organisme\\\":\\\"\\\",\\\"url\\\":\\\"\\\",\\\"indicateur_couvert\\\":\\\"\\\",\\\"frequence\\\":\\\"\\\",\\\"format\\\":\\\"\\\",\\\"acces\\\":\\\"gratuit|inscription|payant\\\",\\\"profondeur_historique\\\":\\\"\\\",\\\"justification\\\":\\\"\\\"}]}.\"\n} }];"
+      },
+      "name": "Cadrer le besoin de veille",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 400],
+      "notes": "Prompt figé et identique pour les quatre modèles : condition de comparabilité (protocole du ch. 9)."
+    },
+    {
+      "parameters": {
+        "url": "http://loader:8080/indicators",
+        "options": {}
+      },
+      "name": "Lire le référentiel existant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 400],
+      "notes": "Sert au dédoublonnage : une source déjà qualifiée ne repasse pas en file humaine."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'gpt-4o', temperature:0, messages:[{role:'user', content: $('Cadrer le besoin de veille').first().json.prompt + ' Besoin: ' + $('Cadrer le besoin de veille').first().json.intitule_besoin + ' Secteur: ' + $('Cadrer le besoin de veille').first().json.secteur + ' Périmètre: ' + $('Cadrer le besoin de veille').first().json.perimetre_geo + ' Critères: ' + JSON.stringify($('Cadrer le besoin de veille').first().json.criteres_admissibilite)}]}) }}"
+      },
+      "name": "Modèle A (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 100],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-5', max_tokens:2048, temperature:0, messages:[{role:'user', content: $('Cadrer le besoin de veille').first().json.prompt + ' Besoin: ' + $('Cadrer le besoin de veille').first().json.intitule_besoin + ' Secteur: ' + $('Cadrer le besoin de veille').first().json.secteur + ' Périmètre: ' + $('Cadrer le besoin de veille').first().json.perimetre_geo + ' Critères: ' + JSON.stringify($('Cadrer le besoin de veille').first().json.criteres_admissibilite)}]}) }}"
+      },
+      "name": "Modèle B (Anthropic)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({contents:[{parts:[{text: $('Cadrer le besoin de veille').first().json.prompt + ' Besoin: ' + $('Cadrer le besoin de veille').first().json.intitule_besoin + ' Secteur: ' + $('Cadrer le besoin de veille').first().json.secteur + ' Périmètre: ' + $('Cadrer le besoin de veille').first().json.perimetre_geo + ' Critères: ' + JSON.stringify($('Cadrer le besoin de veille').first().json.criteres_admissibilite)}]}]}) }}"
+      },
+      "name": "Modèle C (Google)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 500],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'sonar-pro', temperature:0, messages:[{role:'user', content: $('Cadrer le besoin de veille').first().json.prompt + ' Besoin: ' + $('Cadrer le besoin de veille').first().json.intitule_besoin + ' Secteur: ' + $('Cadrer le besoin de veille').first().json.secteur + ' Périmètre: ' + $('Cadrer le besoin de veille').first().json.perimetre_geo + ' Critères: ' + JSON.stringify($('Cadrer le besoin de veille').first().json.criteres_admissibilite)}]}) }}"
+      },
+      "name": "Modèle D (Perplexity)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 700],
+      "notes": "Modèle adossé à la recherche web : sert de contrepoint aux modèles répondant de mémoire."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fusion des propositions, normalisation des URL et calcul du recouvrement inter-modèles.\n// Le recouvrement est un signal de priorisation, jamais une preuve : la vérification objective suit (§ 6.3).\nconst MODELES = ['openai', 'anthropic', 'google', 'perplexity'];\n\nfunction texte(x) {\n  return x.choices?.[0]?.message?.content\n      ?? x.content?.[0]?.text\n      ?? x.candidates?.[0]?.content?.parts?.[0]?.text\n      ?? '';\n}\nfunction parser(t) {\n  try { return (JSON.parse(String(t).replace(/^```json/i, '').replace(/```$/, '').trim()).sources) || []; }\n  catch (e) { return []; }\n}\nfunction cle(u) {\n  try { const p = new URL(u); return (p.hostname.replace(/^www\\./, '') + p.pathname.replace(/\\/$/, '')).toLowerCase(); }\n  catch (e) { return String(u || '').toLowerCase().trim(); }\n}\n\nconst registre = {};\n$input.all().forEach((item, i) => {\n  const modele = MODELES[i] || ('modele_' + i);\n  for (const s of parser(texte(item.json))) {\n    const k = cle(s.url);\n    if (!k) continue;\n    if (!registre[k]) registre[k] = { cle: k, url: s.url, nom: s.nom, organisme: s.organisme, propositions: {}, modeles: [] };\n    registre[k].propositions[modele] = s;\n    if (!registre[k].modeles.includes(modele)) registre[k].modeles.push(modele);\n  }\n});\n\nconst contexte = $('Cadrer le besoin de veille').first().json;\nconst candidats = Object.values(registre).map(c => ({\n  cle: c.cle,\n  url: c.url,\n  nom: c.nom,\n  organisme: c.organisme,\n  modeles: c.modeles,\n  nb_modeles: c.modeles.length,\n  indice_recouvrement: c.modeles.length / MODELES.length,\n  propositions: c.propositions,\n  secteur: contexte.secteur,\n  question_veille: contexte.question_veille,\n  intitule_besoin: contexte.intitule_besoin\n})).sort((a, b) => b.nb_modeles - a.nb_modeles);\n\nconst union = candidats.length;\nconst noyau = candidats.filter(c => c.nb_modeles >= 3).length;\nreturn [{ json: {\n  releve_le: new Date().toISOString(),\n  union_propositions: union,\n  noyau_commun: noyau,\n  indice_recouvrement_global: union ? noyau / union : 0,\n  candidats\n} }];"
+      },
+      "name": "Normaliser et recouper les propositions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 400],
+      "notes": "Produit l'indice de recouvrement du § 9.2 appliqué à la tâche d'identification de sources."
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "candidats",
+        "options": {}
+      },
+      "name": "Éclater les candidats",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1200, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } },
+          "timeout": 15000,
+          "redirect": { "redirect": { "followRedirects": true } }
+        }
+      },
+      "name": "Vérifier l'existence de l'URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1420, 400],
+      "onError": "continueRegularOutput",
+      "notes": "Contrôle objectif : une URL inatteignable est écartée quel que soit le nombre de modèles l'ayant proposée. C'est ce contrôle, et non le consensus, qui borne l'hallucination sur cette tâche."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{ $json.statusCode || 0 }}", "operation": "largerEqual", "value2": 200 },
+            { "value1": "={{ $json.statusCode || 0 }}", "operation": "smaller", "value2": 400 }
+          ]
+        },
+        "combineOperation": "all"
+      },
+      "name": "URL joignable ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1640, 400]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Fiche de qualification pré-remplie, alignée sur la table `indicators` du schéma consolidé.\n// Les champs de décision restent vides : le workflow prépare la décision, il ne la prend pas.\n// Le nœud HTTP précédent ne renvoie que la réponse ; les données du candidat sont reprises par appariement d'items.\nconst cand = $('Éclater les candidats').item.json;\nconst brut = $('Lire le référentiel existant').all().map(i => i.json);\nconst referentiel = Array.isArray(brut[0]) ? brut[0] : brut;\n\nfunction cle(u) {\n  try { const p = new URL(u); return (p.hostname.replace(/^www\\./, '') + p.pathname.replace(/\\/$/, '')).toLowerCase(); }\n  catch (e) { return String(u || '').toLowerCase().trim(); }\n}\nconst dejaConnues = new Set(referentiel.map(r => cle(r.source_url)));\n\nif (dejaConnues.has(cand.cle)) {\n  return { json: {\n    statut_traitement: 'doublon_referentiel',\n    motif: 'Source déjà inscrite au référentiel',\n    source_url: cand.url,\n    nb_modeles: cand.nb_modeles,\n    modeles: cand.modeles,\n    constate_le: new Date().toISOString()\n  } };\n}\n\nconst props = Object.values(cand.propositions || {});\nconst consensuel = (champ) => {\n  const vals = props.map(p => String(p?.[champ] ?? '').trim().toLowerCase()).filter(Boolean);\n  return vals.length && vals.every(x => x === vals[0]) ? vals[0] : null;\n};\n\nreturn { json: {\n  statut_traitement: 'a_qualifier',\n  // Identification\n  source_name: cand.organisme || cand.nom || null,\n  source_url: cand.url,\n  sector: cand.secteur,\n  watch_question: cand.question_veille,\n  besoin: cand.intitule_besoin,\n  // Proposé par les modèles, à confirmer par l'humain (null si les modèles divergent)\n  frequency_proposee: consensuel('frequence'),\n  format_propose: consensuel('format'),\n  acces_propose: consensuel('acces'),\n  indicateur_couvert_propose: props.map(p => p?.indicateur_couvert).filter(Boolean),\n  justifications: props.map(p => p?.justification).filter(Boolean),\n  // Preuves accompagnant la fiche\n  nb_modeles: cand.nb_modeles,\n  modeles: cand.modeles,\n  indice_recouvrement: cand.indice_recouvrement,\n  url_verifiee: true,\n  http_status: $json.statusCode ?? null,\n  verifiee_le: new Date().toISOString(),\n  // Champs de décision, laissés vides à dessein\n  category: null,\n  status: null,\n  decision: null,\n  decide_par: null,\n  decide_le: null\n} };"
+      },
+      "name": "Fiche de qualification pré-remplie",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 260]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{ $json.statut_traitement }}", "operation": "equal", "value2": "a_qualifier" }
+          ]
+        }
+      },
+      "name": "Nouvelle source ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2060, 260],
+      "notes": "Les doublons du référentiel sont écartés de la file humaine mais journalisés : le journal de découverte trace l'intégralité de ce qui a été proposé et ce qui en a été fait."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/source-qualification-queue",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "name": "File de qualification humaine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 160],
+      "notes": "Seul point de sortie vers le référentiel : l'inscription d'une source suppose une décision humaine tracée (E6, E7)."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Journal des propositions non vérifiables : mesure directe du taux d'invention par modèle.\n// Alimente la tâche d'identification de sources du protocole expérimental (T1, § 9.1.2)\n// et le suivi de fiabilité du dispositif en régime d'exploitation.\nconst cand = $('Éclater les candidats').item.json;\nreturn { json: {\n  statut_traitement: 'non_verifiable',\n  motif: 'URL inatteignable ou inexistante à la date de vérification',\n  source_url: cand.url,\n  nom: cand.nom ?? null,\n  organisme: cand.organisme ?? null,\n  modeles_proposants: cand.modeles ?? [],\n  nb_modeles: cand.nb_modeles ?? null,\n  indice_recouvrement: cand.indice_recouvrement ?? null,\n  http_status: $json.statusCode ?? null,\n  constate_le: new Date().toISOString()\n} };"
+      },
+      "name": "Journaliser les propositions non vérifiables",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loader:8080/discovery-log",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "name": "Écrire au journal de découverte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 560]
+    }
+  ],
+  "connections": {
+    "Déclencheur (entretien du référentiel)": { "main": [[ { "node": "Cadrer le besoin de veille", "type": "main", "index": 0 } ]] },
+    "Cadrer le besoin de veille": { "main": [[ { "node": "Lire le référentiel existant", "type": "main", "index": 0 } ]] },
+    "Lire le référentiel existant": { "main": [[ { "node": "Modèle A (OpenAI)", "type": "main", "index": 0 }, { "node": "Modèle B (Anthropic)", "type": "main", "index": 0 }, { "node": "Modèle C (Google)", "type": "main", "index": 0 }, { "node": "Modèle D (Perplexity)", "type": "main", "index": 0 } ]] },
+    "Modèle A (OpenAI)": { "main": [[ { "node": "Normaliser et recouper les propositions", "type": "main", "index": 0 } ]] },
+    "Modèle B (Anthropic)": { "main": [[ { "node": "Normaliser et recouper les propositions", "type": "main", "index": 0 } ]] },
+    "Modèle C (Google)": { "main": [[ { "node": "Normaliser et recouper les propositions", "type": "main", "index": 0 } ]] },
+    "Modèle D (Perplexity)": { "main": [[ { "node": "Normaliser et recouper les propositions", "type": "main", "index": 0 } ]] },
+    "Normaliser et recouper les propositions": { "main": [[ { "node": "Éclater les candidats", "type": "main", "index": 0 } ]] },
+    "Éclater les candidats": { "main": [[ { "node": "Vérifier l'existence de l'URL", "type": "main", "index": 0 } ]] },
+    "Vérifier l'existence de l'URL": { "main": [[ { "node": "URL joignable ?", "type": "main", "index": 0 } ]] },
+    "URL joignable ?": { "main": [ [ { "node": "Fiche de qualification pré-remplie", "type": "main", "index": 0 } ], [ { "node": "Journaliser les propositions non vérifiables", "type": "main", "index": 0 } ] ] },
+    "Fiche de qualification pré-remplie": { "main": [[ { "node": "Nouvelle source ?", "type": "main", "index": 0 } ]] },
+    "Nouvelle source ?": { "main": [ [ { "node": "File de qualification humaine", "type": "main", "index": 0 } ], [ { "node": "Écrire au journal de découverte", "type": "main", "index": 0 } ] ] },
+    "Journaliser les propositions non vérifiables": { "main": [[ { "node": "Écrire au journal de découverte", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

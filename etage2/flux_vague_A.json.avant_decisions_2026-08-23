@@ -1,0 +1,93 @@
+{
+  "_note": "Descripteurs des flux de la vague A (CONCEPTION_ETAGE2.md § 3). Ce fichier est la PROPOSITION de semis de flux_sources : tout flux naît 'a_verifier' et ne passe 'actif' qu'après vue d'une réponse réelle par l'étudiant (acte de qualification nominatif, contrainte chk_flux_qualifie_trace). Les codes CPV marqués a_verifier se contrôlent par une requête de décompte TED avant activation — méthode M7 du 20.08.2026.",
+  "flux": [
+    {
+      "flux_id": "ted_medical",
+      "famille": "marches_publics",
+      "sector_code": "medical",
+      "libelle": "Avis TED — équipements et fournitures médicaux (CPV 33)",
+      "url_base": "https://api.ted.europa.eu/v3/notices/search",
+      "parametres": { "cpv": "33100000", "cpv_statut": "verifie_20.08.2026_via_M7", "fenetre_jours": 7, "limite": 50 }
+    },
+    {
+      "flux_id": "ted_aerospatial",
+      "famille": "marches_publics",
+      "sector_code": "aerospatial",
+      "libelle": "Avis TED — aéronefs, engins spatiaux et équipements associés",
+      "url_base": "https://api.ted.europa.eu/v3/notices/search",
+      "parametres": { "cpv": "34700000", "cpv_statut": "a_verifier", "fenetre_jours": 7, "limite": 50 }
+    },
+    {
+      "flux_id": "ted_automobile",
+      "famille": "marches_publics",
+      "sector_code": "automobile",
+      "libelle": "Avis TED — véhicules et pièces (division 34.3)",
+      "url_base": "https://api.ted.europa.eu/v3/notices/search",
+      "parametres": { "cpv": "34300000", "cpv_statut": "a_verifier", "fenetre_jours": 7, "limite": 50 }
+    },
+    {
+      "flux_id": "gdelt_horlogerie",
+      "famille": "actualite",
+      "sector_code": "horlogerie",
+      "libelle": "GDELT — actualité mondiale de l'industrie horlogère",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": { "requete": "(\"swiss watch industry\" OR \"watch exports\" OR \"horlogerie suisse\")", "fenetre": "7d", "limite": 50 }
+    },
+    {
+      "flux_id": "gdelt_medical",
+      "famille": "actualite",
+      "sector_code": "medical",
+      "libelle": "GDELT — actualité medtech (réglementation, investissements)",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": { "requete": "(\"medical device\" (regulation OR investment OR manufacturing OR recall))", "fenetre": "7d", "limite": 50 }
+    },
+    {
+      "flux_id": "gdelt_automobile",
+      "famille": "actualite",
+      "sector_code": "automobile",
+      "libelle": "GDELT — actualité de la filière automobile (production, électrification)",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": { "requete": "(\"car production\" OR \"auto parts\" OR \"vehicle manufacturing\" OR \"EV production\")", "fenetre": "7d", "limite": 50 }
+    },
+    {
+      "flux_id": "gdelt_aerospatial",
+      "famille": "actualite",
+      "sector_code": "aerospatial",
+      "libelle": "GDELT — actualité aérospatiale (commandes, cadences, lancements)",
+      "url_base": "https://api.gdeltproject.org/api/v2/doc/doc",
+      "parametres": { "requete": "(aerospace (orders OR \"production rate\" OR supplier) OR \"aircraft orders\")", "fenetre": "7d", "limite": 50 }
+    },
+    {
+      "flux_id": "marches_horlogerie",
+      "famille": "marches_financiers",
+      "sector_code": "horlogerie",
+      "libelle": "Cours des donneurs d'ordre horlogers — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": { "tickers": ["uhr.sw", "cfr.sw"], "tickers_statut": "a_verifier_symboles_stooq", "seuil_variation_pct": 5.0, "fenetre_seances": 5 }
+    },
+    {
+      "flux_id": "marches_medical",
+      "famille": "marches_financiers",
+      "sector_code": "medical",
+      "libelle": "Cours des donneurs d'ordre medtech — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": { "tickers": ["syk.us", "mdt.us"], "tickers_statut": "a_verifier_symboles_stooq", "seuil_variation_pct": 5.0, "fenetre_seances": 5 }
+    },
+    {
+      "flux_id": "marches_automobile",
+      "famille": "marches_financiers",
+      "sector_code": "automobile",
+      "libelle": "Cours des donneurs d'ordre automobiles — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": { "tickers": ["vow3.de", "stla.us"], "tickers_statut": "a_verifier_symboles_stooq", "seuil_variation_pct": 5.0, "fenetre_seances": 5 }
+    },
+    {
+      "flux_id": "marches_aerospatial",
+      "famille": "marches_financiers",
+      "sector_code": "aerospatial",
+      "libelle": "Cours des donneurs d'ordre aérospatiaux — variation hebdomadaire",
+      "url_base": "https://stooq.com/q/d/l/",
+      "parametres": { "tickers": ["air.fr", "saf.fr", "ba.us"], "tickers_statut": "a_verifier_symboles_stooq", "seuil_variation_pct": 5.0, "fenetre_seances": 5 }
+    }
+  ]
+}

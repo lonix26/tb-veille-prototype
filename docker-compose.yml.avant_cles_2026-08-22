@@ -66,16 +66,10 @@ services:
       # dans le workflow par {{ $env.* }} — elles n'apparaissent ni dans le JSON du
       # workflow ni dans le dépôt. Vides par défaut : le pipeline composite ne
       # tourne pas tant qu'elles ne sont pas renseignées.
-      # CORRECTION DU 22.08.2026 — les clés ne sont plus lues dans ./.env.
-      # ./.env est DANS le dossier du travail de bachelor, lequel est recopié chaque jour
-      # vers le Drive : y loger des clés contredit le § 6 du protocole de la vague 3
-      # (« aucune clé ne doit se trouver dans le dossier, même en .env »). Le .gitignore
-      # protégeait du dépôt git, pas de la copie Drive. Les clés sont désormais lues dans
-      # un fichier hors dossier, dont seul le CHEMIN est configurable ici.
-      # Une PME qui reproduit le dispositif renseigne CLES_API_FICHIER dans son .env.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
-    env_file:
-      - ${CLES_API_FICHIER:-./.env}
     volumes:
       - n8n_data:/home/node/.n8n
       # Zone de dépôt brut : chaque réponse d'API et chaque document sont conservés tels que reçus (exigence E6, audit).

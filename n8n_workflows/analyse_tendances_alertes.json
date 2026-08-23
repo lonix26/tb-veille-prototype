@@ -9,7 +9,10 @@
       "name": "Déclencheur manuel",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "notes": "Déclenchement manuel pour la mise au point — comme les collecteurs. Une cadence mensuelle (après la collecte) pourra être posée une fois le circuit de validation rodé."
     },
     {
@@ -21,7 +24,10 @@
       "name": "Ouvrir le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [200, 300],
+      "position": [
+        200,
+        300
+      ],
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -32,13 +38,16 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT sector_code,\n       jsonb_agg(jsonb_build_object(\n         'indicateur', indicator_id,\n         'libelle', indicator_label,\n         'periode', period,\n         'zone', geo,\n         'valeur', ROUND(value::numeric, 2),\n         'unite', unit,\n         'variation_periode_pct', variation_periode_pct,\n         'glissement_annuel_pct', glissement_annuel_pct,\n         'moyenne_mobile_annuelle', moyenne_mobile_annuelle,\n         'ecart_a_la_moyenne_pct', ecart_a_la_moyenne_pct,\n         'seuil_materialite_pct', seuil_materialite_pct,\n         'statut_validation', validation_status,\n         'franchissement', franchissement,\n         'completude', completude\n       ) ORDER BY indicator_id) AS charge\nFROM v_dernier_point\nWHERE geo IN ('WORLD','EU27','EU','CH','G20')\nGROUP BY sector_code\nORDER BY sector_code;",
+        "query": "-- CORRIGÉ LE 24.08.2026. La version précédente filtrait les zones par une\n-- LISTE ÉCRITE EN DUR : geo IN ('WORLD','EU27','EU','CH','G20'). Or les zones\n-- de référence déclarées depuis le 23.08 sont W00 (H1), EU27_2020 (A5, M2, T5,\n-- T7), US (M8), EU (M7, S7) — dont AUCUNE n'y figurait. Six indicateurs sur\n-- neuf n'atteignaient donc jamais le modèle : le commentaire de l'horlogerie\n-- était rédigé sur H2 seul, un point unique de 2023. Le commentaire ne parlait\n-- pas du marché parce qu'on ne lui montrait presque rien.\n--\n-- La zone est désormais celle que l'indicateur DÉCLARE (indicators.geo_reference).\n--\n-- AJOUT : le mécanisme causal de chaque question de veille sectorielle. Il est\n-- déjà écrit dans sector_watch_questions — c'est du savoir DÉCLARÉ, pas une\n-- invention du modèle. Le lui donner lui permet de rattacher un chiffre au\n-- raisonnement métier que la grille porte déjà, au lieu de commenter un nombre\n-- hors sol.\nWITH metriques AS (\n  SELECT d.sector_code,\n         jsonb_agg(jsonb_build_object(\n           'indicateur', d.indicator_id,\n           'libelle', d.indicator_label,\n           'periode', d.period,\n           'zone', d.geo,\n           'valeur', ROUND(d.value::numeric, 2),\n           'unite', d.unit,\n           'latence', i.latence,\n           'sens_favorable', i.sens_favorable,\n           'questions_de_veille', (SELECT string_agg(w.watch_question_code, ',' ORDER BY w.watch_question_code)\n                                     FROM indicator_watch_questions w\n                                    WHERE w.indicator_id = d.indicator_id),\n           'variation_periode_pct', d.variation_periode_pct,\n           'glissement_annuel_pct', d.glissement_annuel_pct,\n           'moyenne_mobile_annuelle', d.moyenne_mobile_annuelle,\n           'ecart_a_la_moyenne_pct', d.ecart_a_la_moyenne_pct,\n           'seuil_materialite_pct', d.seuil_materialite_pct,\n           'statut_validation', d.validation_status,\n           'franchissement', d.franchissement,\n           'completude', d.completude\n         ) ORDER BY d.indicator_id) AS charge\n  FROM v_dernier_point d\n  JOIN indicators i ON i.indicator_id = d.indicator_id\n  WHERE i.geo_reference IS NOT NULL AND d.geo = i.geo_reference\n  GROUP BY d.sector_code\n),\nmecanismes AS (\n  SELECT sector_code,\n         jsonb_agg(jsonb_build_object(\n           'question', watch_question_code,\n           'formulation', question_sectorielle,\n           'mecanisme', mecanisme) ORDER BY watch_question_code) AS cadre\n  FROM v_instanciation_qv GROUP BY sector_code\n),\nsante AS (\n  SELECT sector_code, score_sante, etat, n_indicateurs_orientables\n  FROM v_sante_secteur\n)\nSELECT m.sector_code,\n       jsonb_build_object('metriques', m.charge,\n                          'cadre_de_veille', COALESCE(c.cadre, '[]'::jsonb),\n                          'sante', to_jsonb(s.*) - 'sector_code') AS charge\nFROM metriques m\nLEFT JOIN mecanismes c ON c.sector_code = m.sector_code\nLEFT JOIN sante s ON s.sector_code = m.sector_code\nORDER BY m.sector_code;",
         "options": {}
       },
       "name": "Lire l'objet compact par secteur",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [400, 300],
+      "position": [
+        400,
+        300
+      ],
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -49,12 +58,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prépare la charge par secteur : le prompt système porte les règles\n// d'interprétation RI0-RI10 (§ 10.4.3), la charge utilisateur est le JSON\n// EXACT des métriques du secteur — conservé tel quel pour input_payload,\n// sans quoi la fidélité du commentaire serait invérifiable a posteriori.\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst SYSTEME = `Tu es la couche de rédaction d'un dispositif de veille économique destiné à un décideur de PME industrielle. Tu reçois un objet JSON de métriques calculées en amont par la base de données : c'est ta SEULE source. Applique dans l'ordre les règles d'interprétation suivantes. RI0, prioritaire sur toutes les autres — interdiction de calcul : ne produis, ne recalcule, n'arrondis et n'extrapole aucune valeur ; reprends les chiffres tels quels ; toute métrique absente ou null est signalée dans « Points à vérifier », sans conclusion — la colonne completude énonce ce qui manque et pourquoi, et tu la REPRENDS TELLE QUELLE : aucune quantité dérivée n'est admise, même triviale (ne calcule pas un nombre de points manquants depuis « 7 sur 12 » — cite « 7 point(s) sur 12 » à l'identique). RI1 — effet de base : si la période de référence paraît atypique, déclare la variation relative peu significative et privilégie le niveau absolu. RI2 — saisonnalité : ne fonde aucune lecture sur variation_periode_pct (périodes consécutives en série brute) ; fonde-la sur glissement_annuel_pct (même période de l'année précédente), ou sur moyenne_mobile_annuelle et ecart_a_la_moyenne_pct ; si les deux sont null, dis-le et abstiens-toi de qualifier l'évolution. RI3 — effets d'anticipation : un pic suivi d'un creux d'ampleur comparable est traité comme un ensemble unique, avec recherche d'une échéance réglementaire ou fiscale en hypothèse. RI4 — matérialité : si la variation est inférieure en valeur absolue à seuil_materialite_pct, déclare-la non significative et ne lui attribue aucune explication. RI5 — fiabilité : si statut_validation n'est ni valide_source ni valide_humain, abaisse d'un niveau la confiance attribuée et motive cet abaissement. RI6 — persistance : n'emploie « tendance » ou « inversion » qu'avec au moins trois périodes cohérentes — si l'historique fourni ne permet pas d'en juger, n'emploie aucun des deux termes. RI7 — volume et structure : si les deux dimensions sont fournies, analyse-les conjointement et signale toute divergence en priorité. RI8 — décomposition : si des segments évoluent en sens opposés, ne présente pas l'agrégat comme représentatif. RI9 — interdiction de causalité : formulations proscrites : « en raison de », « causé par », « s'explique par » ; admises : « concomitant avec », « hypothèse à vérifier », « compatible avec ». RI10 — hypothèses concurrentes : présente toutes les explications compatibles avec les données, chacune accompagnée de la donnée qui permettrait de trancher. Format imposé, 250 mots maximum, en français : Constat / Neutralisations appliquées / Lecture / Hypothèses / Qualification (niveau de signal : routine, à surveiller, significatif, rupture ; niveau de confiance : élevée, moyenne, faible) / Points à vérifier. Arrête-toi au diagnostic : aucune recommandation de décision.`;\n\nconst sortie = [];\nfor (const item of $input.all()) {\n  const s = item.json;\n  sortie.push({ json: {\n    run_id: runId,\n    sector_code: s.sector_code,\n    charge: s.charge,\n    systeme: SYSTEME,\n    utilisateur: 'Métriques calculées du secteur « ' + s.sector_code + ' » (seule source autorisée) : ' + JSON.stringify(s.charge)\n  } });\n}\nif (sortie.length === 0) throw new Error('v_dernier_point ne renvoie aucun secteur sur les zones agrégées — vérifier la vue et le filtre de zones.');\nreturn sortie;"
+        "jsCode": "// Prépare la charge par secteur : le prompt système porte les règles\n// d'interprétation RI0-RI10 (§ 10.4.3), la charge utilisateur est le JSON\n// EXACT des métriques du secteur — conservé tel quel pour input_payload,\n// sans quoi la fidélité du commentaire serait invérifiable a posteriori.\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst SYSTEME = `Tu rédiges la note hebdomadaire d'un dispositif de veille économique pour le DIRIGEANT d'une PME suisse de mécanique de précision (usinage de pièces métalliques à tolérances serrées, en sous-traitance pour les secteurs horloger, médical, automobile et aérospatial). Il te lira une minute, entre deux rendez-vous. \\n\\nTu reçois un objet JSON contenant : « metriques », les chiffres calculés par la base — TA SEULE SOURCE CHIFFRÉE ; « cadre_de_veille », les questions de veille du secteur avec leur mécanisme causal DÉJÀ ÉTABLI par le dispositif, que tu peux mobiliser pour relier un chiffre à ce qu'il signifie ; « sante », le score de santé du secteur s'il est calculable. \\n\\nApplique dans l'ordre les règles d'interprétation suivantes. RI0, prioritaire sur toutes les autres — interdiction de calcul : ne produis, ne recalcule, n'arrondis et n'extrapole aucune valeur ; reprends les chiffres tels quels ; toute métrique absente ou null est signalée dans « Points à vérifier », sans conclusion — la colonne completude énonce ce qui manque et pourquoi, et tu la REPRENDS TELLE QUELLE : aucune quantité dérivée n'est admise, même triviale (ne calcule pas un nombre de points manquants depuis « 7 sur 12 » — cite « 7 point(s) sur 12 » à l'identique). RI1 — effet de base : si la période de référence paraît atypique, déclare la variation relative peu significative et privilégie le niveau absolu. RI2 — saisonnalité : ne fonde aucune lecture sur variation_periode_pct (périodes consécutives en série brute) ; fonde-la sur glissement_annuel_pct (même période de l'année précédente), ou sur moyenne_mobile_annuelle et ecart_a_la_moyenne_pct ; si les deux sont null, dis-le et abstiens-toi de qualifier l'évolution. RI3 — effets d'anticipation : un pic suivi d'un creux d'ampleur comparable est traité comme un ensemble unique, avec recherche d'une échéance réglementaire ou fiscale en hypothèse. RI4 — matérialité : si la variation est inférieure en valeur absolue à seuil_materialite_pct, déclare-la non significative et ne lui attribue aucune explication. RI5 — fiabilité : si statut_validation n'est ni valide_source ni valide_humain, abaisse d'un niveau la confiance attribuée et motive cet abaissement. RI6 — persistance : n'emploie « tendance » ou « inversion » qu'avec au moins trois périodes cohérentes — si l'historique fourni ne permet pas d'en juger, n'emploie aucun des deux termes. RI7 — volume et structure : si les deux dimensions sont fournies, analyse-les conjointement et signale toute divergence en priorité. RI8 — décomposition : si des segments évoluent en sens opposés, ne présente pas l'agrégat comme représentatif. RI9 — interdiction de causalité : formulations proscrites : « en raison de », « causé par », « s'explique par » ; admises : « concomitant avec », « hypothèse à vérifier », « compatible avec ». RI10 — hypothèses concurrentes : présente toutes les explications compatibles avec les données, chacune accompagnée de la donnée qui permettrait de trancher. \\n\\nFORMAT IMPOSÉ, 200 mots maximum, en français, dans CET ORDRE — la réponse d'abord, la méthode ensuite :\\n1. « Ce qu'il faut retenir » — UNE phrase. Ce que disent les chiffres du marché, pas de la base. Interdiction absolue d'y mentionner un statut de validation, un nom d'indicateur, une complétude ou un vocabulaire de base de données : le dirigeant ne sait pas ce qu'est « valide_source ».\\n2. « Ce que cela change pour un sous-traitant » — deux phrases au plus. La CONSÉQUENCE pour un atelier d'usinage : charge de travail attendue, matières, débouché qui s'ouvre ou se ferme, exigence technique. Appuie-toi sur le mécanisme causal du cadre de veille quand il éclaire. Ce n'est PAS une recommandation d'action — tu décris une implication, tu ne prescris rien.\\n3. « À surveiller » — une ligne : le prochain chiffre qui confirmera ou infirmera, et quand.\\n4. « Fiabilité » — niveau de signal (routine, à surveiller, significatif, rupture) et de confiance (élevée, moyenne, faible), avec en une ligne ce qui la limite.\\n5. « Réserves de méthode » — EN DERNIER, et seulement si nécessaire : neutralisations appliquées, données manquantes reprises telles quelles, hypothèses concurrentes. C'est la section que le dirigeant saute et que le contrôleur lit.\\n\\nSi les chiffres ne permettent RIEN de dire sur le marché, écris-le en une phrase à la section 1 et n'invente pas de substance. Un commentaire honnêtement vide vaut mieux qu'un commentaire qui décrit l'état de la base.`;\n\nconst sortie = [];\nfor (const item of $input.all()) {\n  const s = item.json;\n  sortie.push({ json: {\n    run_id: runId,\n    sector_code: s.sector_code,\n    charge: s.charge,\n    systeme: SYSTEME,\n    utilisateur: 'Secteur « ' + s.sector_code + ' ». Objet de veille (seule source autorisée) : ' + JSON.stringify(s.charge)\n  } });\n}\nif (sortie.length === 0) throw new Error('v_dernier_point ne renvoie aucun secteur sur les zones agrégées — vérifier la vue et le filtre de zones.');\nreturn sortie;"
       },
       "name": "Préparer les charges",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, 300]
+      "position": [
+        600,
+        300
+      ]
     },
     {
       "parameters": {
@@ -79,7 +91,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 1500, system: $json.systeme, messages: [{ role: 'user', content: $json.utilisateur }] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: $env.MODELE_ANTHROPIC || 'claude-opus-5', max_tokens: 16000, system: $json.systeme, messages: [{ role: 'user', content: $json.utilisateur }] }) }}",
         "options": {
           "timeout": 180000,
           "batching": {
@@ -93,18 +105,24 @@
       "name": "Rédiger le commentaire (modèle)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [800, 300],
+      "position": [
+        800,
+        300
+      ],
       "onError": "continueRegularOutput",
       "notes": "Un seul modèle pour la rédaction : le multi-modèles sert à l'extraction de valeurs (où le consensus a un sens), pas à la rédaction (où deux textes différents ne sont pas un désaccord). Le contrôle ici est la validation humaine systématique avant diffusion, et la vérifiabilité par input_payload."
     },
     {
       "parameters": {
-        "jsCode": "// Normalise la réponse du modèle, consigne les échecs. La violation de\n// RI0/RI9 se détecte à la relecture humaine — c'est sa fonction — mais un\n// contrôle lexical grossier des formulations proscrites est appliqué ici\n// pour signalement (jamais pour correction automatique).\nconst sorties = [];\nconst incidents = [];\nconst lignes = $input.all();\nfor (let i = 0; i < lignes.length; i++) {\n  const r = lignes[i].json;\n  const t = $('Préparer les charges').itemMatching(i).json;\n  if (r.error) { incidents.push(t.sector_code + ' : appel en échec (' + JSON.stringify(r.error).slice(0, 200) + ')'); continue; }\n  const texte = r.content?.[0]?.text ?? null;\n  if (!texte) { incidents.push(t.sector_code + ' : réponse sans texte'); continue; }\n  const proscrites = ['en raison de', 'causé par', 'causée par', \"s'explique par\"].filter(f => texte.toLowerCase().includes(f));\n  sorties.push({ json: {\n    run_id: t.run_id,\n    sector_code: t.sector_code,\n    input_payload: JSON.stringify(t.charge),\n    model: 'claude-opus-4-8',\n    text: texte,\n    _signalement_ri9: proscrites.length ? 'formulations proscrites détectées : ' + proscrites.join(', ') : '',\n    _incidents: incidents\n  } });\n}\nif (sorties.length === 0) {\n  // Échec bruyant, jamais d'item vide vers l'écriture : le run reste\n  // visible en échec et le message porte les incidents réels — la cause,\n  // pas son symptôme (constaté le 17.08 : un marqueur sans run_id partait\n  // à l'INSERT et la contrainte NOT NULL répondait à la place du vrai motif).\n  throw new Error('Aucun commentaire généré. Incidents : ' + (incidents.join(' | ') || 'aucun incident consigné — vérifier l’appariement des items'));\n}\nreturn sorties;"
+        "jsCode": "// Normalise la réponse du modèle, consigne les échecs. La violation de\n// RI0/RI9 se détecte à la relecture humaine — c'est sa fonction — mais un\n// contrôle lexical grossier des formulations proscrites est appliqué ici\n// pour signalement (jamais pour correction automatique).\nconst sorties = [];\nconst incidents = [];\nconst lignes = $input.all();\nfor (let i = 0; i < lignes.length; i++) {\n  const r = lignes[i].json;\n  const t = $('Préparer les charges').itemMatching(i).json;\n  if (r.error) { incidents.push(t.sector_code + ' : appel en échec (' + JSON.stringify(r.error).slice(0, 200) + ')'); continue; }\n  // CORRIGÉ LE 24.08.2026 — même défaut que la couche 0 la veille : sur les\n  // modèles à raisonnement adaptatif, content[0] N'EST PAS le texte. Il faut\n  // concaténer TOUS les blocs de type « text », sans quoi la réponse est jugée\n  // vide alors qu'elle est complète — diagnostic « réponse sans texte » trompeur.\n  const texte = Array.isArray(r.content)\n    ? (r.content.filter(b => b.type === 'text').map(b => b.text).join('\\n').trim() || null)\n    : (r.content?.[0]?.text ?? null);\n  if (!texte) { incidents.push(t.sector_code + ' : réponse sans texte'); continue; }\n  const proscrites = ['en raison de', 'causé par', 'causée par', \"s'explique par\"].filter(f => texte.toLowerCase().includes(f));\n  sorties.push({ json: {\n    run_id: t.run_id,\n    sector_code: t.sector_code,\n    input_payload: JSON.stringify(t.charge),\n    // CORRIGÉ LE 24.08.2026 — l'identifiant était écrit EN DUR ici,\n    // indépendamment du modèle réellement appelé : les commentaires générés\n    // avec claude-opus-5 étaient archivés sous « claude-opus-4-8 ». Même\n    // défaut que dans la chaîne d'extraction, corrigé la veille. On lit\n    // désormais ce que l'API DÉCLARE avoir exécuté.\n    model: r.model || $env.MODELE_ANTHROPIC || 'inconnu',\n    text: texte,\n    _signalement_ri9: proscrites.length ? 'formulations proscrites détectées : ' + proscrites.join(', ') : '',\n    _incidents: incidents\n  } });\n}\nif (sorties.length === 0) {\n  // Échec bruyant, jamais d'item vide vers l'écriture : le run reste\n  // visible en échec et le message porte les incidents réels — la cause,\n  // pas son symptôme (constaté le 17.08 : un marqueur sans run_id partait\n  // à l'INSERT et la contrainte NOT NULL répondait à la place du vrai motif).\n  throw new Error('Aucun commentaire généré. Incidents : ' + (incidents.join(' | ') || 'aucun incident consigné — vérifier l’appariement des items'));\n}\nreturn sorties;"
       },
       "name": "Normaliser et contrôler RI9",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1000, 300]
+      "position": [
+        1000,
+        300
+      ]
     },
     {
       "parameters": {
@@ -117,7 +135,10 @@
       "name": "Stocker à valider",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1200, 300],
+      "position": [
+        1200,
+        300
+      ],
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -137,7 +158,10 @@
       "name": "Clôturer le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1400, 300],
+      "position": [
+        1400,
+        300
+      ],
       "executeOnce": true,
       "credentials": {
         "postgres": {
@@ -149,25 +173,81 @@
   ],
   "connections": {
     "Déclencheur manuel": {
-      "main": [[{ "node": "Ouvrir le run", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Ouvrir le run": {
-      "main": [[{ "node": "Lire l'objet compact par secteur", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Lire l'objet compact par secteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Lire l'objet compact par secteur": {
-      "main": [[{ "node": "Préparer les charges", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Préparer les charges",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Préparer les charges": {
-      "main": [[{ "node": "Rédiger le commentaire (modèle)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Rédiger le commentaire (modèle)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Rédiger le commentaire (modèle)": {
-      "main": [[{ "node": "Normaliser et contrôler RI9", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Normaliser et contrôler RI9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Normaliser et contrôler RI9": {
-      "main": [[{ "node": "Stocker à valider", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Stocker à valider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Stocker à valider": {
-      "main": [[{ "node": "Clôturer le run", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

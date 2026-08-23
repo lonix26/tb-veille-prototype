@@ -11,7 +11,10 @@
       "name": "Requête du tableau de bord",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "webhookId": "veille-donnees",
       "notes": "Interface de LECTURE SEULE entre la base consolidée et le tableau de bord. Choix d'architecture (E5) : l'orchestrateur fait office d'interface de lecture, ce qui évite d'introduire un serveur applicatif supplémentaire dans un dispositif qu'une PME doit pouvoir reproduire sans compétence d'exploitation. Aucune écriture n'est possible par cette voie."
     },
@@ -24,7 +27,10 @@
       "name": "Lire la base consolidée",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [260, 300],
+      "position": [
+        260,
+        300
+      ],
       "notes": "Une seule requête, en lecture seule. Elle assemble ce que le tableau de bord affiche (v_current), ce qui fait l'outil vivant (révisions constatées entre runs) et les vues de contrôle qui rendent calculables des affirmations du rapport (décompte du référentiel, couverture des questions de veille). Le nombre de comparaisons entre runs est renvoyé à part : sans lui, une liste de révisions vide serait ambiguë — elle peut signifier « aucune révision » comme « aucune comparaison possible ». La clé 'alertes' (ajoutée le 10.08.2026) restreint v_alertes_candidates à la dernière observation de chaque couple indicateur/zone, par jointure sur v_dernier_point : un franchissement de seuil sur une période ancienne relève de l'historique, pas du signal courant. La colonne diffusable de la vue applique RI5 et est restituée telle quelle, motif de retenue compris — le tableau de bord affiche les retenues au lieu de les filtrer."
     },
     {
@@ -34,8 +40,14 @@
         "options": {
           "responseHeaders": {
             "entries": [
-              { "name": "Access-Control-Allow-Origin", "value": "*" },
-              { "name": "Cache-Control", "value": "no-store" }
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
             ]
           }
         }
@@ -43,12 +55,354 @@
       "name": "Répondre au tableau de bord",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [520, 300],
+      "position": [
+        520,
+        300
+      ],
       "notes": "En-tête d'origine permissif : le tableau de bord est un fichier local ouvert depuis le poste du veilleur, son origine est nulle. Acceptable ici parce que le service n'écoute que sur 127.0.0.1 et ne sert que des données publiques (OSINT). À restreindre en cas d'exposition réseau — point à consigner dans les limites."
+    },
+    {
+      "parameters": {
+        "path": "veille/sante",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-sante",
+      "name": "Requête santé sectorielle",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        520
+      ],
+      "webhookId": "veille-sante"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- Les cinq secteurs sont TOUJOURS rendus, y compris ceux dont la santé\n  -- n'est pas calculable : la conception v4 exige « base insuffisante » en\n  -- toutes lettres, ce qui suppose que le secteur figure dans la réponse.\n  'sante', (SELECT coalesce(json_agg(x ORDER BY x.sector_code), '[]'::json) FROM (\n      SELECT sec.code AS sector_code, sec.label AS sector_label,\n             s.n_indicateurs_orientables, s.score_sante,\n             coalesce(s.etat, 'non_declare') AS etat,\n             s.profondeur_min, s.indicateurs,\n             (SELECT count(*) FROM indicators i\n               WHERE i.sector_code = sec.code AND i.status = 'certifie') AS indicateurs_certifies,\n             (SELECT count(*) FROM indicators i\n               WHERE i.sector_code = sec.code AND i.status = 'certifie'\n                 AND i.sens_favorable IS NOT NULL) AS indicateurs_declares\n      FROM sectors sec LEFT JOIN v_sante_secteur s ON s.sector_code = sec.code) x),\n  -- Compteur, jamais le contenu : le non-validé se compte, il ne s'affiche pas.\n  'items_en_attente_examen', (SELECT count(*) FROM v_flux_a_examiner),\n  'commentaires_en_attente', (SELECT count(*) FROM commentaries WHERE status = 'a_valider'),\n  'run_courant', (SELECT json_build_object('run_id', run_id, 'executed_at', executed_at,\n                    'closed_at', closed_at, 'status', status)\n                  FROM runs WHERE status IN ('ok','partiel') ORDER BY run_id DESC LIMIT 1),\n  'fraicheur', (SELECT json_build_object(\n                   'point_le_plus_ancien', min(p_max), 'point_le_plus_recent', max(p_max))\n                FROM (SELECT max(period) AS p_max FROM indicator_values\n                       WHERE validation_status <> 'rejete' GROUP BY indicator_id) f)\n) AS payload;",
+        "options": {}
+      },
+      "id": "sql-sante",
+      "name": "Lire santé sectorielle",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        520
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "rep-sante",
+      "name": "Répondre santé sectorielle",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "path": "veille/signaux",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-signaux",
+      "name": "Requête signaux validés",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        720
+      ],
+      "webhookId": "veille-signaux"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- UNIQUEMENT les signaux VALIDÉS : la doctrine v4 interdit d'afficher du\n  -- non validé hors compteurs. Les axes du triage (antériorité, portée) sont\n  -- rattachés quand le signal provient d'un item de flux promu ; ils ne sont\n  -- JAMAIS un statut, seulement une aide de lecture affichée comme telle.\n  'signaux', (SELECT coalesce(json_agg(x ORDER BY x.validated_at DESC NULLS LAST), '[]'::json) FROM (\n      SELECT s.signal_id, s.sector_code, s.sector_label, s.watch_question_code,\n             s.evenement, s.acteur, s.echeance, s.zone, s.source_doc, s.raw_ref,\n             s.score_recoupement, s.statut, s.validated_by, s.validated_at,\n             s.note_validation, s.created_at,\n             t.anteriorite, t.portee, fi.titre AS item_titre, fi.url AS item_url,\n             -- Rattachement de confirmation : les indicateurs de l'étage 1\n             -- portant la MÊME question de veille pour le MÊME secteur. C'est\n             -- par eux qu'une statistique ultérieure confirmera ou infirmera.\n             (SELECT coalesce(json_agg(json_build_object(\n                        'indicator_id', i.indicator_id, 'label', i.label,\n                        'latence', i.latence) ORDER BY i.indicator_id), '[]'::json)\n                FROM indicators i\n                JOIN indicator_watch_questions w ON w.indicator_id = i.indicator_id\n               WHERE i.sector_code = s.sector_code\n                 AND w.watch_question_code = s.watch_question_code\n                 AND i.status = 'certifie') AS confirmateurs\n      FROM v_signaux s\n      LEFT JOIN flux_examens e ON e.signal_id = s.signal_id\n      LEFT JOIN flux_items  fi ON fi.item_id  = e.item_id\n      LEFT JOIN flux_triage_ia t ON t.item_id = e.item_id AND t.doctrine = 'signal'\n      WHERE s.statut = 'valide') x),\n  'signaux_en_attente', (SELECT count(*) FROM signals WHERE statut = 'a_valider')\n) AS payload;",
+        "options": {}
+      },
+      "id": "sql-signaux",
+      "name": "Lire signaux validés",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        720
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "rep-signaux",
+      "name": "Répondre signaux validés",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "path": "veille/opportunites",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-opportunites",
+      "name": "Requête opportunités",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        920
+      ],
+      "webhookId": "veille-opportunites"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- Uniquement des items EXAMINÉS par un humain (flux_examens), issus des\n  -- marchés publics. Un item non examiné n'est pas une opportunité : c'est\n  -- une ligne de file d'attente.\n  'opportunites', (SELECT coalesce(json_agg(x ORDER BY x.date_publication DESC NULLS LAST), '[]'::json) FROM (\n      SELECT fi.item_id, fi.titre, fi.url, fi.date_publication,\n             fs.sector_code, sec.label AS sector_label, fs.libelle AS flux,\n             e.decision, e.note AS note_examen, e.decide_par, e.decide_le,\n             fi.payload->>'buyer-name' AS acheteur_brut,\n             fi.payload->'buyer-name'  AS acheteur\n      FROM flux_examens e\n      JOIN flux_items  fi ON fi.item_id = e.item_id\n      JOIN flux_sources fs ON fs.flux_id = fi.flux_id\n      LEFT JOIN sectors sec ON sec.code = fs.sector_code\n      WHERE fs.famille = 'marches_publics'\n        AND e.decision IN ('promu_signal','contexte')) x),\n  'examines_total', (SELECT count(*) FROM flux_examens),\n  'en_attente',     (SELECT count(*) FROM v_flux_a_examiner)\n) AS payload;",
+        "options": {}
+      },
+      "id": "sql-opportunites",
+      "name": "Lire opportunités",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        920
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "rep-opportunites",
+      "name": "Répondre opportunités",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        920
+      ]
+    },
+    {
+      "parameters": {
+        "path": "veille/actions",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-actions",
+      "name": "Requête actions",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1120
+      ],
+      "webhookId": "veille-actions"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- LES APPELS SUR LESQUELS ON PEUT ENCORE AGIR. Ni les expirés, ni les\n  -- attribués : les proposer ferait perdre son temps au décideur.\n  'actions', (SELECT coalesce(json_agg(x ORDER BY x.adressable DESC NULLS LAST, x.jours_restants), '[]'::json)\n              FROM v_actions x),\n  -- Les acheteurs qui reviennent : un compte à démarcher, pas un événement.\n  'acheteurs', (SELECT coalesce(json_agg(y ORDER BY y.dont_encore_ouverts DESC, y.avis_publies DESC), '[]'::json)\n                FROM (SELECT * FROM v_acheteurs_recurrents WHERE dont_encore_ouverts > 0 LIMIT 40) y),\n  -- Le tamis, chiffré : ce que le dispositif a écarté et pourquoi.\n  'tamis', (SELECT json_build_object(\n      'avis_collectes',   (SELECT count(*) FROM ted_avis),\n      'appels_ouverts',   (SELECT count(*) FROM ted_avis WHERE est_appel_ouvert),\n      'attributions',     (SELECT count(*) FROM ted_avis WHERE NOT est_appel_ouvert),\n      'non_expires',      (SELECT count(*) FROM v_actions),\n      'adressables',      (SELECT count(*) FROM v_actions WHERE adressable >= 1),\n      'coeur_de_metier',  (SELECT count(*) FROM v_actions WHERE adressable = 2),\n      'modele_lecture',   (SELECT max(modele) FROM ted_lecture_ia))),\n  'fenetre_jours', 60\n) AS payload;",
+        "options": {}
+      },
+      "id": "sql-actions",
+      "name": "Lire actions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        1120
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "rep-actions",
+      "name": "Répondre actions",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        1120
+      ]
     }
   ],
   "connections": {
-    "Requête du tableau de bord": { "main": [[ { "node": "Lire la base consolidée", "type": "main", "index": 0 } ]] },
-    "Lire la base consolidée": { "main": [[ { "node": "Répondre au tableau de bord", "type": "main", "index": 0 } ]] }
+    "Requête du tableau de bord": {
+      "main": [
+        [
+          {
+            "node": "Lire la base consolidée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire la base consolidée": {
+      "main": [
+        [
+          {
+            "node": "Répondre au tableau de bord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requête santé sectorielle": {
+      "main": [
+        [
+          {
+            "node": "Lire santé sectorielle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire santé sectorielle": {
+      "main": [
+        [
+          {
+            "node": "Répondre santé sectorielle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requête signaux validés": {
+      "main": [
+        [
+          {
+            "node": "Lire signaux validés",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire signaux validés": {
+      "main": [
+        [
+          {
+            "node": "Répondre signaux validés",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requête opportunités": {
+      "main": [
+        [
+          {
+            "node": "Lire opportunités",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire opportunités": {
+      "main": [
+        [
+          {
+            "node": "Répondre opportunités",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requête actions": {
+      "main": [
+        [
+          {
+            "node": "Lire actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire actions": {
+      "main": [
+        [
+          {
+            "node": "Répondre actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "description": " — 23.08.2026 : trois points de lecture ajoutés pour la restitution v4 (/veille/sante, /veille/signaux, /veille/opportunites). Lecture seule, mêmes principes que le point existant : aucune écriture, aucun statut modifié, le non-validé se compte et ne s'affiche pas."
   }
 }
