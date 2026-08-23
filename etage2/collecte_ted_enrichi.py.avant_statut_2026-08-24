@@ -142,11 +142,8 @@ def main():
         password=os.environ.get("POSTGRES_PASSWORD", ""), host=os.environ.get("PGHOST", "localhost"),
         port=os.environ.get("PGPORT", "5432"))
     with conn, conn.cursor() as cur:
-        # Seules les liaisons qualifiées collectent : la règle du § 10.4 est
-        # exercée par la requête, pas seulement déclarée au référentiel.
         cur.execute("""SELECT flux_id, sector_code, parametres->>'cpv'
-                       FROM flux_sources
-                       WHERE famille='marches_publics' AND statut='actif'
+                       FROM flux_sources WHERE famille='marches_publics'
                        ORDER BY flux_id""")
         flux = cur.fetchall()
 
