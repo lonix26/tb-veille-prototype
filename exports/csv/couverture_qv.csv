@@ -1,9 +1,9 @@
 Secteur,Question,Indicateurs,dont certifiés,Couverture
 aerospatial,QV1,1,1,couverte
-aerospatial,QV2,3,2,couverte
+aerospatial,QV2,4,3,couverte
 aerospatial,QV3,1,1,couverte
 aerospatial,QV4,0,0,non couverte
-aerospatial,QV5,2,1,couverte
+aerospatial,QV5,3,2,couverte
 automobile,QV1,2,2,couverte
 automobile,QV2,3,3,couverte
 automobile,QV3,2,2,couverte
@@ -15,8 +15,8 @@ horlogerie,QV3,1,1,couverte
 horlogerie,QV4,1,1,couverte
 horlogerie,QV5,1,0,couverte a confirmer
 medical,QV1,3,2,couverte
-medical,QV2,2,2,couverte
+medical,QV2,4,4,couverte
 medical,QV3,2,1,couverte
-medical,QV4,1,1,couverte
-medical,QV5,1,1,couverte
-transversal,QV0,4,4,couverte
+medical,QV4,2,2,couverte
+medical,QV5,2,2,couverte
+transversal,QV0,7,7,couverte
