@@ -407,3 +407,10 @@ input.filtre:focus{outline:2px solid var(--accent);border-color:transparent}
 .ch-aide{flex:1;color:var(--encre2)}
 .ch-ligne b{font-size:14px}
 .ch-per{color:var(--encre2);font-size:11px;flex:0 0 58px;text-align:right}
+
+/* Mix horloger (écran horlogerie) */
+.mix{border-left:3px solid #8b5cf6}
+.mix-principe{font-size:12.5px;line-height:1.6;color:var(--encre2);margin:2px 0 8px}
+.mix-constat{font-size:13px;line-height:1.65;color:var(--encre);background:#f4f2fd;
+  border-left:3px solid #8b5cf6;border-radius:0 6px 6px 0;padding:9px 12px;margin:0 0 10px}
+.mix-constat.alerte{background:#fdf6ec;border-left-color:var(--ambre)}

@@ -228,6 +228,82 @@ const CHAINE = {
   ],
 };
 
+// =====================================================================
+// MIX HORLOGER — la valeur ne dit pas le volume.
+//
+// Le mécanisme de QV1 horlogère porte depuis le chapitre 8 un point de
+// vigilance précis : « une montée en valeur qui masquerait l'érosion du
+// tissu de sous-traitance ». Le commentaire exécutif du 24.08 l'a énoncé
+// lui-même en constatant qu'il n'était PAS observable, faute de série de
+// volume. Les données de la Fédération horlogère, en francs et avec la
+// ventilation mécanique, le rendent observable.
+//
+// Un atelier facture des PIÈCES, pas des francs. C'est pourquoi les deux
+// glissements sont affichés côte à côte : c'est leur ÉCART qui répond.
+// =====================================================================
+
+function MixHorloger({ serie }) {
+  const pts = (serie || []).filter(x => x.part_meca_valeur_pct != null);
+  if (pts.length < 3) return null;
+  const d = pts[pts.length - 1];
+  const gv = d.meca_chf_ga_pct, gq = d.meca_pieces_ga_pct;
+  const lisible = gv != null && gq != null;
+  const ecart = lisible ? Number(gv) - Number(gq) : null;
+
+  return (
+    <div className="carte preuve mix">
+      <div className="p-tete">
+        <div>
+          <div className="p-titre">Mix mécanique des exportations horlogères</div>
+          <div className="p-meta">
+            H7 · H8 · H9 — Fédération de l'industrie horlogère, en francs, {d.period}
+          </div>
+        </div>
+        <div className="p-val">{nb(d.part_meca_valeur_pct, 1)} %</div>
+      </div>
+
+      <p className="mix-principe">
+        Une montre mécanique mobilise des dizaines de pièces usinées à tolérances serrées ; une
+        montre à quartz en mobilise peu. <strong>Le mécanique fait {nb(d.part_meca_valeur_pct, 1)} %
+        de la valeur exportée</strong> — c'est la part du débouché horloger qui commande
+        réellement une charge d'usinage.
+      </p>
+
+      {lisible && (
+        <p className={"mix-constat " + (ecart > 3 ? "alerte" : "")}>
+          Sur un an : la <strong>valeur</strong> mécanique fait {pct(gv)}, le
+          {" "}<strong>volume</strong> {pct(gq)}.
+          {ecart > 3
+            ? <> La valeur croît plus vite que le nombre de montres :
+                <strong> montée en gamme</strong>. Le chiffre d'affaires de la branche progresse
+                sans que la charge d'usinage suive à la même vitesse — c'est exactement le point
+                de vigilance que la question de veille énonce.</>
+            : ecart < -3
+            ? <> Le volume croît <strong>plus vite</strong> que la valeur : la branche exporte plus
+                de montres à valeur unitaire plus basse. Pour un atelier, c'est
+                <strong> davantage de pièces à produire</strong> — l'inverse de la crainte portée
+                par la question de veille.</>
+            : <> Les deux progressent au même rythme : le mix ne se déforme pas.</>}
+          {" "}Valeur moyenne d'une montre mécanique exportée : {nb(d.valeur_moyenne_chf, 0)} CHF.
+        </p>
+      )}
+
+      <Chart hauteur={175}
+             series={{
+               "valeur mécanique (mio CHF)": pts.map(x => ({ period: x.period, value: Number(x.meca_chf) })),
+               "volume mécanique (milliers)": pts.map(x => ({ period: x.period, value: Number(x.meca_pieces) })),
+             }} />
+
+      <p className="base-note">
+        {pts.length} mois collectés. <strong>La profondeur ne peut pas être téléchargée</strong> :
+        la Fédération ne sert que le millésime courant — vérifié le 24.08.2026, les précédents
+        renvoient la page d'accueil. Elle s'accumule donc mois après mois par la ré-exécution du
+        dispositif, ce qui est la raison d'être du registre en ajout seul.
+      </p>
+    </div>
+  );
+}
+
 function Chaine({ code, D }) {
   const plan = CHAINE[code];
   if (!plan) return null;
@@ -597,6 +673,8 @@ export default function SecteurQV() {
                 {qv === "QV1" && <Chaine code={code} D={D} />}
                 {qv === "QV1" && code === "horlogerie" && D.synthetique &&
                   <PartSuisse serie={D.synthetique} />}
+                {qv === "QV1" && code === "horlogerie" && D.mix_horloger &&
+                  <MixHorloger serie={D.mix_horloger} />}
                 {qv === "QV3" && zonesGeo.length > 0 && (
                   <>
                     <DynamiqueGeo zones={zonesGeo} divergences={divergencesGeo} />
