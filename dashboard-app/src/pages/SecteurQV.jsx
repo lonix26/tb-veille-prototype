@@ -191,6 +191,118 @@ function Preuve({ ind, D, navigate }) {
 // concentre, ce qui n'est pas la même chose qu'un débouché qui grandit.
 // =====================================================================
 
+// =====================================================================
+// LA CHAÎNE — du marché final à l'atelier (§ 5.5).
+//
+// Le dispositif mesurait presque exclusivement le MARCHÉ FINAL, alors que
+// le destinataire vend des pièces à un donneur d'ordre. Entre les deux :
+// trois étages, six à dix-huit mois, et une décision de faire ou faire
+// faire qui domine le signal.
+//
+// Ce bloc superpose les étages sur un même graphique. C'est légitime
+// parce que ce sont tous des INDICES DE PRODUCTION de même base (2021),
+// même zone et même fréquence — trois conditions sans lesquelles la
+// superposition serait une illusion d'optique.
+//
+// L'ÉCART entre deux étages est la lecture : il mesure la transmission.
+// Un écart qui se creuse dit que le marché final ne se transmet plus.
+// =====================================================================
+
+const CHAINE = {
+  automobile: [
+    { code: "A5", role: "marché final",       aide: "fabrication de véhicules (NACE C29)" },
+    { code: "A6", role: "demande adressable", aide: "fabrication d'équipements pour véhicules (NACE C29.3)" },
+    { code: "T7", role: "votre branche",      aide: "traitement et usinage des métaux (NACE C25.6)" },
+  ],
+  horlogerie: [
+    { code: "H6", role: "demande adressable", aide: "fabrication de montres et horloges (NACE C26.52)" },
+    { code: "T7", role: "votre branche",      aide: "traitement et usinage des métaux (NACE C25.6)" },
+  ],
+  medical: [
+    { code: "M2", role: "demande adressable", aide: "instruments et fournitures médicaux et dentaires (NACE C32.5)" },
+    { code: "T7", role: "votre branche",      aide: "traitement et usinage des métaux (NACE C25.6)" },
+  ],
+  aerospatial: [
+    { code: "S8", role: "demande adressable", aide: "construction aéronautique et spatiale (NACE C30.3)" },
+    { code: "T7", role: "votre branche",      aide: "traitement et usinage des métaux (NACE C25.6)" },
+  ],
+};
+
+function Chaine({ code, D }) {
+  const plan = CHAINE[code];
+  if (!plan) return null;
+  const series = {}, derniers = {};
+  plan.forEach(e => {
+    const pts = (D.valeurs || [])
+      .filter(v => v.indicator_id === e.code)
+      .sort((a, b) => String(a.period).localeCompare(String(b.period)))
+      .map(v => ({ period: v.period, value: Number(v.value) }));
+    if (pts.length > 2) {
+      series[e.role] = pts;
+      derniers[e.role] = pts[pts.length - 1];
+    }
+  });
+  const roles = Object.keys(series);
+  if (roles.length < 2) return null;
+
+  const adressable = derniers["demande adressable"];
+  const final = derniers["marché final"];
+  const atelier = derniers["votre branche"];
+  const ecart = final && adressable ? Number(final.value) - Number(adressable.value) : null;
+
+  return (
+    <div className="chaine">
+      <div className="ch-titre">La chaîne — du marché final à votre atelier</div>
+
+      <p className="ch-principe">
+        Ces courbes sont des <strong>indices de production</strong> de même base (2021), même zone
+        et même fréquence : elles se superposent légitimement. Chacune est un étage de la chaîne.
+        {" "}<strong>Ce qui décide, c'est l'écart entre les étages</strong> — il mesure ce qui se
+        transmet réellement du marché final jusqu'à un atelier d'usinage.
+      </p>
+
+      {ecart != null && Math.abs(ecart) >= 3 && (
+        <p className="ch-constat">
+          <strong>{nb(Math.abs(ecart), 1)} points d'écart</strong> entre le marché final
+          ({nb(final.value, 1)}) et la demande adressable ({nb(adressable.value, 1)}) en
+          {" "}{adressable.period}.
+          {ecart > 0
+            ? <> Le marché final se tient au-dessus de la branche qui vous commande :
+                <strong> la demande finale ne se transmet pas intégralement</strong> à la
+                sous-traitance. Les explications compatibles sont le contenu mécanique par
+                véhicule, l'internalisation chez le donneur d'ordre, ou un déstockage de la
+                filière — le dispositif constate l'écart, il ne le tranche pas.</>
+            : <> La branche qui vous commande produit au-dessus du marché final, configuration
+                compatible avec un rattrapage de stocks ou une montée en contenu.</>}
+        </p>
+      )}
+
+      <Chart series={series} hauteur={230} />
+
+      <div className="ch-legende">
+        {plan.filter(e => series[e.role]).map(e => (
+          <div key={e.code} className="ch-ligne">
+            <span className="etq e-gris">{e.code}</span>
+            <span className="ch-role">{e.role}</span>
+            <span className="ch-aide">{e.aide}</span>
+            <b>{nb(derniers[e.role].value, 1)}</b>
+            <span className="ch-per">{derniers[e.role].period}</span>
+          </div>
+        ))}
+      </div>
+
+      {atelier && (
+        <p className="base-note">
+          Base 100 = moyenne 2021. Un indice à {nb(atelier.value, 1)} signifie que la branche
+          produit {nb(Math.abs(100 - Number(atelier.value)), 1)} %
+          {Number(atelier.value) < 100 ? " en dessous" : " au-dessus"} de son niveau de 2021 —
+          ce n'est pas une variation récente, c'est un niveau.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function PartSuisse({ serie }) {
   const pts = (serie || []).filter(x => x.part_suisse_pct != null);
   if (pts.length < 3) return null;
@@ -482,6 +594,7 @@ export default function SecteurQV() {
                   </div>
                 )}
                 {qv === "QV1" && attribution && <AttributionAncree bloc={attribution} />}
+                {qv === "QV1" && <Chaine code={code} D={D} />}
                 {qv === "QV1" && code === "horlogerie" && D.synthetique &&
                   <PartSuisse serie={D.synthetique} />}
                 {qv === "QV3" && zonesGeo.length > 0 && (

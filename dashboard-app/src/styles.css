@@ -390,3 +390,20 @@ input.filtre:focus{outline:2px solid var(--accent);border-color:transparent}
   padding:4px 11px;cursor:pointer;font-family:inherit}
 .bascule button+button{border-left:1px solid var(--trait)}
 .bascule button.actif{background:#1b4f91;color:#fff;font-weight:600}
+.k-tendance{font-size:11px;color:var(--encre2);margin:-4px 0 8px}
+.k-tendance strong{font-weight:600}
+
+/* La chaîne — étages de production (écran secteur) */
+.chaine{background:var(--carte);border:1px solid var(--trait);border-left:3px solid #1b4f91;
+  border-radius:0 10px 10px 0;padding:14px 16px;margin:10px 0 16px}
+.ch-titre{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:#1b4f91;margin-bottom:8px}
+.ch-principe{font-size:12.5px;line-height:1.6;color:var(--encre2);margin:0 0 9px}
+.ch-constat{font-size:13px;line-height:1.65;color:var(--encre);background:#fdf6ec;
+  border-left:3px solid var(--ambre);border-radius:0 6px 6px 0;padding:9px 12px;margin:0 0 10px}
+.ch-legende{margin-top:8px;border-top:1px solid var(--trait);padding-top:8px}
+.ch-ligne{display:flex;align-items:baseline;gap:9px;font-size:12px;padding:3px 0}
+.ch-role{font-weight:650;flex:0 0 132px}
+.ch-aide{flex:1;color:var(--encre2)}
+.ch-ligne b{font-size:14px}
+.ch-per{color:var(--encre2);font-size:11px;flex:0 0 58px;text-align:right}

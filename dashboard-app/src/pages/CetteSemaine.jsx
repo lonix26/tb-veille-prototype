@@ -109,6 +109,22 @@ function TuileSante({ s, onClic }) {
         <>
           <div className={"k-v " + cls}>{score > 0 ? "+" : ""}{nb(score, 2)}</div>
           <div className={"k-mot " + lireScore(score).ton}>{lireScore(score).mot}</div>
+          {/* LA TENDANCE VIT À CÔTÉ DU SCORE, JAMAIS À SA PLACE (§ 5.6).
+              Le score est détendancé : il dit où le marché se situe dans son
+              cycle. Il ne dit RIEN de la direction longue de la branche, qui
+              est une autre question — et souvent la plus importante pour une
+              décision d'investissement. Les deux se lisent ensemble. */}
+          {s.tendance_moyenne != null && (
+            <div className="k-tendance" title="corrélation moyenne des séries du secteur au temps, sur toute la profondeur collectée">
+              tendance longue{" "}
+              <strong className={Number(s.tendance_moyenne) > 0.3 ? "hausse"
+                : Number(s.tendance_moyenne) < -0.3 ? "baisse" : ""}>
+                {Number(s.tendance_moyenne) > 0.3 ? "orientée à la hausse"
+                  : Number(s.tendance_moyenne) < -0.3 ? "orientée à la baisse"
+                  : "sans direction nette"}
+              </strong>
+            </div>
+          )}
           {/* La règle : elle rend le chiffre comparable d'un marché à l'autre. */}
           <div className="regle" title="échelle en écarts-types, bornée à ±2">
             <div className="r-zone-norme" />
@@ -253,9 +269,13 @@ export default function CetteSemaine() {
         à la base de sa propre série, orienté par le sens de lecture déclaré — au-dessus de
         zéro, le secteur est au-dessus de sa base. Il s'exprime en écarts-types : sous 0,5
         le marché est <strong>dans sa norme habituelle</strong> (zone grise de la règle),
-        au-delà de 1 l'écart est <strong>net</strong>, au-delà de 2 il est rare. Un score
-        n'est pas une prévision : c'est la position d'aujourd'hui par rapport au passé
-        collecté, rien de plus.
+        au-delà de 1 l'écart est <strong>net</strong>, au-delà de 2 il est rare.
+        <br />
+        <strong>La tendance longue est retirée avant le calcul</strong> (§ 5.6) : sans cela, toute
+        série qui croît se serait affichée « au-dessus » en permanence et aucun retournement
+        n'aurait pu être signalé. Le score mesure donc la <em>position dans le cycle</em> ; la
+        direction longue de la branche est indiquée séparément sous chaque score, parce qu'elle
+        répond à une autre question.
       </p>
 
       {GEO && <EffetPays divergences={GEO.divergences} />}
