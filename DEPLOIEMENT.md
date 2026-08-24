@@ -24,20 +24,42 @@ cd prototype
 docker compose up -d          # base, orchestrateur, service statique de restitution
 ```
 
-## 2. Schéma et référentiel
+## 2. Schéma et référentiel — rien à lancer
 
-Rejouer les migrations dans l'ordre chronologique de leur nom :
+**Le `docker compose up -d` de l'étape précédente a déjà tout fait.** Le service de base monte
+`./db` sur `/docker-entrypoint-initdb.d` : au tout premier démarrage, sur un volume vide,
+PostgreSQL exécute lui-même les deux fichiers, dans l'ordre de leur nom.
 
-```bash
-for f in migrations/*.sql; do
-  docker exec -i veille_db psql -U veille -d veille -v ON_ERROR_STOP=1 < "$f" || echo "ÉCHEC : $f"
-done
-```
+| Fichier | Ce qu'il pose |
+|---|---|
+| `db/01_socle.sql` | 22 tables, 31 vues, les déclencheurs et les contraintes métier |
+| `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 27 sources, 43 indicateurs, 73 liaisons dont 71 actives, 16 flux |
 
-Elles créent le schéma, sèment le référentiel — indicateurs, sources, liaisons, questions de
-veille — **et amorcent les seize flux de l'étage 2 avec leurs statuts de qualification**
-(`2026-08-25_amorcage_flux.sql`). Une base neuve repart donc dans l'état qualifié, pas dans un
-état par défaut qu'il faudrait requalifier.
+Une base neuve repart donc dans l'**état qualifié** — pas dans un état par défaut qu'il faudrait
+requalifier source par source. Elle est en revanche **vide d'observations**, et c'est voulu :
+ce sont les collecteurs de l'étape 4 qui la remplissent.
+
+> **Vérifié le 25.08.2026, et pas seulement affirmé** : base neuve créée, les deux fichiers
+> appliqués, comparaison faite avec la base en service — mêmes tables, mêmes vues, mêmes
+> déclencheurs, mêmes liaisons actives, mêmes flux. Seul écart : 43 indicateurs contre 45, les
+> deux manquants étant T12 et T13, abandonnés le 24.08 (motif dans l'en-tête de
+> `db/02_referentiel.sql`).
+
+### Ce que devient `migrations/`
+
+Le dossier reste au dépôt comme **journal du travail** : il porte le raisonnement, les
+corrections et leurs motifs, et c'est à ce titre qu'il est cité au rapport. **Il n'est plus la
+voie de construction de la base, et ne doit pas être rejoué sur une base neuve.**
+
+Le rejeu a été essayé le 25.08 avant d'écrire ceci : sur 78 migrations, 69 passent et 9 échouent
+— dépendances circulaires entre migrations d'un même jour (une vue référence une colonne ajoutée
+par une migration postérieure), migrations de données qui présupposent des observations
+collectées, migrations rendues caduques par le socle lui-même. La base ne tenait donc que par
+l'état accumulé dans le conteneur en service : elle n'était **pas** reconstructible depuis le
+dépôt. Le socle consolidé rétablit cette reproductibilité, qui est la condition de
+l'auditabilité que ce travail revendique.
+
+Toute migration **postérieure au 25.08** s'applique normalement par-dessus le socle, à la main.
 
 ## 3. Importer les workflows
 
@@ -92,9 +114,21 @@ SELECT run_id, status, left(note, 90) FROM runs ORDER BY run_id DESC LIMIT 12;
 SELECT * FROM v_bilan_referentiel;
 
 -- Indicateurs certifiés sans aucune liaison active : ils ne collecteront jamais.
+-- Au 25.08.2026, quatre sont attendus dans ce résultat, et aucun autre :
+--   A2  composite ACEA — alimenté par `composite_queue`, pas par une liaison (doctrine)
+--   A1  production mondiale de véhicules — source non encore liée
+--   H4  brevets horlogers CIB G04 — en attente d'un accès OEB (portail OPS hors service)
+--   S1  commandes et livraisons d'avions — requalification en composite à trancher
+-- Tout autre indicateur qui apparaît ici est une régression.
 SELECT i.indicator_id, i.label FROM indicators i
 WHERE i.status = 'certifie'
   AND NOT EXISTS (SELECT 1 FROM v_bindings_actifs b WHERE b.indicator_id = i.indicator_id);
+
+-- Liaisons actives à fenêtre FIGÉE : elles rapporteront toujours la même période.
+-- Doivent être vides, hors les fichiers d'archive dont l'année ne bouge plus.
+SELECT binding_id, indicator_id, left(params::text, 70)
+FROM source_bindings
+WHERE statut = 'actif' AND params::text !~ '\{\{' AND params::text ~ '"(year|Jahr)"';
 ```
 
 ```bash
