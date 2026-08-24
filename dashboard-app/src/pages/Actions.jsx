@@ -135,6 +135,32 @@ export default function Actions() {
         <div className="t-etape fort"><b>{nb(t.adressables, 0)}</b><span>à examiner<small>dont {nb(t.coeur_de_metier, 0)} au cœur du métier</small></span></div>
       </div>
 
+      {/* VALEUR EN JEU — par devise, jamais convertie. Les avis européens sont
+          libellés en huit monnaies ; les additionner comme des euros donnerait
+          un total plausible et faux. Le nombre d'appels sans valeur publiée est
+          affiché avec, sans quoi le total passerait pour exhaustif. */}
+      {(A.valeur_en_jeu || []).length > 0 && (
+        <div className="enjeu">
+          <div className="en-titre">Valeur en jeu sur les appels adressables</div>
+          <div className="en-lignes">
+            {A.valeur_en_jeu.map(v => (
+              <div key={v.devise} className="en-ligne">
+                <b>{nb(v.montant, 0)}</b> <span className="en-dev">{v.devise}</span>
+                <span className="en-n">sur {v.appels} appel{v.appels > 1 ? "s" : ""}</span>
+              </div>
+            ))}
+          </div>
+          <p className="en-note">
+            Montants <strong>non convertis</strong> : les avis européens sont libellés en huit
+            monnaies et le dispositif ne dispose d'aucune table de change pour la plupart d'entre
+            elles. Les additionner donnerait un total faux d'apparence juste.
+            {A.sans_valeur_publiee > 0 && <> {A.sans_valeur_publiee} des {retenues.length} appels
+              adressables ne publient <strong>aucune valeur estimée</strong> — l'enjeu réel est
+              donc supérieur à ce qui est affiché ici.</>}
+          </p>
+        </div>
+      )}
+
       {marches.length > 0 && (
         <div className="repartition">
           <div className="r-titre">Où sont les appels adressables</div>

@@ -113,6 +113,139 @@ function Preuve({ ind, D, navigate }) {
 // pièce, sinon l'écran affiche la promesse sans la tenir.
 // =====================================================================
 
+// =====================================================================
+// DYNAMIQUE GÉOGRAPHIQUE — instrumente QV3, l'un des cinq angles
+// invariants du cadre du chapitre 8.
+//
+// Constat à l'origine : le registre porte 88 destinations pour les
+// exportations horlogères, 64 pays pour les ventes de véhicules
+// électriques, 7 à 11 pour les flux de commerce — et la restitution
+// n'en affichait qu'UNE par indicateur, la zone de référence déclarée.
+// La question de veille était posée par la grille et répondue par
+// personne, alors que la donnée était collectée depuis le premier jour.
+// =====================================================================
+
+// =====================================================================
+// PART SUISSE DU COMMERCE MONDIAL D'HORLOGERIE — l'indicateur synthétique.
+//
+// Il était calculé par vue depuis le 17.08 et servi par l'interface, mais
+// n'apparaissait que dans l'écran d'ensemble hérité de la v3 : en
+// pratique, invisible. L'approfondissement des séries du 24.08 l'a par
+// ailleurs étendu de deux à ONZE exercices sans que personne le
+// remarque — c'est ce qui en fait aujourd'hui un fait de structure et
+// non plus une photographie.
+//
+// Il répond directement au mécanisme de QV1 : le tissu de sous-traitance
+// s'érode-t-il ? Une part qui progresse dit que le débouché domestique se
+// concentre, ce qui n'est pas la même chose qu'un débouché qui grandit.
+// =====================================================================
+
+function PartSuisse({ serie }) {
+  const pts = (serie || []).filter(x => x.part_suisse_pct != null);
+  if (pts.length < 3) return null;
+  const a = pts[0], z = pts[pts.length - 1];
+  const gain = Number(z.part_suisse_pct) - Number(a.part_suisse_pct);
+  const nonCalc = (serie || []).filter(x => x.part_suisse_pct == null);
+
+  return (
+    <div className="carte preuve part-ch">
+      <div className="p-tete">
+        <div>
+          <div className="p-titre">Part suisse du commerce mondial d'articles d'horlogerie</div>
+          <div className="p-meta">indicateur synthétique · calculé par requête sur les séries consolidées</div>
+        </div>
+        <div className="p-val">{nb(z.part_suisse_pct, 1)} %</div>
+      </div>
+
+      <p className="pc-constat">
+        <strong>{nb(a.part_suisse_pct, 1)} % en {a.period} → {nb(z.part_suisse_pct, 1)} % en {z.period}</strong>
+        {" "}: {gain > 0 ? "gain" : "perte"} de {nb(Math.abs(gain), 1)} points en {pts.length - 1} exercices,
+        sur un panier mondial passé de {nb(a.total_panier_mia_usd, 1)} à {nb(z.total_panier_mia_usd, 1)} milliards
+        de dollars. La Suisse capte une part croissante d'un marché qui ne grandit pas.
+        {" "}<strong>Pour un sous-traitant, ce n'est pas la même chose qu'un débouché qui s'élargit</strong> :
+        c'est un débouché qui se concentre, et dont la santé tient à celle d'un petit nombre de donneurs
+        d'ordre.
+      </p>
+
+      <Chart series={{ CHE: pts.map(x => ({ period: x.period, value: Number(x.part_suisse_pct) })) }}
+             hauteur={150} />
+
+      <p className="base-note">
+        Panier de {z.nb_declarants_attendus} déclarants. La part n'est calculée que si tous ont
+        soumis — c'est pourquoi {nonCalc.length > 0
+          ? <>l'exercice {nonCalc.map(x => x.period).join(", ")} n'est pas calculable : la fraîcheur
+             d'un panier est celle de son déclarant le plus lent.</>
+          : "aucun exercice n'est écarté ici."}
+      </p>
+    </div>
+  );
+}
+
+function DynamiqueGeo({ zones, divergences }) {
+  const [tout, setTout] = React.useState({});
+  const parIndicateur = {};
+  zones.forEach(z => { (parIndicateur[z.indicator_id] ||= []).push(z); });
+  const codes = Object.keys(parIndicateur);
+  if (!codes.length) return null;
+
+  return (
+    <div className="geo">
+      {codes.map(code => {
+        const liste = parIndicateur[code];
+        const div = divergences.find(d => d.indicator_id === code);
+        const ouvert = !!tout[code];
+        const visibles = ouvert ? liste : liste.slice(0, 8);
+        const maxPart = Math.max(...liste.map(z => Number(z.part_pct) || 0));
+        return (
+          <div key={code} className="geo-bloc">
+            <div className="geo-tete">
+              <span className="etq e-gris">{code}</span>
+              <span className="geo-lib">{liste[0].label}</span>
+              <span className="geo-base">{liste[0].base_comparaison}</span>
+            </div>
+
+            {div && div.divergence && (
+              <p className="geo-divergence">
+                <strong>{div.premier_marche} — premier débouché avec {nb(div.premier_part_pct, 1)} % —
+                évolue à {pct(div.premier_variation_pct)} quand la moyenne pondérée des
+                {" "}{div.n_autres} autres marchés fait {pct(div.var_moy_ponderee)}.</strong> Soit un
+                écart de {nb(Math.abs(div.ecart_points), 1)} points, de sens opposé. Le constat est
+                calculé, non rédigé : il y a divergence quand les signes s'opposent et que l'écart
+                atteint 5 points — seuil affiché pour être contesté, non pour être cru.
+              </p>
+            )}
+
+            <div className="geo-liste">
+              {visibles.map(z => {
+                const v = Number(z.variation_pct);
+                return (
+                  <div key={z.geo} className={"geo-ligne" + (z.est_zone_de_reference ? " ref" : "")}>
+                    <span className="geo-zone">{nomZone(z.geo)}</span>
+                    <div className="geo-piste">
+                      <div className="geo-jauge" style={{ width: (100 * (Number(z.part_pct) || 0) / maxPart) + "%" }} />
+                    </div>
+                    <span className="geo-part">{nb(z.part_pct, 1)} %</span>
+                    <span className={"geo-var " + (v > 0 ? "hausse" : v < 0 ? "baisse" : "")}>
+                      {pct(z.variation_pct)}
+                    </span>
+                    {z.est_zone_de_reference && <span className="geo-ref">zone de référence</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {liste.length > 8 && (
+              <span className="src-inline" onClick={() => setTout(t => ({ ...t, [code]: !t[code] }))}>
+                {ouvert ? "réduire" : `voir les ${liste.length} marchés`}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TexteAncre({ texte, index }) {
   // Découpe le texte sur les ancres [CTX-146] / [SIG-5] et rend chacune
   // comme un lien vers la pièce qu'elle désigne.
@@ -213,7 +346,7 @@ function AttributionAncree({ bloc }) {
 
 export default function SecteurQV() {
   const { code } = useParams();
-  const { D, S, G, AT } = useDonnees();
+  const { D, S, G, AT, GEO } = useDonnees();
   const navigate = useNavigate();
   if (!D) return <div className="page"><div className="vide">Chargement…</div></div>;
 
@@ -224,6 +357,11 @@ export default function SecteurQV() {
   const couverture = (D.couverture_qv || []).filter(c => c.sector_code === code);
   const commentaire = (D.commentaires || []).find(c => c.sector_code === code);
   const attribution = ((AT && AT.attribution) || []).find(a => a.sector_code === code);
+  // QV3 : les zones du secteur, et le constat de divergence s'il y en a un.
+  const zonesGeo = ((GEO && GEO.zones) || []).filter(z => z.sector_code === code);
+  const divergencesGeo = ((GEO && GEO.divergences) || []).filter(d => d.sector_code === code);
+  const ecarteesGeo = (GEO && GEO.ecartees) || 0;
+  const seuilGeo = (GEO && GEO.seuil_poids_pct) || 1;
   // Les questions applicables au secteur, dans l'ordre, telles que déclarées.
   const questionsDuSecteur = [...new Set(instanciation.map(q => q.watch_question_code))].sort();
   const signaux = (G?.signaux || []).filter(s => s.sector_code === code);
@@ -293,6 +431,19 @@ export default function SecteurQV() {
                   </div>
                 )}
                 {qv === "QV1" && attribution && <AttributionAncree bloc={attribution} />}
+                {qv === "QV1" && code === "horlogerie" && D.synthetique &&
+                  <PartSuisse serie={D.synthetique} />}
+                {qv === "QV3" && zonesGeo.length > 0 && (
+                  <>
+                    <DynamiqueGeo zones={zonesGeo} divergences={divergencesGeo} />
+                    <p className="geo-tamis">
+                      Marchés pesant au moins {nb(seuilGeo, 0)} % de leur indicateur. Une variation
+                      relative énorme sur un marché minuscule est un artefact, pas un signal :
+                      {" "}{ecarteesGeo} zones sont écartées à ce titre, tous indicateurs confondus,
+                      et restent lisibles au registre.
+                    </p>
+                  </>
+                )}
                 {sigs.length > 0 && (
                   <div className="liste-signaux">
                     {sigs.map(s => (

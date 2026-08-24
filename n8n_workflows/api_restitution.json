@@ -274,7 +274,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- LES APPELS SUR LESQUELS ON PEUT ENCORE AGIR. Ni les expirés, ni les\n  -- attribués : les proposer ferait perdre son temps au décideur.\n  'actions', (SELECT coalesce(json_agg(x ORDER BY x.adressable DESC NULLS LAST, x.jours_restants), '[]'::json)\n              FROM v_actions x),\n  -- Les acheteurs qui reviennent : un compte à démarcher, pas un événement.\n  'acheteurs', (SELECT coalesce(json_agg(y ORDER BY y.dont_encore_ouverts DESC, y.avis_publies DESC), '[]'::json)\n                FROM (SELECT * FROM v_acheteurs_recurrents WHERE dont_encore_ouverts > 0 LIMIT 40) y),\n  -- Le tamis, chiffré : ce que le dispositif a écarté et pourquoi.\n  'tamis', (SELECT json_build_object(\n      'avis_collectes',   (SELECT count(*) FROM ted_avis),\n      'appels_ouverts',   (SELECT count(*) FROM ted_avis WHERE est_appel_ouvert),\n      'attributions',     (SELECT count(*) FROM ted_avis WHERE NOT est_appel_ouvert),\n      'non_expires',      (SELECT count(*) FROM v_actions),\n      'adressables',      (SELECT count(*) FROM v_actions WHERE adressable >= 1),\n      'coeur_de_metier',  (SELECT count(*) FROM v_actions WHERE adressable = 2),\n      'modele_lecture',   (SELECT max(modele) FROM ted_lecture_ia))),\n  'fenetre_jours', 60\n) AS payload;",
+        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- LES APPELS SUR LESQUELS ON PEUT ENCORE AGIR. Ni les expirés, ni les\n  -- attribués : les proposer ferait perdre son temps au décideur.\n  'actions', (SELECT coalesce(json_agg(x ORDER BY x.adressable DESC NULLS LAST, x.jours_restants), '[]'::json)\n              FROM v_actions x),\n  -- Les acheteurs qui reviennent : un compte à démarcher, pas un événement.\n  'acheteurs', (SELECT coalesce(json_agg(y ORDER BY y.dont_encore_ouverts DESC, y.avis_publies DESC), '[]'::json)\n                FROM (SELECT * FROM v_acheteurs_recurrents WHERE dont_encore_ouverts > 0 LIMIT 40) y),\n  -- Le tamis, chiffré : ce que le dispositif a écarté et pourquoi.\n  'tamis', (SELECT json_build_object(\n      'avis_collectes',   (SELECT count(*) FROM ted_avis),\n      'appels_ouverts',   (SELECT count(*) FROM ted_avis WHERE est_appel_ouvert),\n      'attributions',     (SELECT count(*) FROM ted_avis WHERE NOT est_appel_ouvert),\n      'non_expires',      (SELECT count(*) FROM v_actions),\n      'adressables',      (SELECT count(*) FROM v_actions WHERE adressable >= 1),\n      'coeur_de_metier',  (SELECT count(*) FROM v_actions WHERE adressable = 2),\n      'modele_lecture',   (SELECT max(modele) FROM ted_lecture_ia))),\n  -- VALEUR EN JEU, PAR DEVISE ET JAMAIS CONVERTIE. Les valeurs estimées des\n  -- avis européens sont libellées en huit devises (EUR, RON, CZK, PLN, NOK,\n  -- SEK, HUF, BGN). Les additionner comme des euros donnerait un total\n  -- plausible et faux — l'erreur a été commise à l'analyse du 24.08 avant\n  -- d'être corrigée ici. Le dispositif ne dispose d'aucune table de change\n  -- pour ces monnaies : il additionne donc PAR DEVISE, et affiche le nombre\n  -- d'appels dont la valeur n'est pas publiée, sans quoi le total passerait\n  -- pour exhaustif.\n  'valeur_en_jeu', (SELECT coalesce(json_agg(z ORDER BY z.montant DESC), '[]'::json)\n     FROM (SELECT a.devise, count(*) AS appels, sum(a.valeur_estimee) AS montant\n           FROM ted_avis a\n           JOIN ted_lecture_ia l ON l.publication_number = a.publication_number\n                                AND l.profil = 'A_metier_declare'\n           WHERE a.est_appel_ouvert AND a.date_limite >= CURRENT_DATE\n             AND l.adressable >= 1 AND a.valeur_estimee IS NOT NULL\n           GROUP BY a.devise) z),\n  'sans_valeur_publiee', (SELECT count(*) FROM ted_avis a\n     JOIN ted_lecture_ia l ON l.publication_number = a.publication_number\n                          AND l.profil = 'A_metier_declare'\n     WHERE a.est_appel_ouvert AND a.date_limite >= CURRENT_DATE\n       AND l.adressable >= 1 AND a.valeur_estimee IS NULL),\n  'fenetre_jours', 60\n) AS payload;",
         "options": {}
       },
       "id": "sql-actions",
@@ -376,6 +376,68 @@
       "position": [
         480,
         1000
+      ]
+    },
+    {
+      "parameters": {
+        "path": "veille/geographie",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "geo-requête",
+      "name": "Requête géographie",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1140
+      ],
+      "webhookId": "veille-signaux"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- Répartition et évolution par zone : la question de veille QV3, jusqu'ici\n  -- non instrumentée par la restitution alors que les données existaient.\n  'zones', (SELECT coalesce(json_agg(x ORDER BY x.indicator_id, x.part_pct DESC), '[]'::json)\n            FROM (SELECT * FROM v_dynamique_geographique WHERE poids_significatif) x),\n  -- Le constat, CALCULÉ et non rédigé, avec sa règle affichable.\n  'divergences', (SELECT coalesce(json_agg(y ORDER BY y.divergence DESC, abs(y.ecart_points) DESC), '[]'::json)\n                  FROM v_divergence_geographique y),\n  -- Ce que le seuil de poids écarte : le tamis doit être chiffré, sinon la\n  -- liste affichée passe pour exhaustive.\n  'ecartees', (SELECT count(*) FROM v_dynamique_geographique WHERE NOT poids_significatif),\n  'seuil_poids_pct', 1.0\n) AS payload;",
+        "options": {}
+      },
+      "id": "geo-lire",
+      "name": "Lire géographie",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        1140
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "geo-répondre",
+      "name": "Répondre géographie",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        1140
       ]
     }
   ],
@@ -506,6 +568,28 @@
         [
           {
             "node": "Répondre attribution ancrée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requête géographie": {
+      "main": [
+        [
+          {
+            "node": "Lire géographie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire géographie": {
+      "main": [
+        [
+          {
+            "node": "Répondre géographie",
             "type": "main",
             "index": 0
           }

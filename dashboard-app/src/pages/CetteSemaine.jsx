@@ -35,6 +35,64 @@ function positionAiguille(score) {
   return (50 + 50 * clamp / borne);
 }
 
+
+// =====================================================================
+// EFFET PAYS — le croisement que le socle transversal rend possible.
+//
+// Le cadre du chapitre 8 pose un socle d'attribution dont la fonction est
+// de distinguer un choc PROPRE à un marché d'un mouvement général. Ce
+// bloc en fait la même chose sur l'axe géographique : quand un pays
+// diverge de la même façon sur DEUX secteurs sans rapport, ce n'est plus
+// une nouvelle sectorielle, c'est un effet pays. Aucun indicateur pris
+// isolément ne le montre — c'est le croisement qui le produit.
+// =====================================================================
+
+function EffetPays({ divergences }) {
+  const reelles = (divergences || []).filter(d => d.divergence);
+  if (!reelles.length) return null;
+
+  // Un pays qui diverge sur plusieurs secteurs : le regroupement EST le constat.
+  const parPays = {};
+  reelles.forEach(d => { (parPays[d.premier_marche] ||= []).push(d); });
+  const croises = Object.entries(parPays).filter(([, l]) =>
+    new Set(l.map(d => d.sector_code)).size >= 2);
+
+  return (
+    <div className="effet">
+      <div className="ef-titre">Ce qui traverse les marchés</div>
+      {croises.map(([pays, liste]) => (
+        <p key={pays} className="ef-constat">
+          <strong>{nomZone(pays)} diverge sur {liste.length} secteurs sans rapport entre eux</strong>
+          {" — "}
+          {liste.map((d, i) => (
+            <span key={d.indicator_id}>
+              {i > 0 ? ", " : ""}{d.sector_code} ({d.indicator_id}) : {pct(d.premier_variation_pct)}
+              {" "}contre {pct(d.var_moy_ponderee)} pour les autres marchés
+            </span>
+          ))}
+          . Un mouvement qui se répète sur des marchés indépendants ne se lit pas comme une
+          nouvelle sectorielle : c'est un <strong>effet pays</strong>, et il appelle une
+          explication d'un autre ordre — politique commerciale, change, demande intérieure.
+          Le dispositif le constate ; il ne le tranche pas.
+        </p>
+      ))}
+      {!croises.length && reelles.map(d => (
+        <p key={d.indicator_id} className="ef-constat">
+          <strong>{nomZone(d.premier_marche)}</strong>, premier débouché de {d.sector_code}
+          {" "}({nb(d.premier_part_pct, 1)} %), évolue à {pct(d.premier_variation_pct)} quand la
+          moyenne pondérée des {d.n_autres} autres fait {pct(d.var_moy_ponderee)}.
+        </p>
+      ))}
+      <p className="ef-pied">
+        Constat calculé, non rédigé. Divergence déclarée quand les signes s'opposent et que
+        l'écart atteint 5 points, sur les marchés pesant au moins 1 % de leur indicateur —
+        les deux seuils sont affichés pour être contestés. Le détail par marché figure sous la
+        question de veille « dynamique géographique » de chaque secteur.
+      </p>
+    </div>
+  );
+}
+
 function TuileSante({ s, onClic }) {
   const calcule = s.etat === "calcule";
   const score = s.score_sante;
@@ -156,7 +214,7 @@ function CarteCommentaire({ c, secteur, navigate }) {
 }
 
 export default function CetteSemaine() {
-  const { D, S, G, erreursV4 } = useDonnees();
+  const { D, S, G, erreursV4, GEO } = useDonnees();
   const navigate = useNavigate();
 
   if (!S) return (
@@ -199,6 +257,8 @@ export default function CetteSemaine() {
         n'est pas une prévision : c'est la position d'aujourd'hui par rapport au passé
         collecté, rien de plus.
       </p>
+
+      {GEO && <EffetPays divergences={GEO.divergences} />}
 
       <div className="grille g4">
         {sante.filter(s => s.sector_code !== "transversal")

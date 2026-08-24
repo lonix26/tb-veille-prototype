@@ -24,6 +24,7 @@ export function FournisseurDonnees({ children }) {
   const [opportunites, setOpportunites] = useState(null);
   const [actions, setActions] = useState(null);
   const [attribution, setAttribution] = useState(null);
+  const [geographie, setGeographie] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [erreursV4, setErreursV4] = useState({});
   const [chargement, setChargement] = useState(true);
@@ -56,7 +57,8 @@ export function FournisseurDonnees({ children }) {
       secondaire("/signaux", setSignaux),
       secondaire("/opportunites", setOpportunites),
       secondaire("/actions", setActions),
-      secondaire("/attribution", setAttribution)
+      secondaire("/attribution", setAttribution),
+      secondaire("/geographie", setGeographie)
     ]);
     setChargement(false);
   }, []);
@@ -64,7 +66,7 @@ export function FournisseurDonnees({ children }) {
   useEffect(() => { recharger(); }, [recharger]);
 
   return (
-    <Ctx.Provider value={{ D: donnees, S: sante, G: signaux, O: opportunites, A: actions, AT: attribution,
+    <Ctx.Provider value={{ D: donnees, S: sante, G: signaux, O: opportunites, A: actions, AT: attribution, GEO: geographie,
                            erreur, erreursV4, chargement, misAJour, recharger }}>
       {children}
     </Ctx.Provider>
@@ -149,8 +151,19 @@ const AGREGATS = new Set([
 export const estAgregat = g => AGREGATS.has(String(g)) || String(g).startsWith("WB_");
 
 const NOMS_ZONES = {
-  WORLD: "monde", W00: "monde", EU27: "UE-27", EU27_2020: "UE-27",
-  CH: "Suisse", G20: "G20", CHF_USD: "CHF/USD", CHF_EUR: "CHF/EUR"
+  WORLD: "monde", W00: "monde", EU: "Union européenne", EU27: "UE-27", EU27_2020: "UE-27",
+  CH: "Suisse", G20: "G20", CHF_USD: "CHF/USD", CHF_EUR: "CHF/EUR", OWID_WRL: "monde",
+  // Les pays qui pèsent effectivement dans les séries collectées. La liste est
+  // volontairement courte : un code ISO non traduit s'affiche tel quel, ce qui
+  // est lisible ; une traduction approximative ne le serait pas.
+  USA: "États-Unis", US: "États-Unis", CHN: "Chine", JPN: "Japon", DEU: "Allemagne",
+  FRA: "France", GBR: "Royaume-Uni", ITA: "Italie", ESP: "Espagne", NLD: "Pays-Bas",
+  CHE: "Suisse", HKG: "Hong Kong", SGP: "Singapour", KOR: "Corée du Sud", IND: "Inde",
+  ARE: "Émirats arabes unis", SAU: "Arabie saoudite", QAT: "Qatar", TUR: "Turquie",
+  MEX: "Mexique", CAN: "Canada", BRA: "Brésil", AUS: "Australie", POL: "Pologne",
+  CZE: "Tchéquie", IRL: "Irlande", RUS: "Russie", BEL: "Belgique", AUT: "Autriche",
+  SWE: "Suède", THA: "Thaïlande", VNM: "Viêt Nam", MYS: "Malaisie", IDN: "Indonésie",
+  ZAF: "Afrique du Sud", ISR: "Israël", NOR: "Norvège", DNK: "Danemark", PRT: "Portugal"
 };
 export const nomZone = g => {
   if (NOMS_ZONES[g]) return NOMS_ZONES[g];

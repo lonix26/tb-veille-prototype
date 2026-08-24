@@ -338,3 +338,47 @@ input.filtre:focus{outline:2px solid var(--accent);border-color:transparent}
   border-top:1px solid #dde7f4;padding-top:9px}
 .at-h{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
   color:#1b4f91;margin-bottom:2px}
+
+/* Dynamique géographique — QV3 (écran secteur) */
+.geo{margin:6px 0 4px}
+.geo-bloc{background:var(--carte);border:1px solid var(--trait);border-radius:10px;
+  padding:12px 14px;margin-bottom:12px}
+.geo-tete{display:flex;align-items:baseline;gap:9px;margin-bottom:8px;flex-wrap:wrap}
+.geo-lib{font-weight:650;font-size:13px}
+.geo-base{margin-left:auto;font-size:11px;color:var(--encre2)}
+.geo-divergence{font-size:12.5px;line-height:1.6;color:var(--encre2);background:#fdf6ec;
+  border-left:3px solid var(--ambre);border-radius:0 6px 6px 0;padding:9px 12px;margin:0 0 10px}
+.geo-ligne{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12.5px}
+.geo-ligne.ref{background:#f2f7fc;border-radius:5px;padding-left:5px;margin-left:-5px}
+.geo-zone{flex:0 0 190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.geo-piste{flex:1;height:8px;background:#eef1f4;border-radius:99px;overflow:hidden}
+.geo-jauge{height:100%;background:#4a6fa5;border-radius:99px}
+.geo-part{flex:0 0 52px;text-align:right;color:var(--encre2)}
+.geo-var{flex:0 0 62px;text-align:right;font-weight:600}
+.geo-ref{font-size:10px;color:var(--encre2);white-space:nowrap}
+.geo-tamis{font-size:11.5px;line-height:1.55;color:var(--encre2);margin:2px 0 8px}
+
+/* Effet pays — croisement inter-secteurs (écran Cette semaine) */
+.effet{background:#fdf6ec;border:1px solid #f0dfc4;border-left:4px solid var(--ambre);
+  border-radius:0 10px 10px 0;padding:13px 16px;margin:0 0 18px}
+.ef-titre{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--ambre);margin-bottom:7px}
+.ef-constat{font-size:13.5px;line-height:1.65;margin:0 0 8px;color:var(--encre)}
+.ef-pied{font-size:11.5px;line-height:1.55;color:var(--encre2);margin:8px 0 0;
+  border-top:1px solid #f0dfc4;padding-top:8px}
+
+/* Valeur en jeu (écran Actions) */
+.enjeu{background:var(--carte);border:1px solid var(--trait);border-radius:10px;
+  padding:12px 16px;margin:0 0 16px}
+.en-titre{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--encre2);margin-bottom:8px}
+.en-lignes{display:flex;gap:26px;flex-wrap:wrap;align-items:baseline}
+.en-ligne b{font-size:22px;letter-spacing:-.4px}
+.en-dev{font-size:12px;color:var(--encre2);margin-left:3px}
+.en-n{font-size:11.5px;color:var(--encre2);margin-left:8px}
+.en-note{font-size:11.5px;line-height:1.55;color:var(--encre2);margin:9px 0 0;
+  border-top:1px solid var(--trait);padding-top:8px}
+
+/* Indicateur synthétique — part suisse (écran horlogerie) */
+.part-ch{border-left:3px solid var(--vert)}
+.pc-constat{font-size:13px;line-height:1.65;color:var(--encre);margin:2px 0 10px}
