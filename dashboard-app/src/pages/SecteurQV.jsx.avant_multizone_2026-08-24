@@ -27,33 +27,6 @@ function Preuve({ ind, D, navigate }) {
   const zones = [...new Set(serie.map(v => v.geo))];
   const zone = zones.find(estAgregat) || zones[0];
   const points = serie.filter(v => v.geo === zone);
-
-  // ── Vue par marché ────────────────────────────────────────────────────
-  // La carte ne traçait qu'UNE courbe, celle de la zone de référence, alors
-  // que la charge contient toutes les zones collectées — 197 destinations
-  // pour les exportations horlogères. Constater qu'un agrégat monte ne dit
-  // pas OÙ il monte, et c'est cette question-là qui décide d'un effort
-  // commercial. Les principaux marchés sont donc traçables ici, sur la même
-  // carte et au même endroit du regard.
-  //
-  // Le repère de base disparaît en vue par marché, et c'est volontaire : une
-  // moyenne mobile est calculée pour la zone de référence, la superposer à
-  // cinq courbes d'autres zones inviterait à une comparaison qui n'a pas
-  // lieu d'être.
-  const [parMarche, setParMarche] = React.useState(false);
-  const AGREGATS = new Set(["W00","WORLD","World","OWID_WRL","EU","EU27","EU27_2020","G20"]);
-  const derniereP = points.length ? points[points.length - 1].period : null;
-  const marches = [...new Set(serie.filter(v => !AGREGATS.has(v.geo)).map(v => v.geo))]
-    .map(g => {
-      const pts = serie.filter(v => v.geo === g);
-      const dern = pts[pts.length - 1];
-      return { geo: g, pts, poids: dern ? Math.abs(Number(dern.value) || 0) : 0,
-               frais: dern && dern.period === derniereP };
-    })
-    .filter(x => x.pts.length > 2)
-    .sort((a, b) => b.poids - a.poids);
-  const top = marches.slice(0, 5);
-  const multiZone = marches.length >= 2;
   const m = (D.metriques || []).find(x => x.indicator_id === ind.indicator_id && x.geo === zone);
   const dernier = points[points.length - 1];
 
@@ -77,37 +50,13 @@ function Preuve({ ind, D, navigate }) {
           « écart à la base » : sans cette ligne, le graphique ne permet pas de
           vérifier l'écart annoncé. Elle n'est dessinée que si le calcul a
           réellement eu lieu — une moyenne partielle est signalée sous la courbe. */}
-      {multiZone && (
-        <div className="bascule">
-          <button className={!parMarche ? "actif" : ""} onClick={() => setParMarche(false)}>
-            {nomZone(zone)}
-          </button>
-          <button className={parMarche ? "actif" : ""} onClick={() => setParMarche(true)}>
-            par marché ({marches.length})
-          </button>
-        </div>
-      )}
-      {points.length > 1 && !parMarche &&
+      {points.length > 1 &&
         <Chart series={{ [zone]: points.map(p => ({ period: p.period, value: Number(p.value) })) }}
                refLine={m?.moyenne_mobile_annuelle ?? undefined}
                refLabel={m?.moyenne_mobile_annuelle != null
                  ? "base " + nb(m.moyenne_mobile_annuelle)
                  : undefined}
                hauteur={170} />}
-      {parMarche && top.length > 0 && (
-        <>
-          <Chart hauteur={200}
-                 series={Object.fromEntries(top.map(x =>
-                   [x.geo, x.pts.map(p => ({ period: p.period, value: Number(p.value) }))]))} />
-          <p className="base-note">
-            Les {top.length} premiers marchés par dernière valeur, sur {marches.length} zones
-            collectées. Les agrégats (monde, Union européenne) sont exclus de ce classement — les
-            compter parmi les pays doublerait le total.
-            {top.some(x => !x.frais) && <> Attention : {top.filter(x => !x.frais).map(x => nomZone(x.geo)).join(", ")}
-              {" "}n'a pas de point sur la dernière période — la courbe s'y arrête plus tôt.</>}
-          </p>
-        </>
-      )}
       {points.length > 1 && m?.moyenne_mobile_annuelle != null && (
         <p className="base-note">
           Base tracée : moyenne mobile sur {m.nb_points_moyenne} point

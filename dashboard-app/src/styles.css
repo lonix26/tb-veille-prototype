@@ -382,3 +382,11 @@ input.filtre:focus{outline:2px solid var(--accent);border-color:transparent}
 /* Indicateur synthétique — part suisse (écran horlogerie) */
 .part-ch{border-left:3px solid var(--vert)}
 .pc-constat{font-size:13px;line-height:1.65;color:var(--encre);margin:2px 0 10px}
+
+/* Bascule agrégat / par marché sur les cartes d'indicateur */
+.bascule{display:flex;gap:0;margin:2px 0 8px;border:1px solid var(--trait);
+  border-radius:7px;overflow:hidden;width:fit-content}
+.bascule button{border:0;background:var(--carte);color:var(--encre2);font-size:11.5px;
+  padding:4px 11px;cursor:pointer;font-family:inherit}
+.bascule button+button{border-left:1px solid var(--trait)}
+.bascule button.actif{background:#1b4f91;color:#fff;font-weight:600}
