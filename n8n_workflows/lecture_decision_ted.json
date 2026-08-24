@@ -1,0 +1,295 @@
+{
+  "id": "lectureDecisionV1",
+  "name": "Veille - Lecture décisionnelle des marchés publics (étage 2)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "déclencheur-manuel",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual','B','en_cours','Lecture decisionnelle TED') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "id": "ouvrir-le-run",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        700,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Seuls les appels ENCORE OUVERTS et NON EXPIRÉS : lire un marché attribué\n-- ou dont l'échéance est passée ferait perdre son temps au décideur.\n-- Et seuls ceux que ce modèle n'a pas déjà lus sous le profil de référence :\n-- le workflow est donc rejouable sans retraiter ni doublonner.\nSELECT a.publication_number, a.sector_code, a.acheteur_pays,\n       array_to_string(a.cpv, '/') AS cpv_texte,\n       a.date_limite - CURRENT_DATE AS jours_restants, a.titre\nFROM ted_avis a\nWHERE a.est_appel_ouvert AND a.date_limite >= CURRENT_DATE\n  AND NOT EXISTS (SELECT 1 FROM ted_lecture_ia l\n                  WHERE l.publication_number = a.publication_number\n                    AND l.modele = $1 AND l.profil = 'A_metier_declare')\nORDER BY a.date_limite LIMIT 200;",
+        "options": {
+          "queryReplacement": "={{ [$env.MODELE_GOOGLE || 'gemini-3.7-flash'] }}"
+        }
+      },
+      "id": "lire-les-appels-sans-lecture",
+      "name": "Lire les appels sans lecture",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Constitution des lots d'avis à lire.\n//\n// LA CONSIGNE EST REPRISE MOT POUR MOT du script qu'elle remplace : le profil\n// métier gouverne 74 exclusions sur 77, sa sensibilité a été mesurée (§ 11.8),\n// et le porter en workflow ne doit RIEN changer à ce qu'il dit. Toute retouche\n// invaliderait la mesure de sensibilité déjà publiée.\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst TAILLE_LOT = 8;   // au-delà, le modèle raccourcit ses justifications\nconst CONSIGNE = \"Tu conseilles une PME suisse de MÉCANIQUE DE PRÉCISION (canton de Neuchâtel,\\nenviron 50 personnes). Son métier : l'usinage de pièces métalliques à tolérances serrées —\\ntournage, fraisage, décolletage, rectification — en petites et moyennes séries, en\\nSOUS-TRAITANCE pour des donneurs d'ordre des secteurs horloger, médical (implants,\\ninstruments), automobile et aérospatial.\\n\\nCe qu'elle SAIT faire : produire des pièces sur plan, des composants mécaniques, des\\nsous-ensembles usinés, de l'outillage, des prototypes et des séries.\\n\\nCe qu'elle NE FAIT PAS, et qu'il ne faut jamais lui proposer : vendre des appareils\\ncomplets (drones, hélicoptères, véhicules, machines finies), des consommables, des\\nlogiciels, des prestations de service (maintenance, nettoyage, transport, conseil,\\nformation), du mobilier, des matières premières brutes, ou des équipements qu'elle\\nrevendrait sans les produire.\\n\\nPour CHAQUE avis de marché public de la liste, réponds à une seule question :\\ncet appel est-il exécutable par cet atelier, et que faut-il faire maintenant ?\\n\\nTrois axes :\\n\\n1. adressable (0-2)\\n   0 = hors du savoir-faire. Appareil complet, service, consommable, logiciel,\\n       matière brute, mobilier. C'est le cas le plus fréquent : n'hésite pas à\\n       mettre 0, une liste courte et juste vaut mieux qu'une liste longue.\\n   1 = périphérique. Des pièces sont impliquées mais l'objet principal est\\n       ailleurs, ou le lot devrait être décomposé pour être atteignable.\\n   2 = coeur de métier. L'avis porte sur des pièces usinées, des composants\\n       mécaniques, des sous-ensembles, de l'outillage ou des prototypes.\\n\\n2. piece_concernee — ce qu'il faudrait produire, en quelques mots concrets et\\n   tirés de l'avis. Si rien n'est à produire, laisse vide.\\n\\n3. action_proposee — le GESTE, pas un conseil général. Formule-le à l'impératif\\n   et rends-le exécutable : qui contacter, pour demander quoi. Exemple utile :\\n   « Demander le cahier des charges à l'acheteur pour vérifier les tolérances et\\n   les matières. » Exemple inutile, à ne jamais produire : « Étudier\\n   l'opportunité. » Si adressable vaut 0, laisse vide.\\n\\nN'INVENTE RIEN. Ne suppose ni matière, ni tolérance, ni volume qui ne soit dans\\nl'intitulé. Si l'intitulé est trop vague pour trancher, mets adressable 1 et dis-le\\ndans la justification.\\n\\nRéponds UNIQUEMENT par un JSON strict, sans texte autour :\\n{\\\"lectures\\\": [{\\\"publication_number\\\": \\\"\\\", \\\"adressable\\\": 0, \\\"piece_concernee\\\": \\\"\\\",\\n\\\"action_proposee\\\": \\\"\\\", \\\"justification\\\": \\\"\\\"}]}\";\n\n// Les lignes sont relues à la source : le nœud d'ouverture du run, placé\n// entre les deux, ne les transmet pas.\nconst avis = $('Lire les appels sans lecture').all().map(x => x.json).filter(a => a.publication_number);\nif (!avis.length) // RIEN À TRAITER N'EST PAS UNE ERREUR : c'est le cas nominal d'un dispositif\n  // rejoué à intervalle régulier. Lever une exception ici interromprait le\n  // workflow AVANT la clôture — le run resterait ouvert, et la vue de santé des\n  // exécutions compterait indéfiniment une exécution en cours qui ne l'est plus.\n  // Constaté au rejeu de bout en bout du 25.08.2026 (run 138).\n  // On rend un item marqueur, que les nœuds suivants laissent passer sans écrire.\n  return [{ json: { _rien_a_faire: true, run_id: runId } }];\n\nconst lots = [];\nfor (let i = 0; i < avis.length; i += TAILLE_LOT) {\n  const lot = avis.slice(i, i + TAILLE_LOT);\n  const contenu = CONSIGNE + '\\n\\nAvis :\\n' + lot.map(a =>\n    '- ' + a.publication_number + ' [' + (a.sector_code || 'hors grille') + ', '\n    + (a.acheteur_pays || '?') + ', CPV ' + (a.cpv_texte || '?') + ', '\n    + a.jours_restants + ' jours restants] : ' + String(a.titre || '').slice(0, 260)\n  ).join('\\n');\n  lots.push({ json: {\n    run_id: runId, numeros: lot.map(a => a.publication_number),\n    corps: { contents: [{ parts: [{ text: contenu }] }],\n             generationConfig: { temperature: 0, responseMimeType: 'application/json' } }\n  }});\n}\nreturn lots;"
+      },
+      "id": "préparer-les-lots",
+      "name": "Préparer les lots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.MODELE_GOOGLE || 'gemini-3.7-flash' }}:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GOOGLE_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.corps) }}",
+        "options": {
+          "timeout": 180000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "interroger-le-modèle",
+      "name": "Interroger le modèle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalisation des lectures, et contrôle AVANT écriture.\n//\n// Deux garde-fous repris du script : on n'écrit que les numéros RÉELLEMENT\n// soumis dans le lot — un modèle peut inventer une référence — et on n'accepte\n// que les trois valeurs d'adressabilité du barème. Ce qui sort du cadre est\n// consigné en incident, jamais écrit.\nconst sorties = [], incidents = [];\n// Le marqueur posé en amont quand il n'y a rien à traiter traverse sans écrire.\nif ($input.all().some(x => x.json && x.json._rien_a_faire)) {\n  return [{ json: { _rien_a_faire: true, _incidents: [] } }];\n}\nconst lignes = $input.all();\nfor (let i = 0; i < lignes.length; i++) {\n  const r = lignes[i].json;\n  const t = $('Préparer les lots').itemMatching(i).json;\n  if (r.error) { incidents.push('lot ' + (i+1) + ' : appel en échec (' + JSON.stringify(r.error).slice(0,160) + ')'); continue; }\n  // Le modèle rend parfois des blocs de raisonnement avant le texte : on\n  // concatène TOUS les blocs de type texte, jamais seulement le premier.\n  const parts = (r && r.candidates && r.candidates[0] && r.candidates[0].content && r.candidates[0].content.parts) || [];\n  const brut = parts.filter(p => p.text).map(p => p.text).join('\\n').trim();\n  if (!brut) { incidents.push('lot ' + (i+1) + ' : réponse sans texte'); continue; }\n  const m = /```(?:json)?\\s*(\\{[\\s\\S]*\\})\\s*```/.exec(brut);\n  let rep;\n  try { rep = JSON.parse(m ? m[1] : brut); }\n  catch (e) { incidents.push('lot ' + (i+1) + ' : JSON non parsable'); continue; }\n  // Normalisation en chaîne des deux côtés : la comparaison d'un identifiant\n  // rendu par Postgres et d'un identifiant rendu par le modèle ne doit pas\n  // dépendre de leur type de sérialisation.\n  const admis = new Set(t.numeros.map(String));\n  for (const l of (rep.lectures || [])) {\n    if (!admis.has(String(l.publication_number))) { incidents.push('numéro hors lot ignoré : ' + l.publication_number); continue; }\n    if ([0,1,2].indexOf(l.adressable) === -1) { incidents.push('adressable hors barème pour ' + l.publication_number); continue; }\n    sorties.push({ json: {\n      publication_number: l.publication_number,\n      modele: $env.MODELE_GOOGLE || 'gemini-3.7-flash',\n      profil: 'A_metier_declare',\n      adressable: l.adressable,\n      piece_concernee: (l.piece_concernee || '').slice(0,300) || null,\n      action_proposee: (l.action_proposee || '').slice(0,400) || null,\n      justification: (l.justification || '').slice(0,400),\n      _incidents: incidents\n    }});\n  }\n}\nif (!sorties.length) throw new Error('aucune lecture exploitable — incidents : ' + (incidents.join(' | ') || 'aucun'));\nreturn sorties;"
+      },
+      "id": "normaliser-et-contrôler",
+      "name": "Normaliser et contrôler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Le marqueur « rien à faire » n'a pas de clé : la clause WHERE le rejette\n-- sans erreur, et la clôture s'exécute normalement.\nINSERT INTO ted_lecture_ia (publication_number, modele, profil, adressable,\n  piece_concernee, action_proposee, justification)\nVALUES ($1,$2,$3,$4,$5,$6,$7)\nON CONFLICT (publication_number, modele, profil) DO NOTHING\nRETURNING publication_number;",
+        "options": {
+          "queryReplacement": "={{ [$json.publication_number, $json.modele, $json.profil, $json.adressable, $json.piece_concernee, $json.action_proposee, $json.justification] }}"
+        }
+      },
+      "id": "écrire-les-lectures",
+      "name": "Écrire les lectures",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status = CASE WHEN $2::int = 0 THEN 'echec' WHEN $4::int > 0 THEN 'partiel' ELSE 'ok' END, closed_at = now(), note = $3 WHERE run_id = $1 RETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ (() => { let ecrits = 0; try { ecrits = $('Écrire les lectures').all().length; } catch (e) { ecrits = 0; } const items = $('Normaliser et contrôler').all().map(x => x.json); const inc = (items[0] && items[0]._incidents) || []; const note = 'Lecture decisionnelle TED — ' + ecrits + ' lecture(s) ecrite(s), profil A_metier_declare.' + (inc.length ? ' Incidents : ' + inc.join(' | ') + '.' : ''); return [ $('Ouvrir le run').first().json.run_id, ecrits, note, inc.length ]; })() }}"
+        }
+      },
+      "id": "clôturer-le-run",
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1400,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g1",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.publication_number }}"
+            }
+          ]
+        }
+      },
+      "id": "garde",
+      "name": "Des appels à lire ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        0
+      ],
+      "notes": "UN RUN QUI N'A RIEN FAIT NE DOIT PAS EXISTER. Ouvrir le run avant de savoir s'il y a matière laissait une exécution ouverte à chaque rejeu à vide — cas NOMINAL d'un dispositif relancé régulièrement. Le garde est donc placé AVANT l'ouverture, et non après."
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Lire les appels sans lecture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Préparer les lots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les appels sans lecture": {
+      "main": [
+        [
+          {
+            "node": "Des appels à lire ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les lots": {
+      "main": [
+        [
+          {
+            "node": "Interroger le modèle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interroger le modèle": {
+      "main": [
+        [
+          {
+            "node": "Normaliser et contrôler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser et contrôler": {
+      "main": [
+        [
+          {
+            "node": "Écrire les lectures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire les lectures": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Des appels à lire ?": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {}
+}

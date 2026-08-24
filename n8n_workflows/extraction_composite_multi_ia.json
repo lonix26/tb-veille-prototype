@@ -1,4 +1,5 @@
 {
+  "id": "extractionCompositeV0",
   "name": "Veille - Extraction composite multi-IA (human-in-the-loop)",
   "nodes": [
     {
@@ -6,7 +7,10 @@
       "name": "Déclencheur manuel (nouveau document)",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 300]
+      "position": [
+        0,
+        300
+      ]
     },
     {
       "parameters": {
@@ -15,7 +19,10 @@
       "name": "Préparer tâche d'extraction",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -30,7 +37,10 @@
       "name": "Modèle A (OpenAI)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 100]
+      "position": [
+        460,
+        100
+      ]
     },
     {
       "parameters": {
@@ -45,7 +55,10 @@
       "name": "Modèle B (Anthropic)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
@@ -60,7 +73,10 @@
       "name": "Modèle C (Google)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 500]
+      "position": [
+        460,
+        500
+      ]
     },
     {
       "parameters": {
@@ -69,16 +85,29 @@
       "name": "Contrôle de consistance",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [740, 300]
+      "position": [
+        740,
+        300
+      ]
     },
     {
       "parameters": {
-        "conditions": { "boolean": [ { "value1": "={{ $json.unanimous }}", "value2": true } ] }
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.unanimous }}",
+              "value2": true
+            }
+          ]
+        }
       },
       "name": "Consensus unanime ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [980, 300]
+      "position": [
+        980,
+        300
+      ]
     },
     {
       "parameters": {
@@ -91,7 +120,10 @@
       "name": "Charger (pré-validé consensus)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1220, 180]
+      "position": [
+        1220,
+        180
+      ]
     },
     {
       "parameters": {
@@ -104,16 +136,106 @@
       "name": "File de validation humaine",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1220, 420]
+      "position": [
+        1220,
+        420
+      ]
     }
   ],
   "connections": {
-    "Déclencheur manuel (nouveau document)": { "main": [[ { "node": "Préparer tâche d'extraction", "type": "main", "index": 0 } ]] },
-    "Préparer tâche d'extraction": { "main": [[ { "node": "Modèle A (OpenAI)", "type": "main", "index": 0 }, { "node": "Modèle B (Anthropic)", "type": "main", "index": 0 }, { "node": "Modèle C (Google)", "type": "main", "index": 0 } ]] },
-    "Modèle A (OpenAI)": { "main": [[ { "node": "Contrôle de consistance", "type": "main", "index": 0 } ]] },
-    "Modèle B (Anthropic)": { "main": [[ { "node": "Contrôle de consistance", "type": "main", "index": 0 } ]] },
-    "Modèle C (Google)": { "main": [[ { "node": "Contrôle de consistance", "type": "main", "index": 0 } ]] },
-    "Contrôle de consistance": { "main": [[ { "node": "Consensus unanime ?", "type": "main", "index": 0 } ]] },
-    "Consensus unanime ?": { "main": [ [ { "node": "Charger (pré-validé consensus)", "type": "main", "index": 0 } ], [ { "node": "File de validation humaine", "type": "main", "index": 0 } ] ] }
+    "Déclencheur manuel (nouveau document)": {
+      "main": [
+        [
+          {
+            "node": "Préparer tâche d'extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer tâche d'extraction": {
+      "main": [
+        [
+          {
+            "node": "Modèle A (OpenAI)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Modèle B (Anthropic)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Modèle C (Google)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle A (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Contrôle de consistance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle B (Anthropic)": {
+      "main": [
+        [
+          {
+            "node": "Contrôle de consistance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle C (Google)": {
+      "main": [
+        [
+          {
+            "node": "Contrôle de consistance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contrôle de consistance": {
+      "main": [
+        [
+          {
+            "node": "Consensus unanime ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consensus unanime ?": {
+      "main": [
+        [
+          {
+            "node": "Charger (pré-validé consensus)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File de validation humaine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   }
 }

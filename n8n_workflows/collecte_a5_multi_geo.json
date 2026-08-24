@@ -1,4 +1,5 @@
 {
+  "id": "collecteA5MultiGeoV0",
   "name": "Veille - Collecte A5 multi-zones (Eurostat, déclinaison géographique)",
   "meta": {
     "description": "Déclinaison géographique de l'indicateur A5 : production industrielle automobile (NACE C29) pour l'UE27 et les principaux pays producteurs. Répond au besoin exprimé en séance 3 — « le potentiel du marché dans les différentes régions » — que la collecte agrégée ne servait pas. Même chaîne que le pilote : dépôt brut AVANT toute écriture en base, contrôles déterministes, aucune intervention de modèle de langage."

@@ -1,0 +1,231 @@
+{
+  "id": "tedEnrichiV1",
+  "name": "Veille - Enrichissement des avis TED (étage 2)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "déclencheur-manuel",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual','B','en_cours','Enrichissement TED') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "id": "ouvrir-le-run",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Seules les liaisons QUALIFIÉES collectent : la règle du § 10.4 est\n-- exercée par la requête, pas seulement déclarée au référentiel.\nSELECT flux_id, sector_code, parametres\nFROM flux_sources\nWHERE famille = 'marches_publics' AND statut = 'actif'\nORDER BY flux_id;",
+        "options": {}
+      },
+      "id": "lire-les-flux-actifs",
+      "name": "Lire les flux actifs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Une requête par flux de marchés publics ACTIF.\n//\n// Le filtrage sur `statut = 'actif'` n'est pas décoratif : la règle du § 10.4\n// veut qu'aucune liaison ne collecte sans qualification humaine nominative, et\n// jusqu'au 24.08 aucun code ne lisait ce statut. Il est lu ici.\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst JOURS = 60;   // un appel d'offres court dure rarement plus de deux mois\n\nconst CHAMPS = [\"publication-number\",\"notice-title\",\"publication-date\",\"notice-type\",\n  \"buyer-name\",\"buyer-country\",\"buyer-city\",\"buyer-email\",\"buyer-internet-address\",\n  \"deadline-receipt-tender-date-lot\",\"estimated-value-lot\",\"estimated-value-cur-lot\",\n  \"classification-cpv\",\"contract-nature\"];\n\nconst aaaammjj = d => '' + d.getUTCFullYear()\n  + String(d.getUTCMonth()+1).padStart(2,'0') + String(d.getUTCDate()).padStart(2,'0');\nconst fin = new Date();\nconst debut = new Date(fin.getTime() - JOURS*86400000);\n\nconst sorties = [];\nfor (const item of $input.all()) {\n  const f = item.json;\n  const params = typeof f.parametres === 'string' ? JSON.parse(f.parametres) : (f.parametres ?? {});\n  const cpv = params.cpv;\n  if (!cpv) continue;\n  sorties.push({ json: {\n    run_id: runId, flux_id: f.flux_id, sector_code: f.sector_code, cpv,\n    corps: { query: `classification-cpv IN (${cpv}) AND publication-date >= ${aaaammjj(debut)} `\n                  + `AND publication-date <= ${aaaammjj(fin)}`,\n             limit: 250, fields: CHAMPS }\n  }});\n}\nif (!sorties.length) throw new Error(\"aucun flux de marchés publics actif — vérifier flux_sources.statut\");\nreturn sorties;"
+      },
+      "id": "préparer-les-requêtes",
+      "name": "Préparer les requêtes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ted.europa.eu/v3/notices/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.corps) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "interroger-ted",
+      "name": "Interroger TED",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mise à plat des avis, un item de sortie par avis.\n//\n// Mode GLOBAL et non « une fois par item » : une réponse de TED porte jusqu'à\n// 250 avis, et un nœud en mode par-item doit rendre exactement un objet. C'est\n// la cause de l'échec constaté au premier essai (« A 'json' property isn't an\n// object »). On itère donc soi-même, en réappariant chaque réponse à la requête\n// qui l'a produite par `pairedItem` — jamais par position, l'ordre d'arrivée\n// des appels HTTP n'étant pas garanti.\n//\n// TED rend beaucoup de champs en DICTIONNAIRE DE LANGUES ou en liste : le titre\n// arrive sous {fra: \"...\", eng: \"...\"}, l'acheteur parfois en tableau. `txt`\n// déplie cela dans un ordre de préférence déclaré, français d'abord — sans quoi\n// le tableau de bord afficherait des objets JSON.\nfunction txt(v, langues = ['fra','eng','deu','mul']) {\n  if (v === null || v === undefined) return null;\n  if (typeof v === 'string') return v;\n  if (Array.isArray(v)) return v.length ? txt(v[0], langues) : null;\n  if (typeof v === 'object') {\n    for (const lg of langues) if (v[lg]) return txt(v[lg], langues);\n    for (const x of Object.values(v)) { const r = txt(x, langues); if (r) return r; }\n  }\n  return String(v);\n}\nconst dateDe = v => { const s = txt(v); return s && s.length >= 10 ? s.slice(0,10) : null; };\nconst nombre = v => { const n = parseFloat(txt(v)); return Number.isFinite(n) ? n : null; };\n\nconst sorties = [];\nconst lignes = $input.all();\nfor (let i = 0; i < lignes.length; i++) {\n  const rep = lignes[i].json;\n  const t = $('Préparer les requêtes').itemMatching(i).json;\n  for (const a of (rep.notices ?? [])) {\n    const num = a['publication-number'];\n    if (!num) continue;\n    const ntype = txt(a['notice-type']) || '';\n    // cn-* = appel à candidature ; can-* = avis d'ATTRIBUTION, déjà décidé.\n    // La distinction fait tout l'écran Actions : proposer un marché attribué\n    // ferait perdre son temps au décideur.\n    const ouvert = ntype.startsWith('cn');\n    let cpvs = a['classification-cpv'];\n    cpvs = Array.isArray(cpvs) ? [...new Set(cpvs.map(String))].sort() : null;\n    sorties.push({ json: {\n      publication_number: num, flux_id: t.flux_id, sector_code: t.sector_code,\n      notice_type: ntype, est_appel_ouvert: ouvert,\n      date_publication: dateDe(a['publication-date']),\n      date_limite: dateDe(a['deadline-receipt-tender-date-lot']),\n      titre: (txt(a['notice-title']) || '').slice(0, 600),\n      acheteur: txt(a['buyer-name']), acheteur_pays: txt(a['buyer-country']),\n      acheteur_ville: txt(a['buyer-city']), acheteur_courriel: txt(a['buyer-email']),\n      acheteur_site: txt(a['buyer-internet-address']),\n      valeur_estimee: nombre(a['estimated-value-lot']),\n      devise: txt(a['estimated-value-cur-lot']),\n      cpv: cpvs ? '{' + cpvs.join(',') + '}' : null,\n      nature_contrat: txt(a['contract-nature']),\n      url: 'https://ted.europa.eu/fr/notice/-/detail/' + num,\n      raw_ref: 'run ' + t.run_id + ' · ' + t.flux_id + ' · CPV ' + t.cpv,\n      _flux: t.flux_id, _total_disponible: rep.totalNoticeCount ?? null\n    }});\n  }\n}\nif (!sorties.length) throw new Error('aucun avis rendu par TED — requête ou fenêtre à vérifier');\nreturn sorties;"
+      },
+      "id": "mettre-à-plat-les-avis",
+      "name": "Mettre à plat les avis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ted_avis (publication_number, item_id, flux_id, sector_code, notice_type,\n  est_appel_ouvert, date_publication, date_limite, titre, acheteur, acheteur_pays,\n  acheteur_ville, acheteur_courriel, acheteur_site, valeur_estimee, devise, cpv,\n  nature_contrat, url, raw_ref)\nVALUES ($1,\n  -- Rattachement à l'item de flux déjà collecté, s'il existe : les deux chaînes\n  -- voient le même avis, l'une pour la liste actionnable, l'autre pour le comptage.\n  (SELECT item_id FROM flux_items WHERE titre LIKE '[TED ' || $1 || ']%' LIMIT 1),\n  $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::text[],$17,$18,$19)\nON CONFLICT (publication_number) DO UPDATE SET\n  notice_type = EXCLUDED.notice_type,\n  est_appel_ouvert = EXCLUDED.est_appel_ouvert,\n  date_limite = EXCLUDED.date_limite,\n  acheteur_courriel = EXCLUDED.acheteur_courriel,\n  valeur_estimee = EXCLUDED.valeur_estimee,\n  collecte_le = now()\nRETURNING publication_number;",
+        "options": {
+          "queryReplacement": "={{ [$json.publication_number, $json.flux_id, $json.sector_code, $json.notice_type, $json.est_appel_ouvert, $json.date_publication, $json.date_limite, $json.titre, $json.acheteur, $json.acheteur_pays, $json.acheteur_ville, $json.acheteur_courriel, $json.acheteur_site, $json.valeur_estimee, $json.devise, $json.cpv, $json.nature_contrat, $json.url, $json.raw_ref] }}"
+        }
+      },
+      "id": "écrire-les-avis",
+      "name": "Écrire les avis",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status = CASE WHEN $2::int = 0 THEN 'echec' WHEN $4::int > 0 THEN 'partiel' ELSE 'ok' END, closed_at = now(), note = $3 WHERE run_id = $1 RETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ (() => { const ecrits = $('Écrire les avis').all().length; const flux = [...new Set($('Mettre à plat les avis').all().map(x => x.json._flux))]; const note = 'Enrichissement TED — ' + ecrits + ' avis écrits sur ' + flux.length + ' flux actif(s) ' + JSON.stringify(flux) + ', fenêtre 60 jours.'; return [ $('Ouvrir le run').first().json.run_id, ecrits, note, 0 ]; })() }}"
+        }
+      },
+      "id": "clôturer-le-run",
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1400,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Lire les flux actifs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les flux actifs": {
+      "main": [
+        [
+          {
+            "node": "Préparer les requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les requêtes": {
+      "main": [
+        [
+          {
+            "node": "Interroger TED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interroger TED": {
+      "main": [
+        [
+          {
+            "node": "Mettre à plat les avis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mettre à plat les avis": {
+      "main": [
+        [
+          {
+            "node": "Écrire les avis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire les avis": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

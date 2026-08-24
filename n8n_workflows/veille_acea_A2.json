@@ -1,0 +1,259 @@
+{
+  "id": "veilleAceaV1",
+  "name": "Veille - Détection du communiqué ACEA (composite A2)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "déclencheur-manuel",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual','B','en_cours','Veille ACEA') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "id": "ouvrir-le-run",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Détermination du communiqué attendu.\n//\n// Le communiqué publié au mois M porte sur le mois M−1 : on vise donc toujours\n// le mois révolu, jamais le mois courant.\n//\n// CONFORMITÉ, vérifiée le 23.08.2026 sur le fichier robots.txt de la source :\n// l'agent générique « * » est autorisé, et plusieurs robots d'indexation de\n// modèles y sont nommément interdits. Le dispositif s'annonce donc sous un\n// agent propre, à usage académique déclaré, et ne se fait pas passer pour un\n// navigateur. Il ne relève d'aucune des interdictions nominatives.\nconst MOIS_EN = ['January','February','March','April','May','June',\n                 'July','August','September','October','November','December'];\nconst auj = new Date();\nconst premier = new Date(Date.UTC(auj.getUTCFullYear(), auj.getUTCMonth(), 1));\nconst precedent = new Date(premier.getTime() - 86400000);\nconst annee = precedent.getUTCFullYear();\nconst mois = precedent.getUTCMonth();          // 0-11\nconst periode = annee + '-' + String(mois + 1).padStart(2, '0');\nreturn [{ json: {\n  run_id: $('Ouvrir le run').first().json.run_id,\n  periode,\n  url: 'https://www.acea.auto/files/Press_release_car_registrations_'\n       + MOIS_EN[mois] + '_' + annee + '.pdf'\n} }];"
+      },
+      "id": "cibler-le-communiqué-attendu",
+      "name": "Cibler le communiqué attendu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "veille-TB-HEG-Arc/1.0 (travail de bachelor, HEG Arc, usage academique et non commercial)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "sonder-le-document",
+      "name": "Sonder le document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Le communiqué est-il paru ?\n//\n// La détection ne fait qu'une chose : constater qu'un document EXISTE. Elle ne\n// l'extrait pas, ne l'interprète pas, et n'écrit aucune valeur au registre —\n// elle inscrit une entrée en FILE DE VÉRIFICATION, au statut « a_verifier ».\n// L'inscription au registre reste conditionnée à la chaîne composite\n// multi-modèles ET à la validation humaine (§ 10.4). Un document détecté n'est\n// pas un document lu.\nconst t = $('Cibler le communiqué attendu').first().json;\nconst r = $json;\nconst code = r.statusCode ?? (r.error && r.error.httpCode) ?? 0;\nconst type = String((r.headers && (r.headers['content-type'] || r.headers['Content-Type'])) || '');\nconst dispo = String(code) === '200' && /pdf/i.test(type);\nreturn [{ json: { ...t, disponible: dispo, code_http: String(code), type_contenu: type.slice(0, 60) } }];"
+      },
+      "id": "décider-de-linscription",
+      "name": "Décider de l'inscription",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d1",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.disponible }}"
+            }
+          ]
+        }
+      },
+      "id": "communiqué-disponible-?",
+      "name": "Communiqué disponible ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO composite_queue (indicator_id, period, geo, source_doc, statut, note)\nVALUES ('A2', $1, 'EU27', $2, 'a_verifier',\n        'Détecté par le workflow de veille ACEA le ' || CURRENT_DATE ||\n        '. Document joignable au moment de l''inscription. VÉRIFICATION HUMAINE REQUISE avant extraction.')\nON CONFLICT (indicator_id, period, source_doc) DO NOTHING\nRETURNING doc_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.periode, $json.url] }}"
+        }
+      },
+      "id": "inscrire-en-file-de-vérification",
+      "name": "Inscrire en file de vérification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1220,
+        -110
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status='ok', closed_at=now(), note=$3 WHERE run_id=$1 RETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ (() => { const t = $('Décider de l\\'inscription').first().json; /* Le nœud d'inscription n'est PAS exécuté quand le communiqué n'est pas paru : le référencer sans précaution fait échouer la clôture et le run reste ouvert. */ let inscrits = 0; try { inscrits = $('Inscrire en file de vérification').all().length; } catch (e) { inscrits = 0; } const note = t.disponible ? ('Veille ACEA — communiqué ' + t.periode + ' DISPONIBLE, ' + inscrits + ' inscription(s) en file de vérification (statut a_verifier). Vérification humaine requise avant extraction.') : ('Veille ACEA — communiqué ' + t.periode + ' pas encore publié (HTTP ' + t.code_http + '). Rien à faire ; relancer le workflow demain.'); return [ $('Ouvrir le run').first().json.run_id, 1, note, 0 ]; })() }}"
+        }
+      },
+      "id": "clôturer-le-run",
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Cibler le communiqué attendu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cibler le communiqué attendu": {
+      "main": [
+        [
+          {
+            "node": "Sonder le document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sonder le document": {
+      "main": [
+        [
+          {
+            "node": "Décider de l'inscription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Décider de l'inscription": {
+      "main": [
+        [
+          {
+            "node": "Communiqué disponible ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Communiqué disponible ?": {
+      "main": [
+        [
+          {
+            "node": "Inscrire en file de vérification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inscrire en file de vérification": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

@@ -23,6 +23,34 @@ DOSSIER = RACINE / "n8n_workflows"
 # État DÉCLARÉ, parce qu'il n'est pas lisible dans le fichier. Un JSON ne dit
 # pas s'il a jamais tourné : l'affirmer sans le savoir serait surdéclarer.
 ETATS = {
+    "collecte_flux.json": (
+        "En service", "Collecte des flux de l'étage 2",
+        "Quatre familles en un seul workflow — avis de marchés publics, dépêches, actes "
+        "réglementaires, fils de syndication. Porté depuis un script le 25.08.2026."),
+    "collecte_ted_enrichi.json": (
+        "En service", "Enrichissement des avis de marchés publics",
+        "Quatorze champs par avis, dont l'échéance de remise, la valeur estimée et le contact "
+        "acheteur. Alimente l'écran Actions. Porté depuis un script le 25.08.2026."),
+    "triage_ia_flux.json": (
+        "En service", "Triage assisté par IA des items de flux",
+        "Deux doctrines coexistantes — « événement » et « signal » —, l'écart entre elles étant "
+        "lui-même une mesure. Porté depuis un script le 25.08.2026."),
+    "lecture_decision_ted.json": (
+        "En service", "Lecture décisionnelle des marchés publics",
+        "Profil métier déclaré en clair, repris mot pour mot du script qu'il remplace : sa "
+        "sensibilité est mesurée au § 11.8 et toute retouche invaliderait cette mesure."),
+    "collecte_fh_horlogerie.json": (
+        "En service", "Collecteur de la Fédération horlogère (PDF tabulaire)",
+        "Le nœud de lecture PDF ne préservant pas l'alignement des colonnes, l'analyse se fait "
+        "en flux de jetons. Porté depuis un script le 25.08.2026."),
+    "veille_acea_A2.json": (
+        "En service", "Détection du communiqué ACEA",
+        "Constate qu'un document existe et l'inscrit en file de VÉRIFICATION : il n'extrait rien "
+        "et n'écrit aucune valeur. Porté depuis un script le 25.08.2026."),
+    "attribution_ancree_medical.json": (
+        "Démonstration, hors production", "Attribution ancrée (§ 12.3)",
+        "Écrit dans le schéma de bac à sable ; ses sorties n'atteignent la restitution que "
+        "validées, et sous une mention explicite."),
     "collecte_generique.json": (
         "En service", "Collecteur générique piloté par les liaisons du référentiel",
         "Le collecteur principal : il lit `source_bindings` et interroge chaque source active. "

@@ -1,4 +1,5 @@
 {
+  "id": "collecteM2V0",
   "name": "Veille - Collecte M2 (Eurostat, production instruments médicaux UE)",
   "meta": {
     "description": "Deuxième indicateur hard data instrumenté : M2, production de l'industrie des instruments médicaux UE (NACE C32.5, trimestriel). Réutilise l'adaptateur Eurostat du pilote A5 — même API, même décodage JSON-stat, mêmes contrôles — avec trois paramètres changés : jeu de données trimestriel, code NACE, identifiant d'indicateur. C'est la démonstration minimale de la réutilisabilité de l'adaptateur avant sa généralisation en descripteur (§ 10.6)."

@@ -1,0 +1,257 @@
+{
+  "id": "collecteFhV1",
+  "name": "Veille - Collecteur Fédération horlogère (PDF tabulaire)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "déclencheur-manuel",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual','B','en_cours','Collecteur FH — exportations horlogères') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "id": "ouvrir-le-run",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.fhs.swiss/fre/statistics.html",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "lire-la-page-d'index",
+      "name": "Lire la page d'index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Résolution du lien du document depuis la page d'index.\n//\n// Le nom du fichier change à chaque parution (histo_elec-meca_260707_f.pdf pour\n// juillet 2026) : la liaison déclare la page STABLE et le motif du lien. Même\n// principe que le connecteur de classeur indexé, et même raison — reconstruire\n// l'URL par calcul de date supposerait de connaître la convention de nommage du\n// producteur, qui n'est pas documentée et a déjà changé.\n//\n// L'URL résolue est consignée : elle fait partie de la trace d'audit du run.\nconst page = $json.data ?? $json.body ?? '';\nconst m = /(\\/scripts\\/getstat\\.php\\?file=histo_elec-meca_(\\d{6})_f\\.pdf)/.exec(String(page));\nif (!m) throw new Error(\"lien histo_elec-meca introuvable sur la page d'index — structure de la page modifiée, à instruire\");\nreturn [{ json: {\n  url_document: 'https://www.fhs.swiss' + m[1].replace(/&amp;/g, '&'),\n  millesime: m[2]\n} }];"
+      },
+      "id": "résoudre-le-lien-du-document",
+      "name": "Résoudre le lien du document",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url_document }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "télécharger-le-document",
+      "name": "Télécharger le document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "data",
+        "options": {}
+      },
+      "id": "lire-le-pdf",
+      "name": "Lire le PDF",
+      "type": "n8n-nodes-base.readPDF",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ANALYSE EN FLUX DE JETONS, et non en colonnes.\n//\n// POURQUOI. Le nœud de lecture PDF ne préserve pas l'alignement visuel du\n// document : les six valeurs d'un mois se retrouvent réparties sur plusieurs\n// lignes de sortie. Vérifié en réponse réelle le 25.08.2026 — un découpage par\n// lignes ne rend que deux ou trois valeurs sur six. Mais les nombres restent\n// dans le BON ORDRE. On lit donc le document comme une suite de jetons : dès\n// qu'un libellé de mois apparaît, les six nombres qui suivent sont ses colonnes.\n//\n// C'est ce qui permet de se passer d'un outil externe d'extraction et de tout\n// tenir dans l'orchestrateur.\nconst runId = $('Ouvrir le run').first().json.run_id;\nconst url = $('Résoudre le lien du document').first().json.url_document;\nconst t = ($json.text || '').replace(/[\\r\\n]+/g, ' ');\n\n// Le nœud rend un texte mal décodé (« fÃ©v » pour « fév ») : les deux graphies\n// sont acceptées plutôt que de corriger l'encodage en amont, ce qui serait\n// fragile si le producteur changeait de jeu de caractères.\nconst MOIS = { jan:'01', 'fÃ©v':'02', 'fév':'02', fev:'02', mar:'03', avr:'04',\n               mai:'05', jun:'06', jui:'07', aou:'08', 'aoÃ»':'08', 'aoû':'08',\n               sep:'09', oct:'10', nov:'11', 'dÃ©c':'12', 'déc':'12', dec:'12' };\n\n// Ordre des colonnes du tableau, vérifié par le contrôle de cohérence plus bas.\nconst COLONNES = ['total_pieces','total_chf','elec_pieces','elec_chf','meca_pieces','meca_chf'];\n// Ce que chaque indicateur prélève.\nconst PLAN = { H7: 'total_chf', H8: 'meca_chf', H9: 'meca_pieces' };\n\nconst jetons = t.split(/\\s+/).filter(Boolean);\nconst nombre = s => {\n  const n = parseFloat(String(s).replace(/['’]/g, '').replace(',', '.'));\n  return Number.isFinite(n) ? n : null;\n};\n\nconst lignes = {};\nconst incidents = [];\nfor (let i = 0; i < jetons.length; i++) {\n  const mois = MOIS[jetons[i]];\n  if (!mois) continue;\n  const an = jetons[i + 1];\n  if (!/^\\d{2}$/.test(an || '')) continue;\n  const vals = [];\n  let j = i + 2;\n  while (j < jetons.length && vals.length < COLONNES.length) {\n    const v = nombre(jetons[j]);\n    if (v === null) break;\n    vals.push(v); j++;\n  }\n  if (vals.length === COLONNES.length) {\n    lignes[`20${an}-${mois}`] = Object.fromEntries(COLONNES.map((c, k) => [c, vals[k]]));\n  } else {\n    incidents.push(`${jetons[i]} ${an} : ${vals.length} colonne(s) lue(s) sur ${COLONNES.length}`);\n  }\n  i = j - 1;\n}\n\nconst cles = Object.keys(lignes).sort();\nif (cles.length === 0) throw new Error('aucune ligne mensuelle extraite — structure du document modifiée, à instruire');\n\n// CONTRÔLE DE COHÉRENCE AVANT ÉCRITURE, et non après. L'ordre des colonnes est\n// une HYPOTHÈSE sur le document : on la teste. Électroniques + mécaniques\n// doivent reconstituer le total des montres-bracelets. Un écart important\n// signale que les colonnes ont bougé — et l'écriture est alors refusée.\nlet pire = 0, pireMois = null, somme = 0, n = 0;\nfor (const k of cles) {\n  const v = lignes[k];\n  if (!(v.total_chf > 0)) continue;\n  const e = Math.abs((v.elec_chf + v.meca_chf) - v.total_chf) / v.total_chf * 100;\n  if (e > pire) { pire = e; pireMois = k; }\n  somme += e; n++;\n}\nconst moyen = n ? somme / n : 0;\nconst ok = pire < 8;\nconst controle = `écart élec+méca contre total : moyen ${moyen.toFixed(2)} %, maximum ${pire.toFixed(2)} %`\n  + (pireMois ? ` (${pireMois})` : '') + ` — ${ok ? 'ordre des colonnes confirmé' : 'ORDRE DES COLONNES SUSPECT'}`;\nif (!ok) throw new Error('écriture refusée — ' + controle);\n\nconst sorties = [];\nfor (const k of cles) {\n  for (const [code, colonne] of Object.entries(PLAN)) {\n    const v = lignes[k][colonne];\n    if (v === undefined || v === null) continue;\n    sorties.push({ json: { indicator_id: code, run_id: runId, period: k,\n                           geo: 'CH', value: v, raw_ref: url,\n                           _bilan: { mois: cles.length, premier: cles[0], dernier: cles[cles.length-1],\n                                     controle, incidents, indicateurs: Object.keys(PLAN) } } });\n  }\n}\nreturn sorties;"
+      },
+      "id": "analyser-le-tableau",
+      "name": "Analyser le tableau",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO indicator_values (indicator_id, run_id, period, geo, value, obtained_by, validation_status, raw_ref)\nVALUES ($1,$2,$3,$4,$5,'etl','valide_source',$6)\nRETURNING value_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.value, $json.raw_ref] }}"
+        }
+      },
+      "id": "écrire-au-registre",
+      "name": "Écrire au registre",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1400,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status = CASE WHEN $2::int = 0 THEN 'echec' WHEN $4::int > 0 THEN 'partiel' ELSE 'ok' END, closed_at = now(), note = $3 WHERE run_id = $1 RETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ (() => { const b = $('Analyser le tableau').first().json._bilan ?? {}; const ecrites = $('Écrire au registre').all().length; const inc = b.incidents ?? []; const note = 'Collecteur FH — ' + ecrites + ' observation(s) sur ' + (b.indicateurs||[]).length + ' indicateur(s) ' + JSON.stringify(b.indicateurs||[]) + ', ' + (b.premier||'?') + ' à ' + (b.dernier||'?') + '. ' + (b.controle||'') + '.' + (inc.length ? ' Incidents : ' + inc.join(' | ') + '.' : ''); return [ $('Ouvrir le run').first().json.run_id, ecrites, note, inc.length ]; })() }}"
+        }
+      },
+      "id": "clôturer-le-run",
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1600,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Lire la page d'index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire la page d'index": {
+      "main": [
+        [
+          {
+            "node": "Résoudre le lien du document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Résoudre le lien du document": {
+      "main": [
+        [
+          {
+            "node": "Télécharger le document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Télécharger le document": {
+      "main": [
+        [
+          {
+            "node": "Lire le PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le PDF": {
+      "main": [
+        [
+          {
+            "node": "Analyser le tableau",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyser le tableau": {
+      "main": [
+        [
+          {
+            "node": "Écrire au registre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire au registre": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

@@ -1,12 +1,25 @@
 {
+  "id": "collecteHardDataV0",
   "name": "Veille - Collecte hard data (ETL)",
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 6 1 * *" }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 1 * *"
+            }
+          ]
+        }
+      },
       "name": "Déclencheur mensuel",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 300]
+      "position": [
+        0,
+        300
+      ]
     },
     {
       "parameters": {
@@ -16,7 +29,10 @@
       "name": "API Banque mondiale",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 100]
+      "position": [
+        260,
+        100
+      ]
     },
     {
       "parameters": {
@@ -26,7 +42,10 @@
       "name": "API UN Comtrade (SH8708)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 300]
+      "position": [
+        260,
+        300
+      ]
     },
     {
       "parameters": {
@@ -36,7 +55,10 @@
       "name": "API Eurostat (NACE C32.5)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 500]
+      "position": [
+        260,
+        500
+      ]
     },
     {
       "parameters": {
@@ -45,7 +67,10 @@
       "name": "Normaliser (codes pays, périodes, unités)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [520, 300]
+      "position": [
+        520,
+        300
+      ]
     },
     {
       "parameters": {
@@ -54,7 +79,10 @@
       "name": "Contrôles qualité",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [760, 300]
+      "position": [
+        760,
+        300
+      ]
     },
     {
       "parameters": {
@@ -65,7 +93,10 @@
       "name": "Écrire en zone de dépôt brut",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [1000, 300]
+      "position": [
+        1000,
+        300
+      ]
     },
     {
       "parameters": {
@@ -78,16 +109,99 @@
       "name": "Charger en base consolidée",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1240, 300]
+      "position": [
+        1240,
+        300
+      ]
     }
   ],
   "connections": {
-    "Déclencheur mensuel": { "main": [[ { "node": "API Banque mondiale", "type": "main", "index": 0 }, { "node": "API UN Comtrade (SH8708)", "type": "main", "index": 0 }, { "node": "API Eurostat (NACE C32.5)", "type": "main", "index": 0 } ]] },
-    "API Banque mondiale": { "main": [[ { "node": "Normaliser (codes pays, périodes, unités)", "type": "main", "index": 0 } ]] },
-    "API UN Comtrade (SH8708)": { "main": [[ { "node": "Normaliser (codes pays, périodes, unités)", "type": "main", "index": 0 } ]] },
-    "API Eurostat (NACE C32.5)": { "main": [[ { "node": "Normaliser (codes pays, périodes, unités)", "type": "main", "index": 0 } ]] },
-    "Normaliser (codes pays, périodes, unités)": { "main": [[ { "node": "Contrôles qualité", "type": "main", "index": 0 } ]] },
-    "Contrôles qualité": { "main": [[ { "node": "Écrire en zone de dépôt brut", "type": "main", "index": 0 } ]] },
-    "Écrire en zone de dépôt brut": { "main": [[ { "node": "Charger en base consolidée", "type": "main", "index": 0 } ]] }
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "API Banque mondiale",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "API UN Comtrade (SH8708)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "API Eurostat (NACE C32.5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Banque mondiale": {
+      "main": [
+        [
+          {
+            "node": "Normaliser (codes pays, périodes, unités)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API UN Comtrade (SH8708)": {
+      "main": [
+        [
+          {
+            "node": "Normaliser (codes pays, périodes, unités)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Eurostat (NACE C32.5)": {
+      "main": [
+        [
+          {
+            "node": "Normaliser (codes pays, périodes, unités)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser (codes pays, périodes, unités)": {
+      "main": [
+        [
+          {
+            "node": "Contrôles qualité",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contrôles qualité": {
+      "main": [
+        [
+          {
+            "node": "Écrire en zone de dépôt brut",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire en zone de dépôt brut": {
+      "main": [
+        [
+          {
+            "node": "Charger en base consolidée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   }
 }
