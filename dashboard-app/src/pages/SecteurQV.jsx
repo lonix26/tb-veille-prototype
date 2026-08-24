@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useDonnees, nb, pct, clsVar, dateCH, nomZone, estAgregat,
          BadgeStatut, MarkdownLeger, LienSource } from "../api.jsx";
 import Chart from "../Chart.jsx";
+import { Regle } from "../Mini.jsx";
+import { etatMarche, directionLongue, redondances, avecArticle } from "../phrases.jsx";
 
 // =====================================================================
 // ÉCRAN 2 — Secteur : la question avant la courbe.
@@ -605,32 +607,53 @@ export default function SecteurQV() {
   const questionsDuSecteur = [...new Set(instanciation.map(q => q.watch_question_code))].sort();
   const signaux = (G?.signaux || []).filter(s => s.sector_code === code);
 
+  // L'état du marché en mots — même règle et mêmes bornes que l'écran d'accueil,
+  // pour qu'un lecteur qui passe de l'un à l'autre lise la même chose.
+  const score = (secteur?.score_sante === null || secteur?.score_sante === undefined)
+    ? null : Number(secteur.score_sante);
+  const etat = etatMarche(score);
+  const direction = directionLongue(Number(secteur?.tendance_moyenne));
+  const doublons = redondances(D, secteur?.indicateurs || []);
+
   return (
     <div className="page">
-      <div className="topbar">
-        <h1>{libelle}</h1>
-        <div className="meta">
-          {secteur?.etat === "calcule"
-            ? <>santé {secteur.score_sante > 0 ? "+" : ""}{nb(secteur.score_sante, 2)}</>
-            : <>santé : base insuffisante</>}
+      <header className="ouverture">
+        <div>
+          <p className="ouv-date">
+            {questionsDuSecteur.length > 1
+              ? `Marché suivi · ${questionsDuSecteur.length} questions de veille`
+              : "Socle commun aux quatre marchés"}
+          </p>
+          <h1 className="ouv-titre">{libelle}</h1>
         </div>
-      </div>
+        <div className="ouv-etat" style={{ minWidth: 190 }}>
+          <span className={"marche-etat t-" + etat.ton} style={{ fontSize: 19 }}>{etat.mot}</span>
+          <Regle score={score} ton={etat.ton} />
+        </div>
+      </header>
 
-      {/* Texte piloté par les données : le socle transversal n'a qu'une question
-          (QV0, attribution), les quatre marchés en ont cinq. Écrire « les cinq
-          questions » en dur donnait un bandeau faux sur le socle. */}
-      <p className="lecture">
+      <p className="brief">
+        {etat.phrase}{direction ? `, ${direction}` : ""}.{" "}
         {questionsDuSecteur.length > 1 ? (
-          <>Les {questionsDuSecteur.length} questions de veille structurent la lecture. Sous
-          chacune : ce que l'on peut en dire, puis les séries et les signaux qui l'établissent.
-          Une question sans matière reste affichée — savoir ce qu'on ne mesure pas fait partie
-          du dispositif.</>
+          <>Ce qui suit répond, question par question, à ce qu'un sous-traitant a besoin de
+          savoir de ce marché. Une question sans matière reste affichée : savoir ce qu'on ne
+          mesure pas fait partie du dispositif.</>
         ) : (
-          <>Le socle transversal ne répond pas aux questions sectorielles : il porte la question
-          d'attribution, qui sert de dénominateur commun aux quatre marchés. Sous elle, les
-          séries qui l'établissent.</>
+          <>Le socle ne répond pas aux questions sectorielles : il porte la question
+          d'attribution, qui sert de dénominateur commun aux quatre marchés.</>
         )}
       </p>
+
+      {doublons.length > 0 && (
+        <div className="carte avert" style={{ marginBottom: 22 }}>
+          <strong>Prudence sur le score de ce marché.</strong>{" "}
+          <em>{doublons[0].nomA}</em> et <em>{doublons[0].nomB}</em> évoluent ensemble
+          (corrélation {nb(Math.abs(doublons[0].r), 2)} sur {doublons[0].n} points communs) :
+          elles mesurent pratiquement la même grandeur, et le score les compte à égalité.
+          Il est donc plus assuré qu'il ne devrait l'être. Les séries elles-mêmes, ci-dessous,
+          ne sont pas en cause — c'est leur moyenne qui l'est.
+        </div>
+      )}
 
       {questionsDuSecteur.map(qv => {
         const inst = instanciation.find(q => q.watch_question_code === qv);

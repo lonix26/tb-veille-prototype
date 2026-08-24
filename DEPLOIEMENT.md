@@ -61,7 +61,31 @@ l'auditabilité que ce travail revendique.
 
 Toute migration **postérieure au 25.08** s'applique normalement par-dessus le socle, à la main.
 
-## 3. Importer les workflows
+## 3. Construire l'interface de restitution
+
+**Étape indispensable, et facile à oublier** : le service `dashboard` sert `dashboard-app/dist`,
+un dossier **exclu du dépôt** (c'est un produit de compilation, pas une source). Sans cette
+étape, nginx répond 200 sur un dossier vide et l'application paraît cassée sans l'être.
+
+```bash
+cd dashboard-app
+npm ci            # ou npm install au premier jet
+npm run build     # produit dashboard-app/dist, servi tel quel par nginx
+cd ..
+```
+
+Puis, une fois l'API de restitution active (étape suivante), vérifier que les huit écrans se
+rendent réellement — un écran qui plante ne se voit qu'en l'ouvrant, et on n'ouvre que celui
+qu'on vient d'écrire :
+
+```bash
+bash dashboard-app/verification/executer.sh
+```
+
+Il rend chaque écran hors navigateur avec les données réelles de l'API et sort en erreur si
+l'un d'eux lève une exception.
+
+## 4. Importer les workflows
 
 ```bash
 for f in n8n_workflows/*.json; do
@@ -76,7 +100,7 @@ docker compose restart n8n        # INDISPENSABLE : sans redémarrage, les webho
 Chaque fichier porte son **identifiant épinglé** : l'import met à jour en place et ne crée pas de
 copie. Sans cela, l'instance accumule des doublons et rien ne dit lequel s'exécute.
 
-## 4. Lancer la chaîne, dans cet ordre
+## 5. Lancer la chaîne, dans cet ordre
 
 L'ordre compte : le triage a besoin des items, la lecture décisionnelle a besoin des avis
 enrichis, le commentaire a besoin des indicateurs.
@@ -104,7 +128,7 @@ done
 > **Piège connu** : `n8n execute` en ligne de commande échoue sur « Task Broker's port 5679 is
 > already in use ». Passer **les deux** variables de port ci-dessus le contourne.
 
-## 5. Vérifier
+## 6. Vérifier
 
 ```sql
 -- Aucun run ne doit rester ouvert ni en échec.

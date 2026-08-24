@@ -8,7 +8,10 @@ export const API_BASE =
   import.meta.env.VITE_API_BASE || "http://localhost:5678/webhook/veille";
 export const API_URL = API_BASE + "/donnees";
 
-const Ctx = createContext(null);
+// Exporté — et pas seulement déclaré — pour que le rendu puisse être éprouvé
+// hors navigateur (voir `verification/rendu.jsx`). Sans cela, un écran ne se
+// teste qu'en l'ouvrant à la main, ce qui n'est pas une vérification.
+export const Ctx = createContext(null);
 
 // La v4 lit QUATRE points de lecture, tous en lecture seule :
 //   /donnees      — la charge utile historique (v2/v3), conservée telle quelle
