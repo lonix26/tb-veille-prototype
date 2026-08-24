@@ -309,3 +309,32 @@ input.filtre:focus{outline:2px solid var(--accent);border-color:transparent}
 /* Indicateur certifié sans observation (écran secteur) */
 .non-collecte{font-size:12px;line-height:1.55;color:var(--encre2);background:#fdf6ec;
   border-left:3px solid var(--ambre);border-radius:0 6px 6px 0;padding:9px 12px;margin:2px 0 10px}
+
+/* Attribution ancrée — démonstration (§ 12.3, écran secteur) */
+.attribution{border:1px solid #cddcf0;background:#f7fafd;border-radius:10px;
+  padding:14px 16px;margin:10px 0 16px}
+.at-tete{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.at-titre{font-weight:700;font-size:13.5px;color:#1b4f91}
+.at-compte{margin-left:auto;font-size:11.5px;color:var(--encre2)}
+.at-principe{font-size:12.5px;line-height:1.6;color:var(--encre2);margin:0 0 10px;
+  border-bottom:1px solid #dde7f4;padding-bottom:10px}
+.at-texte p{font-size:13.5px;line-height:1.65;margin:0 0 9px}
+.ancre{display:inline-block;background:#1b4f91;color:#fff;font-size:10.5px;font-weight:700;
+  border-radius:4px;padding:1px 5px;margin:0 1px;text-decoration:none;vertical-align:1px}
+.ancre:hover{background:#123561}
+.ancre-inconnue{background:var(--rouge);cursor:help}
+.at-pied{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;
+  color:var(--encre2);border-top:1px solid #dde7f4;padding-top:9px;margin-top:4px}
+.at-lien{margin-left:auto;color:#1b4f91;cursor:pointer;text-decoration:underline}
+.at-contexte{margin-top:10px;border-top:1px dashed #cddcf0;padding-top:10px}
+.at-sous{font-size:11.5px;color:var(--encre2);margin-bottom:8px;opacity:.9}
+.at-fait{display:flex;align-items:baseline;gap:8px;font-size:12px;padding:4px 0;
+  border-bottom:1px solid #eaf0f7;opacity:.55}
+.at-fait.cite{opacity:1}
+.at-date{color:var(--encre2);white-space:nowrap;font-size:11px}
+.at-lib{flex:1;line-height:1.45}
+.at-nc{font-size:10.5px;color:var(--encre2);font-style:italic;white-space:nowrap}
+.at-reserve{font-size:11.5px;line-height:1.55;color:var(--encre2);margin:10px 0 0;
+  border-top:1px solid #dde7f4;padding-top:9px}
+.at-h{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+  color:#1b4f91;margin-bottom:2px}

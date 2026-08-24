@@ -101,119 +101,9 @@ function Preuve({ ind, D, navigate }) {
   );
 }
 
-// =====================================================================
-// ATTRIBUTION ANCRÉE — démonstration (§ 12.3), affichée à part du
-// commentaire de production et jamais confondue avec lui.
-//
-// Le principe : le dispositif s'interdit d'attribuer une cause (RI9). La
-// variante autorise l'attribution À CONDITION que le fait invoqué figure
-// dans un contexte factuel fourni au modèle et soit cité par son ancre.
-// L'affirmation ne devient pas plus certaine — elle devient VÉRIFIABLE.
-// D'où l'exigence ici : chaque ancre doit être cliquable jusqu'à sa
-// pièce, sinon l'écran affiche la promesse sans la tenir.
-// =====================================================================
-
-function TexteAncre({ texte, index }) {
-  // Découpe le texte sur les ancres [CTX-146] / [SIG-5] et rend chacune
-  // comme un lien vers la pièce qu'elle désigne.
-  const morceaux = String(texte || "").split(/(\[(?:SIG|CTX)-\d+\])/g);
-  return (
-    <>
-      {morceaux.map((m, i) => {
-        const ancre = /^\[((?:SIG|CTX)-\d+)\]$/.exec(m);
-        if (!ancre) return <span key={i}>{m}</span>;
-        const fait = index[ancre[1]];
-        if (!fait) return <span key={i} className="ancre ancre-inconnue" title="ancre absente du contexte fourni">{m}</span>;
-        const contenu = <>{ancre[1]}</>;
-        return fait.source
-          ? <a key={i} className="ancre" href={fait.source} target="_blank" rel="noopener noreferrer"
-               title={`${fait.date || ""} — ${fait.fait || ""}`}>{contenu}</a>
-          : <span key={i} className="ancre" title={fait.fait || ""}>{contenu}</span>;
-      })}
-    </>
-  );
-}
-
-function AttributionAncree({ bloc }) {
-  const [ouvert, setOuvert] = React.useState(false);
-  const contexte = bloc.contexte_fourni || [];
-  const index = Object.fromEntries(contexte.map(a => [a.ancre, a]));
-  const citees = new Set(bloc.ancres_citees || []);
-  const inutilisees = contexte.filter(a => !citees.has(a.ancre));
-
-  return (
-    <div className="attribution">
-      <div className="at-tete">
-        <span className="etq e-bleu">démonstration — hors production</span>
-        <span className="at-titre">Attribution ancrée</span>
-        <span className="at-compte">{citees.size} ancre{citees.size > 1 ? "s" : ""} citée
-          {citees.size > 1 ? "s" : ""} sur {bloc.ancres_disponibles} disponibles</span>
-      </div>
-
-      <p className="at-principe">
-        Le commentaire ci-dessus s'interdit d'attribuer une cause. Cette variante l'autorise à une
-        condition : le fait invoqué doit figurer dans un contexte de faits <strong>validés ou
-        examinés nominativement</strong>, et être cité. <strong>L'affirmation n'en devient pas plus
-        certaine — elle devient vérifiable.</strong> Chaque ancre ci-dessous ouvre sa pièce.
-      </p>
-
-      <div className="at-texte">
-        {/* Les en-têtes de section sont en gras dans la sortie du modèle. Les
-            effacer avec le reste du balisage collait le titre au corps du texte
-            (« qu'il faut retenir Le marché medtech… ») — on les isole. */}
-        {String(bloc.text || "").split(/\n{2,}/).map((par, i) => {
-          const m = /^\*\*(.+?)\*\*\s*(?:—\s*)?([\s\S]*)$/.exec(par.trim());
-          const titre = m ? m[1].replace(/^\d+\.\s*/, "") : null;
-          const corps = (m ? m[2] : par).replace(/\*\*/g, "").trim();
-          return (
-            <p key={i}>
-              {titre && <strong className="at-h">{titre}</strong>}
-              {corps && <TexteAncre texte={corps} index={index} />}
-            </p>
-          );
-        })}
-      </div>
-
-      <div className="at-pied">
-        <span className="etq e-vert">validé</span>
-        {bloc.validated_by} · {dateCH(bloc.validated_at)} · {bloc.model}
-        <span className="at-lien" onClick={() => setOuvert(o => !o)}>
-          {ouvert ? "masquer le contexte" : `voir les ${contexte.length} faits fournis`}
-        </span>
-      </div>
-
-      {ouvert && (
-        <div className="at-contexte">
-          <div className="at-sous">
-            Ce que le modèle avait sous les yeux. Les {inutilisees.length} faits qu'il n'a pas cités
-            sont indiqués : un contexte non utilisé se voit, il ne se devine pas.
-          </div>
-          {contexte.map(a => (
-            <div key={a.ancre} className={"at-fait" + (citees.has(a.ancre) ? " cite" : "")}>
-              <span className="etq e-gris">{a.ancre}</span>
-              <span className="at-date">{a.date}</span>
-              <span className="at-lib">{a.fait}</span>
-              {a.source && <LienSource href={a.source} />}
-              {!citees.has(a.ancre) && <span className="at-nc">non cité</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <p className="at-reserve">
-        <strong>Portée de la validation</strong> — elle établit que chaque fait cité existe et
-        correspond à ce qui en est dit ; elle n'établit pas qu'il explique le mouvement observé.
-        C'est pourquoi le texte écrit « composante identifiée » et « hypothèse documentée », jamais
-        une cause. La couverture dépend du stock de faits examinés, non du mécanisme : les secteurs
-        sans examens versés au contexte n'affichent rien ici, et c'est un constat, pas une panne.
-      </p>
-    </div>
-  );
-}
-
 export default function SecteurQV() {
   const { code } = useParams();
-  const { D, S, G, AT } = useDonnees();
+  const { D, S, G } = useDonnees();
   const navigate = useNavigate();
   if (!D) return <div className="page"><div className="vide">Chargement…</div></div>;
 
@@ -223,7 +113,6 @@ export default function SecteurQV() {
   const instanciation = (D.instanciation || []).filter(q => q.sector_code === code);
   const couverture = (D.couverture_qv || []).filter(c => c.sector_code === code);
   const commentaire = (D.commentaires || []).find(c => c.sector_code === code);
-  const attribution = ((AT && AT.attribution) || []).find(a => a.sector_code === code);
   // Les questions applicables au secteur, dans l'ordre, telles que déclarées.
   const questionsDuSecteur = [...new Set(instanciation.map(q => q.watch_question_code))].sort();
   const signaux = (G?.signaux || []).filter(s => s.sector_code === code);
@@ -292,7 +181,6 @@ export default function SecteurQV() {
                     </div>
                   </div>
                 )}
-                {qv === "QV1" && attribution && <AttributionAncree bloc={attribution} />}
                 {sigs.length > 0 && (
                   <div className="liste-signaux">
                     {sigs.map(s => (

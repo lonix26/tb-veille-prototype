@@ -23,7 +23,6 @@ export function FournisseurDonnees({ children }) {
   const [signaux, setSignaux] = useState(null);
   const [opportunites, setOpportunites] = useState(null);
   const [actions, setActions] = useState(null);
-  const [attribution, setAttribution] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [erreursV4, setErreursV4] = useState({});
   const [chargement, setChargement] = useState(true);
@@ -55,8 +54,7 @@ export function FournisseurDonnees({ children }) {
       secondaire("/sante", setSante),
       secondaire("/signaux", setSignaux),
       secondaire("/opportunites", setOpportunites),
-      secondaire("/actions", setActions),
-      secondaire("/attribution", setAttribution)
+      secondaire("/actions", setActions)
     ]);
     setChargement(false);
   }, []);
@@ -64,7 +62,7 @@ export function FournisseurDonnees({ children }) {
   useEffect(() => { recharger(); }, [recharger]);
 
   return (
-    <Ctx.Provider value={{ D: donnees, S: sante, G: signaux, O: opportunites, A: actions, AT: attribution,
+    <Ctx.Provider value={{ D: donnees, S: sante, G: signaux, O: opportunites, A: actions,
                            erreur, erreursV4, chargement, misAJour, recharger }}>
       {children}
     </Ctx.Provider>

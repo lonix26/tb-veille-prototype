@@ -315,6 +315,68 @@
         480,
         1120
       ]
+    },
+    {
+      "parameters": {
+        "path": "veille/attribution",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "attr-requête",
+      "name": "Requête attribution ancrée",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1000
+      ],
+      "webhookId": "veille-signaux"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'genere_le', now(),\n  -- DÉMONSTRATION D'ATTRIBUTION ANCRÉE (§ 12.3). Servie SÉPARÉMENT du\n  -- commentaire de production et jamais confondue avec lui : c'est une variante\n  -- expérimentale, elle doit s'annoncer comme telle à l'écran.\n  -- Seules les lignes VALIDÉES humainement sortent d'ici — la règle « rien de\n  -- non validé à l'écran » vaut aussi pour une démonstration, sans quoi le\n  -- caractère expérimental deviendrait une porte dérobée.\n  'attribution', (\n     SELECT coalesce(json_agg(x ORDER BY x.id DESC), '[]'::json)\n     FROM (SELECT a.id, a.sector_code, a.model, a.text, a.ancres_citees,\n                  a.ancres_disponibles, a.validated_by, a.validated_at,\n                  a.note_validation, a.contexte_fourni\n           FROM sandbox.commentaires_attribution a\n           WHERE a.statut = 'valide') x),\n  'en_attente', (SELECT count(*) FROM sandbox.commentaires_attribution\n                  WHERE statut <> 'valide')\n) AS payload;",
+        "options": {}
+      },
+      "id": "attr-lire",
+      "name": "Lire attribution ancrée",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        1000
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "attr-répondre",
+      "name": "Répondre attribution ancrée",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        1000
+      ]
     }
   ],
   "connections": {
@@ -422,6 +484,28 @@
         [
           {
             "node": "Répondre actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requête attribution ancrée": {
+      "main": [
+        [
+          {
+            "node": "Lire attribution ancrée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire attribution ancrée": {
+      "main": [
+        [
+          {
+            "node": "Répondre attribution ancrée",
             "type": "main",
             "index": 0
           }
