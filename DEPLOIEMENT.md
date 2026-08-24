@@ -33,7 +33,7 @@ PostgreSQL exécute lui-même les deux fichiers, dans l'ordre de leur nom.
 | Fichier | Ce qu'il pose |
 |---|---|
 | `db/01_socle.sql` | 22 tables, 31 vues, les déclencheurs et les contraintes métier |
-| `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 27 sources, 43 indicateurs, 73 liaisons dont 71 actives, 16 flux |
+| `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 27 sources, 43 indicateurs, 75 liaisons dont 73 actives, 16 flux |
 
 Une base neuve repart donc dans l'**état qualifié** — pas dans un état par défaut qu'il faudrait
 requalifier source par source. Elle est en revanche **vide d'observations**, et c'est voulu :
@@ -125,10 +125,19 @@ WHERE i.status = 'certifie'
   AND NOT EXISTS (SELECT 1 FROM v_bindings_actifs b WHERE b.indicator_id = i.indicator_id);
 
 -- Liaisons actives à fenêtre FIGÉE : elles rapporteront toujours la même période.
--- Doivent être vides, hors les fichiers d'archive dont l'année ne bouge plus.
+-- Au 25.08.2026, DEUX sont attendues et aucune autre : les liaisons A3 24 et 27
+-- (éditions IEA 2023 et 2024), qui portent des années closes et ne bougeront plus.
+-- Toute autre ligne est une liaison qui a cessé d'avancer sans le dire — c'est
+-- exactement le défaut trouvé le 25.08 sur H1, A3, H2 et M4.
 SELECT binding_id, indicator_id, left(params::text, 70)
 FROM source_bindings
 WHERE statut = 'actif' AND params::text !~ '\{\{' AND params::text ~ '"(year|Jahr)"';
+
+-- Et le contrôle qui compte vraiment : chaque indicateur avance-t-il ?
+-- Une période maximale identique d'un run à l'autre, sur un indicateur dont la
+-- source publie, est le signe d'une fenêtre figée.
+SELECT indicator_id, max(period) AS derniere_periode, max(run_id) AS dernier_run
+FROM indicator_values GROUP BY 1 ORDER BY 1;
 ```
 
 ```bash
