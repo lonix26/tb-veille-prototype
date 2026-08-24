@@ -133,11 +133,24 @@ SELECT binding_id, indicator_id, left(params::text, 70)
 FROM source_bindings
 WHERE statut = 'actif' AND params::text !~ '\{\{' AND params::text ~ '"(year|Jahr)"';
 
--- Et le contrôle qui compte vraiment : chaque indicateur avance-t-il ?
--- Une période maximale identique d'un run à l'autre, sur un indicateur dont la
--- source publie, est le signe d'une fenêtre figée.
-SELECT indicator_id, max(period) AS derniere_periode, max(run_id) AS dernier_run
-FROM indicator_values GROUP BY 1 ORDER BY 1;
+-- LE CONTRÔLE QUI COMPTE VRAIMENT : la chaîne produit-elle tout ce que la base
+-- contient déjà ? Un indicateur dont la chaîne rend une période plus ancienne que
+-- ce qui figure au registre a CESSÉ D'AVANCER — fenêtre figée, liaison non
+-- qualifiée, ou contrôle qualité qui tronque. Aucun de ces cas ne lève d'incident :
+-- c'est ainsi que A5 est resté arrêté à 2020-04 pendant dix jours (§ 12.6).
+-- Remplacer 150 par le premier run de la campagne en cours.
+WITH tout AS (SELECT indicator_id, max(period) p FROM indicator_values GROUP BY 1),
+     chaine AS (SELECT indicator_id, max(period) p FROM indicator_values WHERE run_id >= 150 GROUP BY 1)
+SELECT t.indicator_id, t.p AS jamais_atteint, coalesce(c.p, '—') AS par_la_chaine
+FROM tout t LEFT JOIN chaine c USING (indicator_id)
+WHERE c.indicator_id IS NULL OR c.p < t.p
+ORDER BY 1;
+-- Attendu : A2 (composite, alimenté par composite_queue) et les indicateurs
+-- écartés de la grille. Toute autre ligne est une régression à traiter.
+
+-- Et le décompte de la grille, qui fait foi. `en_grille` = certifiés + à confirmer ;
+-- `ecartes` = indicateurs restés au référentiel mais retirés de la grille.
+SELECT * FROM v_bilan_referentiel;
 ```
 
 ```bash

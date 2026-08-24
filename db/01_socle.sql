@@ -1467,10 +1467,19 @@ CREATE VIEW public.v_bilan_referentiel AS
     count(*) FILTER (WHERE (status = 'certifie'::text)) AS certifies,
     count(*) FILTER (WHERE ((status = 'certifie'::text) AND (category = 'hard'::text))) AS certifies_hard,
     count(*) FILTER (WHERE ((status = 'certifie'::text) AND (category = 'composite'::text))) AS certifies_composite,
-    count(*) FILTER (WHERE (status = 'a_confirmer'::text)) AS a_confirmer
+    count(*) FILTER (WHERE (status = 'a_confirmer'::text)) AS a_confirmer,
+    count(*) FILTER (WHERE (status = ANY (ARRAY['certifie'::text, 'a_confirmer'::text]))) AS en_grille,
+    count(*) FILTER (WHERE (status <> ALL (ARRAY['certifie'::text, 'a_confirmer'::text]))) AS ecartes
    FROM public.indicators
   GROUP BY ROLLUP(sector_code)
   ORDER BY sector_code;
+
+
+--
+-- Name: VIEW v_bilan_referentiel; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_bilan_referentiel IS 'Décompte de la grille, produit par requête et faisant foi (§ 8.4.5). `en_grille` = certifiés + à confirmer, ce que le rapport appelle « la grille ». `ecartes` = indicateurs restés au référentiel mais retirés de la grille, leurs observations étant au registre en ajout seul. `total` = somme des deux.';
 
 
 --
