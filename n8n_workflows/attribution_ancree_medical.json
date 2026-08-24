@@ -1,0 +1,257 @@
+{
+  "id": "attributionAncreeD1",
+  "name": "Veille - Attribution ancrée (démonstration, hors production)",
+  "meta": {
+    "description": "Rédaction déléguée du § 10.4.1 (rang 4), exécutable. Remplace le squelette initial qui parlait à un service loader:8080 inexistant : la présente version lit l'objet compact v_dernier_point (les chiffres par le code — aucune métrique n'est calculée ici ni par le modèle), soumet UN commentaire par secteur à un modèle sous les règles d'interprétation RI0-RI10 (§ 10.4.3), et stocke le résultat en table commentaries au statut a_valider avec la charge exacte soumise (input_payload). Rien n'est diffusé sans validation humaine : le tableau de bord n'affiche que les commentaires validés. Les alertes, elles, sont portées par v_alertes_candidates et la restitution — plus par ce workflow."
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "Déclenchement manuel pour la mise au point — comme les collecteurs. Une cadence mensuelle (après la collecte) pourra être posée une fois le circuit de validation rodé."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual', 'B', 'en_cours', 'Attribution ancrée — DÉMONSTRATION hors production (§ 12.3)') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- DÉMONSTRATION D'ATTRIBUTION ANCRÉE — 24.08.2026. Hors production.\n--\n-- Différence unique avec la charge du commentaire exécutif : l'ajout d'un\n-- bloc « contexte_factuel ». Les métriques, le cadre de veille et la santé\n-- sont lus exactement de la même façon, pour que l'écart observé entre les\n-- deux commentaires soit imputable au contexte et à rien d'autre.\n--\n-- CE QUI ENTRE DANS LE CONTEXTE, ET RIEN D'AUTRE : des faits qui sont passés\n-- par un ACTE HUMAIN NOMINATIF. Les signaux validés (validated_by non nul) et\n-- les items de flux qu'un examen a versés au contexte. Un item non examiné\n-- n'y entre pas — sans quoi on autoriserait le modèle à attribuer une cause\n-- à partir de matière que personne n'a regardée, ce qui serait pire que\n-- l'interdit qu'on lève.\nWITH metriques AS (\n  SELECT d.sector_code,\n         jsonb_agg(jsonb_build_object(\n           'indicateur', d.indicator_id,\n           'libelle', d.indicator_label,\n           'periode', d.period,\n           'zone', d.geo,\n           'valeur', ROUND(d.value::numeric, 2),\n           'unite', d.unit,\n           'latence', i.latence,\n           'sens_favorable', i.sens_favorable,\n           'questions_de_veille', (SELECT string_agg(w.watch_question_code, ',' ORDER BY w.watch_question_code)\n                                     FROM indicator_watch_questions w\n                                    WHERE w.indicator_id = d.indicator_id),\n           'variation_periode_pct', d.variation_periode_pct,\n           'glissement_annuel_pct', d.glissement_annuel_pct,\n           'moyenne_mobile_annuelle', d.moyenne_mobile_annuelle,\n           'ecart_a_la_moyenne_pct', d.ecart_a_la_moyenne_pct,\n           'seuil_materialite_pct', d.seuil_materialite_pct,\n           'statut_validation', d.validation_status,\n           'franchissement', d.franchissement,\n           'completude', d.completude\n         ) ORDER BY d.indicator_id) AS charge\n  FROM v_dernier_point d\n  JOIN indicators i ON i.indicator_id = d.indicator_id\n  WHERE i.geo_reference IS NOT NULL AND d.geo = i.geo_reference\n  GROUP BY d.sector_code\n),\nmecanismes AS (\n  SELECT sector_code,\n         jsonb_agg(jsonb_build_object(\n           'question', watch_question_code,\n           'formulation', question_sectorielle,\n           'mecanisme', mecanisme) ORDER BY watch_question_code) AS cadre\n  FROM v_instanciation_qv GROUP BY sector_code\n),\nsante AS (\n  SELECT sector_code, score_sante, etat, n_indicateurs_orientables\n  FROM v_sante_secteur\n),\n-- Signaux qualitatifs VALIDÉS humainement.\nancres_signaux AS (\n  SELECT s.sector_code,\n         jsonb_agg(jsonb_build_object(\n           'ancre', 'SIG-' || s.signal_id,\n           'nature', 'signal qualitatif validé',\n           'question_de_veille', s.watch_question_code,\n           'fait', s.evenement,\n           'acteur', s.acteur,\n           'date', s.echeance,\n           'zone', s.zone,\n           'source', s.source_doc,\n           'valide_par', s.validated_by,\n           'valide_le', s.validated_at::date\n         ) ORDER BY s.echeance DESC) AS ancres\n  FROM signals s\n  WHERE s.statut = 'valide' AND s.validated_by IS NOT NULL\n  GROUP BY s.sector_code\n),\n-- Items de flux versés au contexte par un examen humain nominatif.\nancres_contexte AS (\n  SELECT f.sector_code,\n         jsonb_agg(jsonb_build_object(\n           'ancre', 'CTX-' || i.item_id,\n           'nature', 'item de flux versé au contexte',\n           'famille', f.famille,\n           'fait', i.titre,\n           'date', i.date_publication::date,\n           'source', i.url,\n           'examine_par', e.decide_par,\n           'examine_le', e.decide_le\n         ) ORDER BY i.date_publication DESC) AS ancres\n  FROM flux_examens e\n  JOIN flux_items i USING (item_id)\n  JOIN flux_sources f USING (flux_id)\n  WHERE e.decision = 'contexte' AND f.sector_code IS NOT NULL\n  GROUP BY f.sector_code\n)\nSELECT m.sector_code,\n       jsonb_build_object(\n         'metriques', m.charge,\n         'cadre_de_veille', COALESCE(c.cadre, '[]'::jsonb),\n         'sante', to_jsonb(s.*) - 'sector_code',\n         'contexte_factuel', COALESCE(asig.ancres, '[]'::jsonb) || COALESCE(actx.ancres, '[]'::jsonb)\n       ) AS charge\nFROM metriques m\nLEFT JOIN mecanismes c ON c.sector_code = m.sector_code\nLEFT JOIN sante s ON s.sector_code = m.sector_code\nLEFT JOIN ancres_signaux asig ON asig.sector_code = m.sector_code\nLEFT JOIN ancres_contexte actx ON actx.sector_code = m.sector_code\n-- Démonstration restreinte au secteur qui dispose de matière : le médical\n-- compte un signal validé et onze items versés au contexte. L'automobile en\n-- compte un et zéro — le modèle y répondrait « aucune attribution possible »,\n-- ce qui serait honnête et sans intérêt démonstratif.\nWHERE m.sector_code = 'medical'\nORDER BY m.sector_code;",
+        "options": {}
+      },
+      "name": "Lire l'objet compact par secteur",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "notes": "v_dernier_point est l'objet compact du § 10.4.4 : les métriques y sont calculées par la base, jamais ici ni par le modèle. Restriction aux zones agrégées de référence (WORLD, EU27, EU, CH, G20) : un commentaire sectoriel ne digère pas 190 zones — les indicateurs sans zone agrégée n'y figurent pas, et cette borne est un choix de périmètre à documenter. La colonne completude voyage avec les valeurs : le modèle reçoit l'état de ce qui lui manque, il n'a pas à le deviner."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prépare la charge par secteur : le prompt système porte les règles\n// d'interprétation RI0-RI10 (§ 10.4.3), la charge utilisateur est le JSON\n// EXACT des métriques du secteur — conservé tel quel pour input_payload,\n// sans quoi la fidélité du commentaire serait invérifiable a posteriori.\nconst runId = $('Ouvrir le run').first().json.run_id;\n// VARIANTE DE DÉMONSTRATION — RI9 y est REMPLACÉE, non supprimée.\n// L'interdit de causalité devient une obligation d'ancrage : l'attribution\n// est permise si et seulement si elle cite un fait du contexte fourni. Le\n// reste du prompt est identique au commentaire de production, condition\n// pour que l'écart observé soit imputable à cette seule règle.\nconst SYSTEME = `Tu rédiges la note hebdomadaire d'un dispositif de veille économique pour le DIRIGEANT d'une PME suisse de mécanique de précision (usinage de pièces métalliques à tolérances serrées, en sous-traitance pour les secteurs horloger, médical, automobile et aérospatial). Il te lira une minute, entre deux rendez-vous. \\n\\nTu reçois un objet JSON contenant : « metriques », les chiffres calculés par la base — TA SEULE SOURCE CHIFFRÉE ; « cadre_de_veille », les questions de veille du secteur avec leur mécanisme causal DÉJÀ ÉTABLI par le dispositif, que tu peux mobiliser pour relier un chiffre à ce qu'il signifie ; « sante », le score de santé du secteur s'il est calculable ; « contexte_factuel », une liste de FAITS DATÉS qui ont tous été validés ou examinés nominativement par un humain, chacun portant un identifiant d'ancre, sa source et son validateur — c'est ta SEULE source de faits, comme « metriques » est ta seule source chiffrée. \\n\\nApplique dans l'ordre les règles d'interprétation suivantes. RI0, prioritaire sur toutes les autres — interdiction de calcul : ne produis, ne recalcule, n'arrondis et n'extrapole aucune valeur ; reprends les chiffres tels quels ; toute métrique absente ou null est signalée dans « Points à vérifier », sans conclusion — la colonne completude énonce ce qui manque et pourquoi, et tu la REPRENDS TELLE QUELLE : aucune quantité dérivée n'est admise, même triviale (ne calcule pas un nombre de points manquants depuis « 7 sur 12 » — cite « 7 point(s) sur 12 » à l'identique). RI1 — effet de base : si la période de référence paraît atypique, déclare la variation relative peu significative et privilégie le niveau absolu. RI2 — saisonnalité : ne fonde aucune lecture sur variation_periode_pct (périodes consécutives en série brute) ; fonde-la sur glissement_annuel_pct (même période de l'année précédente), ou sur moyenne_mobile_annuelle et ecart_a_la_moyenne_pct ; si les deux sont null, dis-le et abstiens-toi de qualifier l'évolution. RI3 — effets d'anticipation : un pic suivi d'un creux d'ampleur comparable est traité comme un ensemble unique, avec recherche d'une échéance réglementaire ou fiscale en hypothèse. RI4 — matérialité : si la variation est inférieure en valeur absolue à seuil_materialite_pct, déclare-la non significative et ne lui attribue aucune explication. RI5 — fiabilité : si statut_validation n'est ni valide_source ni valide_humain, abaisse d'un niveau la confiance attribuée et motive cet abaissement. RI6 — persistance : n'emploie « tendance » ou « inversion » qu'avec au moins trois périodes cohérentes — si l'historique fourni ne permet pas d'en juger, n'emploie aucun des deux termes. RI7 — volume et structure : si les deux dimensions sont fournies, analyse-les conjointement et signale toute divergence en priorité. RI8 — décomposition : si des segments évoluent en sens opposés, ne présente pas l'agrégat comme représentatif. RI9 — ATTRIBUTION ANCRÉE (règle modifiée pour cette exécution, § 12.3). Tu PEUX relier un mouvement chiffré à un fait, à une condition stricte : ce fait doit figurer dans « contexte_factuel », et tu dois le citer par son identifiant d'ancre, entre crochets, immédiatement après l'affirmation — par exemple : « le niveau d'autorisations reflète pour partie huit autorisations d'implants orthopédiques recensées sur la période [SIG-5] [CTX-812] ». Toute attribution sans ancre citée est INTERDITE, sans exception. Tu ne mobilises AUCUNE connaissance qui ne soit pas dans la charge : ni un fait d'actualité, ni un contexte réglementaire, ni un événement que tu croirais connaître — s'il n'a pas d'ancre, il n'existe pas. Si aucun fait du contexte n'est compatible avec le mouvement observé, écris-le en toutes lettres : « aucune attribution ancrée n'est possible sur les faits disponibles ». C'est une réponse acceptable et souvent la bonne. ATTENTION À LA PORTÉE : une ancre établit qu'un fait a eu lieu et quand ; elle n'établit pas qu'il explique le mouvement. Formule donc l'attribution comme une composante ou une hypothèse documentée — « participe de », « est une composante identifiée de », « hypothèse documentée par » —, jamais comme une cause suffisante. RI10 — hypothèses concurrentes : présente toutes les explications compatibles avec les données, chacune accompagnée de la donnée qui permettrait de trancher. \\n\\nFORMAT IMPOSÉ, 200 mots maximum, en français, dans CET ORDRE — la réponse d'abord, la méthode ensuite :\\n1. « Ce qu'il faut retenir » — UNE phrase. Ce que disent les chiffres du marché, pas de la base. Interdiction absolue d'y mentionner un statut de validation, un nom d'indicateur, une complétude ou un vocabulaire de base de données : le dirigeant ne sait pas ce qu'est « valide_source ».\\n2. « Ce que cela change pour un sous-traitant » — deux phrases au plus. La CONSÉQUENCE pour un atelier d'usinage : charge de travail attendue, matières, débouché qui s'ouvre ou se ferme, exigence technique. Appuie-toi sur le mécanisme causal du cadre de veille quand il éclaire. Ce n'est PAS une recommandation d'action — tu décris une implication, tu ne prescris rien.\\n3. « À surveiller » — une ligne : le prochain chiffre qui confirmera ou infirmera, et quand.\\n4. « Fiabilité » — niveau de signal (routine, à surveiller, significatif, rupture) et de confiance (élevée, moyenne, faible), avec en une ligne ce qui la limite.\\n5. « Réserves de méthode » — EN DERNIER : neutralisations appliquées, données manquantes reprises telles quelles, hypothèses concurrentes, ET le décompte des ancres — combien de faits le contexte contenait, combien tu en as utilisés, et pour quels mouvements aucune ancre n'était disponible. C'est la section que le dirigeant saute et que le contrôleur lit.\\n\\nSi les chiffres ne permettent RIEN de dire sur le marché, écris-le en une phrase à la section 1 et n'invente pas de substance. Un commentaire honnêtement vide vaut mieux qu'un commentaire qui décrit l'état de la base.`;\n\nconst sortie = [];\nfor (const item of $input.all()) {\n  const s = item.json;\n  sortie.push({ json: {\n    run_id: runId,\n    sector_code: s.sector_code,\n    charge: s.charge,\n    systeme: SYSTEME,\n    utilisateur: 'Secteur « ' + s.sector_code + ' ». Objet de veille (seule source autorisée) : ' + JSON.stringify(s.charge)\n  } });\n}\nif (sortie.length === 0) throw new Error('v_dernier_point ne renvoie aucun secteur sur les zones agrégées — vérifier la vue et le filtre de zones.');\nreturn sortie;"
+      },
+      "name": "Préparer les charges",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.MODELE_ANTHROPIC || 'claude-opus-5', max_tokens: 16000, system: $json.systeme, messages: [{ role: 'user', content: $json.utilisateur }] }) }}",
+        "options": {
+          "timeout": 180000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "name": "Rédiger le commentaire (modèle)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Un seul modèle pour la rédaction : le multi-modèles sert à l'extraction de valeurs (où le consensus a un sens), pas à la rédaction (où deux textes différents ne sont pas un désaccord). Le contrôle ici est la validation humaine systématique avant diffusion, et la vérifiabilité par input_payload."
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONTRÔLE D'ANCRAGE — la contrepartie de la levée de RI9.\n//\n// Autoriser l'attribution sans la vérifier reviendrait à retirer une garantie\n// sans en mettre d'autre à la place. Ici le contrôle est déterministe et porte\n// sur ce qui est vérifiable par calcul : les ancres citées existent-elles dans\n// le contexte fourni, et une formulation causale non ancrée subsiste-t-elle ?\n//\n// CE QUE CE CONTRÔLE NE FAIT PAS, et qui reste à l'humain : juger si le fait\n// cité explique RÉELLEMENT le mouvement. Une ancre valide peut être citée à\n// tort. Le contrôle établit la traçabilité de l'affirmation, jamais sa justesse.\nconst sorties = [];\nconst incidents = [];\nconst lignes = $input.all();\nfor (let i = 0; i < lignes.length; i++) {\n  const r = lignes[i].json;\n  const t = $('Préparer les charges').itemMatching(i).json;\n  if (r.error) { incidents.push(t.sector_code + ' : appel en échec (' + JSON.stringify(r.error).slice(0, 200) + ')'); continue; }\n  const texte = Array.isArray(r.content)\n    ? (r.content.filter(b => b.type === 'text').map(b => b.text).join('\\n').trim() || null)\n    : (r.content?.[0]?.text ?? null);\n  if (!texte) { incidents.push(t.sector_code + ' : réponse sans texte'); continue; }\n\n  const contexte = (t.charge && t.charge.contexte_factuel) || [];\n  const disponibles = new Set(contexte.map(a => a.ancre));\n  const citees = [...new Set((texte.match(/\\[(SIG-\\d+|CTX-\\d+)\\]/g) || []).map(s => s.slice(1, -1)))];\n  const inventees = citees.filter(a => !disponibles.has(a));\n\n  // Une formulation causale forte SANS ancre à proximité immédiate est le\n  // défaut que la règle doit empêcher. On l'approxime par la présence de la\n  // formulation dans une phrase dépourvue de crochet d'ancre.\n  const phrases = texte.split(/(?<=[.!?])\\s+/);\n  const causales = ['en raison de', 'causé par', 'causée par', \"s'explique par\", 'à cause de', 'sous l\\'effet de'];\n  const causalesNonAncrees = phrases.filter(ph => {\n    const bas = ph.toLowerCase();\n    return causales.some(f => bas.includes(f)) && !/\\[(SIG-\\d+|CTX-\\d+)\\]/.test(ph);\n  }).map(ph => ph.trim().slice(0, 120));\n\n  if (inventees.length) incidents.push(t.sector_code + ' : ancre(s) inexistante(s) — ' + inventees.join(', '));\n  if (causalesNonAncrees.length) incidents.push(t.sector_code + ' : attribution non ancrée — ' + causalesNonAncrees.length + ' phrase(s)');\n\n  sorties.push({ json: {\n    run_id: t.run_id,\n    sector_code: t.sector_code,\n    input_payload: JSON.stringify(t.charge),\n    contexte_fourni: JSON.stringify(contexte),\n    model: r.model || null,\n    text: texte,\n    ancres_citees: citees,\n    ancres_disponibles: contexte.length,\n    _ancres_inventees: inventees,\n    _causales_non_ancrees: causalesNonAncrees,\n    _incidents: incidents\n  } });\n}\nif (sorties.length === 0) throw new Error('Aucune sortie exploitable — incidents : ' + (incidents.join(' | ') || 'aucun'));\nreturn sorties;"
+      },
+      "name": "Normaliser et contrôler RI9",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO sandbox.commentaires_attribution\n  (run_id, sector_code, variante, input_payload, contexte_fourni, model, text,\n   ancres_citees, ancres_disponibles)\nVALUES ($1, $2, 'attribution_ancree', $3::jsonb, $4::jsonb, $5, $6, $7::text[], $8)\nRETURNING id, sector_code, ancres_citees, ancres_disponibles;",
+        "options": {
+          "queryReplacement": "={{ [$json.run_id, $json.sector_code, $json.input_payload, $json.contexte_fourni, $json.model, $json.text, '{' + ($json.ancres_citees || []).join(',') + '}', $json.ancres_disponibles] }}"
+        }
+      },
+      "name": "Stocker à valider",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "notes": "Statut a_valider par défaut de la table. La charge exacte soumise au modèle est conservée (input_payload) : la relecture humaine peut vérifier qu'aucun chiffre du texte n'est absent des données fournies — c'est le contrôle de RI0."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs\n   SET status = CASE WHEN $2::int = 0 THEN 'echec' WHEN $4::int > 0 THEN 'partiel' ELSE 'ok' END,\n       closed_at = now(),\n       note = $3\n WHERE run_id = $1\nRETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ (() => { const items = $('Normaliser et contrôler RI9').all().map(x => x.json); const inc = items[0]?._incidents ?? []; const ecrits = $('Stocker à valider').all().length; const cit = items.map(x => x.sector_code + ' : ' + (x.ancres_citees || []).length + '/' + x.ancres_disponibles + ' ancres'); const note = 'Attribution ancrée — DÉMONSTRATION hors production. ' + ecrits + ' commentaire(s) écrit(s) en bac à sable. ' + cit.join(' | ') + '.' + ' Incidents : ' + (inc.join(' | ') || 'aucun') + '.'; return [ $('Ouvrir le run').first().json.run_id, ecrits, note, inc.length ]; })() }}"
+        }
+      },
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1400,
+        300
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Lire l'objet compact par secteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire l'objet compact par secteur": {
+      "main": [
+        [
+          {
+            "node": "Préparer les charges",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les charges": {
+      "main": [
+        [
+          {
+            "node": "Rédiger le commentaire (modèle)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rédiger le commentaire (modèle)": {
+      "main": [
+        [
+          {
+            "node": "Normaliser et contrôler RI9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser et contrôler RI9": {
+      "main": [
+        [
+          {
+            "node": "Stocker à valider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stocker à valider": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
