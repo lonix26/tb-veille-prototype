@@ -5,6 +5,7 @@ import Aujourdhui from "./pages/Aujourdhui.jsx";
 import AFaire from "./pages/AFaire.jsx";
 import Marche from "./pages/Marche.jsx";
 import Fiabilite from "./pages/Fiabilite.jsx";
+import Anticiper from "./pages/Anticiper.jsx";
 
 // =====================================================================
 // v7 — QUATRE ÉCRANS, UNE FEUILLE DE STYLE, RIEN D'AUTRE DANS LE BUNDLE.
@@ -47,6 +48,7 @@ function Navigation() {
       </div>
       {lien("/aujourdhui", "Aujourd'hui")}
       {lien("/a-faire", "À faire", urgentes || null, "alerte")}
+      {lien("/anticiper", "Anticiper")}
       {lien("/fiabilite", "Fiabilité")}
       <div className="nav-titre">Vos marchés</div>
       {SECTEURS.map(([c, l]) => (
@@ -107,6 +109,7 @@ function Coquille() {
           <Route path="/" element={<Navigate to="/aujourdhui" replace />} />
           <Route path="/aujourdhui" element={<Aujourdhui />} />
           <Route path="/a-faire" element={<AFaire />} />
+          <Route path="/anticiper" element={<Anticiper />} />
           <Route path="/fiabilite" element={<Fiabilite />} />
           <Route path="/marche/:code" element={<Marche />} />
 

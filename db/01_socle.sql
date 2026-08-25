@@ -1935,6 +1935,49 @@ COMMENT ON VIEW public.v_ecart_entre_runs IS 'Un écart non nul signale une rév
 
 
 --
+-- Name: v_exposition_horlogere; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_exposition_horlogere AS
+ WITH h AS (
+         SELECT DISTINCT ON (indicator_values.period, indicator_values.geo) indicator_values.period,
+            indicator_values.geo,
+            indicator_values.value
+           FROM public.indicator_values
+          WHERE ((indicator_values.indicator_id = 'H1'::text) AND (indicator_values.geo <> ALL (ARRAY['W00'::text, 'WORLD'::text])) AND (indicator_values.geo !~ '^[SXF][0-9]'::text))
+          ORDER BY indicator_values.period, indicator_values.geo, indicator_values.run_id DESC
+        ), tot AS (
+         SELECT h.period,
+            sum(h.value) AS t
+           FROM h
+          GROUP BY h.period
+        ), parts AS (
+         SELECT h.period,
+            h.geo,
+            ((h.value / t.t) * (100)::numeric) AS part
+           FROM (h
+             JOIN tot t USING (period))
+        )
+ SELECT period,
+    round(max(part) FILTER (WHERE (geo = 'USA'::text)), 1) AS part_usa_pct,
+    round(sum(part) FILTER (WHERE (rn <= 3)), 1) AS top3_pct
+   FROM ( SELECT parts.period,
+            parts.geo,
+            parts.part,
+            row_number() OVER (PARTITION BY parts.period ORDER BY parts.part DESC) AS rn
+           FROM parts) p
+  GROUP BY period
+  ORDER BY period;
+
+
+--
+-- Name: VIEW v_exposition_horlogere; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_exposition_horlogere IS 'Part des États-Unis dans les exportations horlogères suisses et concentration des trois premiers débouchés, par mois. Le choc douanier de 2025 s''y lit intégralement : 34,1 % en avril 2025 (stocks), 10,3 % en octobre (choc), 27,1 % en juillet 2026 (remontée) — le dispositif voit l''événement qui fonde la problématique du travail.';
+
+
+--
 -- Name: v_fiabilite_decouverte; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -2572,6 +2615,37 @@ CREATE VIEW public.v_taux_correction_humaine AS
     round((((count(*) FILTER (WHERE (decision = ANY (ARRAY['corrige'::text, 'rejete'::text]))))::numeric / (NULLIF(count(*) FILTER (WHERE (decision IS NOT NULL)), 0))::numeric) * (100)::numeric), 2) AS taux_correction_pct
    FROM public.validation_queue
   GROUP BY indicator_id;
+
+
+--
+-- Name: v_tension_chaine; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_tension_chaine AS
+ WITH m AS (
+         SELECT mm.indicator_id,
+            mm.period,
+            mm.ecart_a_la_moyenne_pct AS e
+           FROM (public.v_metriques mm
+             JOIN public.indicators i USING (indicator_id))
+          WHERE ((mm.geo = i.geo_reference) AND (mm.ecart_a_la_moyenne_pct IS NOT NULL))
+        )
+ SELECT c.marche,
+    am.period,
+    round(am.e, 1) AS amont_vs_moyenne,
+    round(av.e, 1) AS production_vs_moyenne,
+    round((am.e - av.e), 1) AS tension
+   FROM ((( VALUES ('automobile'::text,'A2'::text,'A6'::text), ('medical'::text,'M7'::text,'M2'::text), ('aerospatial'::text,'S7'::text,'S8'::text), ('horlogerie'::text,'H9'::text,'H6'::text)) c(marche, amont, aval)
+     JOIN m am ON ((am.indicator_id = c.amont)))
+     JOIN m av ON (((av.indicator_id = c.aval) AND (av.period = am.period))))
+  ORDER BY c.marche, am.period;
+
+
+--
+-- Name: VIEW v_tension_chaine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_tension_chaine IS 'Écart entre la position de l''amont d''un marché et celle de sa production adressable, chacune contre sa propre moyenne douze mois. Tension positive = l''amont tire, la production ne suit pas encore : charge à venir pour la sous-traitance. Le § 8.6 transformé en série. Couples : A2/A6, M7/M2, S7/S8, H9/H6.';
 
 
 --
