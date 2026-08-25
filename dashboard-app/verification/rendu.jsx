@@ -16,7 +16,7 @@ import { Ctx } from "../src/api.jsx";
 import Aujourdhui from "../src/pages/Aujourdhui.jsx";
 import AFaire from "../src/pages/AFaire.jsx";
 import Fiabilite from "../src/pages/Fiabilite.jsx";
-import SecteurQV from "../src/pages/SecteurQV.jsx";
+import Marche from "../src/pages/Marche.jsx";
 
 const BASE = process.env.API_BASE || "http://localhost:5678/webhook/veille";
 
@@ -33,11 +33,11 @@ const ECRANS = [
   ["Aujourd'hui", Aujourdhui, "/aujourdhui", "/aujourdhui"],
   ["À faire", AFaire, "/a-faire", "/a-faire"],
   ["Fiabilité", Fiabilite, "/fiabilite", "/fiabilite"],
-  ["Marché — horlogerie", SecteurQV, "/marche/horlogerie", "/marche/:code"],
-  ["Marché — automobile", SecteurQV, "/marche/automobile", "/marche/:code"],
-  ["Marché — médical", SecteurQV, "/marche/medical", "/marche/:code"],
-  ["Marché — aérospatial", SecteurQV, "/marche/aerospatial", "/marche/:code"],
-  ["Socle transversal", SecteurQV, "/marche/transversal", "/marche/:code"]
+  ["Marché — horlogerie", Marche, "/marche/horlogerie", "/marche/:code"],
+  ["Marché — automobile", Marche, "/marche/automobile", "/marche/:code"],
+  ["Marché — médical", Marche, "/marche/medical", "/marche/:code"],
+  ["Marché — aérospatial", Marche, "/marche/aerospatial", "/marche/:code"],
+  ["Socle transversal", Marche, "/marche/transversal", "/marche/:code"]
 ];
 
 // react-dom/server avertit sur useLayoutEffect à chaque écran ; l'avertissement

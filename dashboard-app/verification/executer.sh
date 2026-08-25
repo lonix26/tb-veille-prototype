@@ -6,6 +6,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 node verification/hooks.mjs
+node verification/classes.mjs
 echo
 ./node_modules/.bin/esbuild verification/rendu.jsx \
   --bundle --platform=node --format=esm --loader:.jsx=jsx \

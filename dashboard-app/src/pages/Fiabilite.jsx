@@ -111,12 +111,12 @@ export default function Fiabilite() {
 
   return (
     <div className="page">
-      <header className="jour-tete">
-        <span className="jour-date">Ce que le dispositif sait, et ce qu'il sait mal</span>
-        <span className="jour-etat">{phraseFraicheur(runs[0]?.executed_at)}</span>
+      <header className="tete">
+        <span className="tete-date">Ce que le dispositif sait, et ce qu'il sait mal</span>
+        <span className="tete-etat">{phraseFraicheur(runs[0]?.executed_at)}</span>
       </header>
       <h1 className="verdict" style={{ maxWidth: "26ch" }}>Fiabilité</h1>
-      <p className="verdict-suite">
+      <p className="bloc-intro" style={{ marginTop: -14, fontSize: 14 }}>
         Toutes les réserves du dispositif sont réunies ici, et chacune est <strong>recalculée à
         l'affichage</strong> à partir de la base — aucune n'est écrite à la main. Un tableau de
         bord qui ne dit pas ce qu'il sait mal laisse croire qu'il sait tout.
@@ -176,7 +176,7 @@ export default function Fiabilite() {
                    placeholder="Chercher un indicateur ou une source…"
                    value={filtre} onChange={e => setFiltre(e.target.value)} />
           </div>
-          <table className="t-compacte">
+          <table >
             <thead>
               <tr><th>Code</th><th>Marché</th><th>Ce qu'il mesure</th><th>Rôle</th>
                   <th>Source</th><th>En base</th></tr>
@@ -246,7 +246,7 @@ export default function Fiabilite() {
                 {rev.length} valeurs ont été <strong>corrigées par leur source</strong> entre deux
                 collectes. Sans registre en ajout seul, ces corrections seraient invisibles.
               </p>
-              <table className="t-compacte">
+              <table >
                 <thead><tr><th>Indicateur</th><th>Période</th><th>Zone</th>
                            <th>Avant</th><th>Après</th><th>Écart</th></tr></thead>
                 <tbody>

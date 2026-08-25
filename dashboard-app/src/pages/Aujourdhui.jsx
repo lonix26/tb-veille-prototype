@@ -149,9 +149,9 @@ export default function Aujourdhui() {
 
   return (
     <div className="page">
-      <header className="jour-tete">
-        <span className="jour-date">{aujourdhui}</span>
-        <span className="jour-etat">
+      <header className="tete">
+        <span className="tete-date">{aujourdhui}</span>
+        <span className="tete-etat">
           {phraseFraicheur(run.executed_at)}<br />
           données jusqu'à {phrasePeriode(S.fraicheur?.point_le_plus_recent)}
         </span>
@@ -185,7 +185,7 @@ export default function Aujourdhui() {
         </div>
       )}
 
-      <h2 className="section-titre">
+      <h2 className="section">
         Ce que disent les chiffres · {enLettres(vitrine.length)} indicateurs suivis
       </h2>
 
