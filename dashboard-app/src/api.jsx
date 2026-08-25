@@ -166,7 +166,14 @@ const NOMS_ZONES = {
   MEX: "Mexique", CAN: "Canada", BRA: "Brésil", AUS: "Australie", POL: "Pologne",
   CZE: "Tchéquie", IRL: "Irlande", RUS: "Russie", BEL: "Belgique", AUT: "Autriche",
   SWE: "Suède", THA: "Thaïlande", VNM: "Viêt Nam", MYS: "Malaisie", IDN: "Indonésie",
-  ZAF: "Afrique du Sud", ISR: "Israël", NOR: "Norvège", DNK: "Danemark", PRT: "Portugal"
+  ZAF: "Afrique du Sud", ISR: "Israël", NOR: "Norvège", DNK: "Danemark", PRT: "Portugal",
+  // Ajout du 25.08 : les pays des acheteurs publics européens. Un code ISO
+  // non traduit reste lisible, mais « ROU » dans une colonne « pays » à côté
+  // de « Allemagne » et « Pologne » se lit comme une donnée manquante.
+  ROU: "Roumanie", HUN: "Hongrie", BGR: "Bulgarie", SVK: "Slovaquie",
+  SVN: "Slovénie", HRV: "Croatie", LTU: "Lituanie", LVA: "Lettonie",
+  EST: "Estonie", GRC: "Grèce", FIN: "Finlande", LUX: "Luxembourg",
+  CYP: "Chypre", MLT: "Malte", ISL: "Islande", SRB: "Serbie", UKR: "Ukraine"
 };
 export const nomZone = g => {
   if (NOMS_ZONES[g]) return NOMS_ZONES[g];

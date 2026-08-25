@@ -76,6 +76,106 @@ function Fiche({ a }) {
   );
 }
 
+// ---------------------------------------------------------------------
+// QUI ACHÈTE — la demande publique ramenée à ses acteurs nommés.
+//
+// Ce n'est PAS une liste de prospection. C'est le monitoring de marché mené
+// jusqu'à son terme : un avis d'appel d'offres est un signal de demande, et
+// quand on cesse de l'agréger on découvre que cette demande a un nom, une
+// récurrence et une spécialité. Un acheteur qui publie onze avis en un mois
+// sur une seule famille de pièces dit quelque chose de la structure du
+// marché que nulle série macroéconomique ne dira.
+//
+// La récurrence est la grandeur qui compte : un avis isolé est un accident,
+// une série d'avis est un débouché.
+// ---------------------------------------------------------------------
+function Acheteurs({ acheteurs }) {
+  const [tout, setTout] = useState(false);
+  const liste = [...(acheteurs || [])].sort(
+    (a, b) => (b.avis_publies || 0) - (a.avis_publies || 0));
+  if (!liste.length) return null;
+  const recurrents = liste.filter(a => (a.avis_publies || 0) >= 3);
+  const montres = tout ? liste : liste.slice(0, 12);
+
+  return (
+    <>
+      <h2 className="s-titre">
+        Qui achète, dans ces marchés
+        <span className="s-sous">
+          {liste.length} organisations identifiées · {recurrents.length} publient régulièrement
+        </span>
+      </h2>
+
+      <p className="bloc-intro" style={{ maxWidth: 780 }}>
+        Les avis collectés ne sont pas seulement des occasions : agrégés par émetteur, ils
+        dessinent <strong>qui achète quoi, et à quelle fréquence</strong>. Un acheteur qui publie
+        onze avis en un mois sur une seule famille de pièces renseigne sur la structure d'un
+        marché mieux qu'une série macroéconomique. C'est la demande publique ramenée à ses
+        acteurs nommés — le suivi de marché mené jusqu'au bout.
+      </p>
+
+      <div className="carte" style={{ padding: 0, overflow: "hidden" }}>
+        <table className="t-compacte t-acheteurs">
+          <thead>
+            <tr>
+              <th>Organisation</th><th>Marché</th>
+              <th style={{ textAlign: "right" }}>Avis</th>
+              <th style={{ textAlign: "right" }}>dont ouverts</th>
+              <th style={{ textAlign: "right" }}>Familles de pièces</th>
+              <th>Actif depuis</th><th>Contact</th>
+            </tr>
+          </thead>
+          <tbody>
+            {montres.map((a, i) => (
+              <tr key={i}>
+                <td>
+                  <strong>{a.acheteur}</strong>
+                  <div className="cell-note">{nomZone(a.acheteur_pays)}</div>
+                </td>
+                <td>
+                  {a.sector_code
+                    ? <span className="etq e-gris">{a.sector_code}</span>
+                    : <span className="etq e-ambre" title="marché hors des quatre secteurs suivis">hors grille</span>}
+                </td>
+                <td style={{ textAlign: "right", fontWeight: 650 }}>{a.avis_publies}</td>
+                <td style={{ textAlign: "right" }}>
+                  {a.dont_encore_ouverts
+                    ? <strong className="hausse">{a.dont_encore_ouverts}</strong>
+                    : <span className="neutre">—</span>}
+                </td>
+                <td style={{ textAlign: "right" }}
+                    title={(a.cpv_distincts || []).join(", ")}>
+                  {(a.cpv_distincts || []).length}
+                </td>
+                <td className="cell-note">{dateCH(a.premier_avis)}</td>
+                <td>
+                  {a.acheteur_courriel
+                    ? <a href={"mailto:" + a.acheteur_courriel}>écrire</a>
+                    : <span className="neutre">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {liste.length > 12 && (
+        <button className="bouton-second" style={{ marginTop: 12 }} onClick={() => setTout(t => !t)}>
+          {tout ? "Réduire la liste" : `Montrer les ${liste.length - 12} autres organisations`}
+        </button>
+      )}
+
+      <p className="note" style={{ marginTop: 12, maxWidth: 780 }}>
+        <strong>Une lecture, deux prudences.</strong> Le nombre d'avis mesure l'activité de
+        publication de l'acheteur, pas la taille de son marché : une centrale d'achat publie
+        beaucoup et un donneur d'ordre privé ne publie rien. Et le périmètre est celui des
+        <strong> marchés publics européens</strong> uniquement — la demande privée, qui est
+        l'essentiel du carnet d'un sous-traitant, reste hors de portée du dispositif.
+      </p>
+    </>
+  );
+}
+
 export default function AFaire() {
   const { A, O, erreursV4 } = useDonnees();
   const [tout, setTout] = useState(false);
@@ -150,6 +250,9 @@ export default function AFaire() {
       ) : (
         <div className="fiches">{adressables.map(a => <Fiche key={a.publication_number} a={a} />)}</div>
       )}
+
+      {/* ---------- Qui achète ---------- */}
+      <Acheteurs acheteurs={A.acheteurs} />
 
       {/* ---------- Ce qui a déjà été examiné ---------- */}
       {examinees.length > 0 && (
