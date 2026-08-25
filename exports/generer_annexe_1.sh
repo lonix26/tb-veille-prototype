@@ -107,8 +107,14 @@ cat <<'EOF'
 
 Catégorie : **hard** — donnée officielle structurée, reprise telle quelle ·
 **composite** — extraite ou synthétisée depuis un document non structuré, soumise au contrôle de consistance.
-Le seuil d'alerte est la variation au-delà de laquelle une notification est déclenchée ; « — » signale
-un indicateur sans alerte configurée, généralement parce que sa périodicité rend la variation peu significative.
+Le **rôle** est la latence déclarée de l'indicateur — un indicateur **annonce** (avancé),
+constate (coïncident) ou confirme (retardé) : c'est la distinction la plus utile du métier, et
+mélanger les trois dans une même moyenne est une erreur de catégorie (§ 8.7).
+La colonne **Grille** distingue les indicateurs **suivis** — la vitrine issue de l'élagage du
+25.08.2026 (§ 8.8), treize indicateurs sélectionnés par cinq critères d'utilité — des indicateurs
+en **réserve** : qualifiés, conservés au référentiel avec leurs observations, requalifiables sans
+nouvel examen. Le statut de la source ne se perd pas quand l'indicateur sort de la grille — ce
+sont deux jugements distincts.
 
 EOF
 
@@ -117,17 +123,53 @@ for couple in "transversal|Socle transversal (QV0)" "horlogerie|Horlogerie" "med
   echo ""
   echo "#### ${libelle}"
   echo ""
-  echo "| Code | Indicateur | Questions de veille | Source | Catégorie | Fréquence | Unité | Statut | Seuil d'alerte |"
+  echo "| Code | Indicateur | Questions | Source | Catégorie | Fréquence | Rôle | Statut source | Grille |"
   echo "|---|---|---|---|---|---|---|---|---|"
   q "SELECT '| **' || i.indicator_id || '** | ' || i.label || ' | '
      || (SELECT string_agg(w.watch_question_code, ', ' ORDER BY w.watch_question_code)
          FROM indicator_watch_questions w WHERE w.indicator_id = i.indicator_id)
      || ' | ' || s.organisation || ' | ' || i.category || ' | ' || i.frequency
-     || ' | ' || i.unit || ' | ' || i.status || ' | '
-     || coalesce(i.alert_threshold_pct::text || ' %', '—') || ' |'
+     || ' | ' || CASE i.latence WHEN 'avance' THEN '**annonce**' WHEN 'coincident' THEN 'constate'
+                 WHEN 'retarde' THEN 'confirme' ELSE '—' END
+     || ' | ' || i.status || ' | '
+     || CASE WHEN i.en_vitrine THEN '**suivie**' ELSE 'réserve' END || ' |'
      FROM indicators i JOIN sources s ON s.source_id = i.source_id
-     WHERE i.sector_code = '${code}' ORDER BY i.indicator_id;"
+     WHERE i.sector_code = '${code}' ORDER BY i.en_vitrine DESC, i.indicator_id;"
 done
+
+cat <<'EOF'
+
+---
+
+## A1.3bis Sources de flux — l'étage des signaux
+
+Le tableau de confiance de la section A1.1 porte les sources d'**indicateurs** — celles qui
+produisent des séries chiffrées. Le dispositif surveille aussi des **flux** : marchés publics,
+actualité, communiqués, réglementaire et, depuis le 26.08.2026, la **presse professionnelle de
+branche** — le type de source qui donne de l'avance, identifié comme absent du portefeuille à
+l'évaluation du même jour. Un flux ne produit pas de série : il produit des **items**, qui passent
+au triage assisté par IA puis à l'examen humain. Les mêmes exigences s'appliquent : chaque flux
+est qualifié nominativement, et sa reconnaissance en réponse réelle est datée.
+
+| Flux | Famille | Secteur | Libellé | Statut | Qualifié par | Le |
+|---|---|---|---|---|---|---|
+EOF
+
+q "SELECT '| ' || flux_id || ' | ' || famille || ' | ' || coalesce(sector_code, '—') || ' | '
+   || libelle || ' | ' || statut || ' | ' || coalesce(qualified_by, '—') || ' | '
+   || coalesce(to_char(qualified_at, 'DD.MM.YYYY'), '—') || ' |'
+   FROM flux_sources ORDER BY famille, sector_code NULLS LAST, flux_id;"
+
+cat <<'EOF'
+
+Types de sources identifiés à l'évaluation du 26.08.2026 et **non instrumentés**, avec leur motif —
+les nommer vaut mieux que les laisser croire couverts : les **rapports annuels des donneurs
+d'ordre** (publication apériodique, pas de point d'accès structuré — relèveraient du traitement
+composite) ; les **offres d'emploi** des donneurs d'ordre (aucune API ouverte sans clé identifiée ;
+Adzuna exigerait une clé, à instruire) ; les autres **salons** du périmètre (pas de fil
+exploitable — EPHJ, qui en a un, est instrumenté ci-dessus).
+
+EOF
 
 cat <<'EOF'
 
@@ -138,12 +180,13 @@ cat <<'EOF'
 **Ce décompte fait foi.** Il est calculé par la vue `v_bilan_referentiel` et doit être reporté tel quel
 dans le résumé, le poster et le corps du rapport — jamais l'inverse.
 
-| Secteur | Total | Certifiés | dont hard data | dont composites | À confirmer |
-|---|---|---|---|---|---|
+| Secteur | Référentiel | Certifiés | dont hard | dont composites | À confirmer | **En grille** | En réserve |
+|---|---|---|---|---|---|---|---|
 EOF
 
 q "SELECT '| ' || coalesce(initcap(sector_code), '**Total**') || ' | ' || total || ' | ' || certifies
-   || ' | ' || certifies_hard || ' | ' || certifies_composite || ' | ' || a_confirmer || ' |'
+   || ' | ' || certifies_hard || ' | ' || certifies_composite || ' | ' || a_confirmer
+   || ' | **' || en_grille || '** | ' || ecartes || ' |'
    FROM v_bilan_referentiel;"
 
 cat <<'EOF'
