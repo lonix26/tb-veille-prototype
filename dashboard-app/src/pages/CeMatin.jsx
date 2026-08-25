@@ -212,6 +212,26 @@ export default function CeMatin() {
   const { D, S, A, G, erreursV4 } = useDonnees();
   const navigate = useNavigate();
 
+  // TOUS LES HOOKS AVANT LE PREMIER RETOUR — et pas seulement par convention.
+  // Ce `useMemo` était placé plus bas, après le retour anticipé `if (!S)` :
+  // au premier rendu, l'interface de lecture n'ayant pas encore répondu, il
+  // n'était pas appelé ; au rendu suivant, il l'était. React compte les hooks
+  // par position et lève « Rendered more hooks than during the previous
+  // render » — l'écran devient blanc.
+  //
+  // À NOTER pour le test de rendu (`verification/`) : il n'a pas attrapé ce
+  // défaut, et ne pouvait pas. `renderToString` ne rend QU'UNE FOIS ; une
+  // rupture d'ordre des hooks ne se manifeste qu'au second rendu. Le test
+  // vérifie qu'un écran se peuple, pas qu'il survit à une mise à jour.
+  const longueurs = useMemo(() => {
+    const m = new Map();
+    for (const v of (D?.valeurs || [])) {
+      if (!m.has(v.indicator_id)) m.set(v.indicator_id, new Set());
+      m.get(v.indicator_id).add(v.period);
+    }
+    return m;
+  }, [D]);
+
   if (!S) return (
     <div className="page">
       <div className="vide">
@@ -244,14 +264,6 @@ export default function CeMatin() {
   //     mouvements affichés provenaient d'une série ANNUELLE de trois points,
   //     où « +125 % » décrit la croissance structurelle d'un marché jeune et
   //     non un mouvement. Huit est le seuil déjà retenu pour le score.
-  const longueurs = useMemo(() => {
-    const m = new Map();
-    for (const v of (D?.valeurs || [])) {
-      if (!m.has(v.indicator_id)) m.set(v.indicator_id, new Set());
-      m.get(v.indicator_id).add(v.period);
-    }
-    return m;
-  }, [D]);
   const assezLongue = id => (longueurs.get(id)?.size ?? 0) >= 8;
   const variation = a => Math.abs(Number(a.variation_periode_pct ?? a.glissement_annuel_pct) || 0);
   const eligibles = significatives.filter(a => assezLongue(a.indicator_id));
