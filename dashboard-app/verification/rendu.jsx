@@ -13,9 +13,9 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { Ctx } from "../src/api.jsx";
-import CeMatin from "../src/pages/CeMatin.jsx";
+import Aujourdhui from "../src/pages/Aujourdhui.jsx";
 import AFaire from "../src/pages/AFaire.jsx";
-import Dispositif from "../src/pages/Dispositif.jsx";
+import Fiabilite from "../src/pages/Fiabilite.jsx";
 import SecteurQV from "../src/pages/SecteurQV.jsx";
 
 const BASE = process.env.API_BASE || "http://localhost:5678/webhook/veille";
@@ -30,14 +30,14 @@ async function lire(chemin) {
 // d'URL (les marchés lisent `:code`) ne se teste pas hors de son routage,
 // sinon elle rend son état vide et le test passe en croyant vérifier.
 const ECRANS = [
-  ["Ce matin", CeMatin, "/ce-matin", "/ce-matin"],
+  ["Aujourd'hui", Aujourdhui, "/aujourdhui", "/aujourdhui"],
   ["À faire", AFaire, "/a-faire", "/a-faire"],
-  ["Le dispositif", Dispositif, "/dispositif", "/dispositif"],
-  ["Marché — horlogerie", SecteurQV, "/qv/horlogerie", "/qv/:code"],
-  ["Marché — automobile", SecteurQV, "/qv/automobile", "/qv/:code"],
-  ["Marché — médical", SecteurQV, "/qv/medical", "/qv/:code"],
-  ["Marché — aérospatial", SecteurQV, "/qv/aerospatial", "/qv/:code"],
-  ["Socle transversal", SecteurQV, "/qv/transversal", "/qv/:code"]
+  ["Fiabilité", Fiabilite, "/fiabilite", "/fiabilite"],
+  ["Marché — horlogerie", SecteurQV, "/marche/horlogerie", "/marche/:code"],
+  ["Marché — automobile", SecteurQV, "/marche/automobile", "/marche/:code"],
+  ["Marché — médical", SecteurQV, "/marche/medical", "/marche/:code"],
+  ["Marché — aérospatial", SecteurQV, "/marche/aerospatial", "/marche/:code"],
+  ["Socle transversal", SecteurQV, "/marche/transversal", "/marche/:code"]
 ];
 
 // react-dom/server avertit sur useLayoutEffect à chaque écran ; l'avertissement
