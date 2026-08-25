@@ -239,9 +239,20 @@ export function construireBrief({ sante, actions, alertes, aValider, aExaminer, 
 // ---------------------------------------------------------------------
 export function phraseMouvement(a) {
   const zone = estAgregat(a.geo) ? "" : ` vers ${nomZone(a.geo)}`;
-  const v = Number(a.glissement_annuel_pct);
   const libelle = (a.indicator_label || a.indicator_id) + zone;
-  return phraseVariation(libelle, v) || `${libelle} : variation non calculable`;
+  // On AFFICHE ce sur quoi on CLASSE. Le bloc triait sur la variation d'une
+  // période à la suivante et montrait le glissement annuel : deux grandeurs
+  // différentes dans le même bloc, dont l'une justifiait un rang que l'autre
+  // ne montrait pas. Le glissement reste indiqué en second, quand il existe.
+  const dPeriode = Number(a.variation_periode_pct);
+  const dAnnuel = Number(a.glissement_annuel_pct);
+  const base = phraseVariation(libelle, dPeriode, "depuis le point précédent");
+  if (!base) return phraseVariation(libelle, dAnnuel) || `${libelle} : variation non calculable`;
+  // Sur une série annuelle, « depuis le point précédent » EST le glissement annuel :
+  // afficher les deux répète le même chiffre. On ne montre le second que lorsqu'il
+  // apporte quelque chose.
+  const memeChiffre = !isNaN(dAnnuel) && Math.abs(dAnnuel - dPeriode) < 0.05;
+  return (isNaN(dAnnuel) || memeChiffre) ? base : `${base} (${pct(dAnnuel)} sur un an)`;
 }
 
 // ---------------------------------------------------------------------
@@ -292,4 +303,59 @@ export function phraseComposition(c) {
   if (c.coincident) bouts.push(`${enLettres(c.coincident)} qui constate${c.coincident > 1 ? "nt" : ""}`);
   if (c.retarde) bouts.push(`${enLettres(c.retarde)} qui confirme${c.retarde > 1 ? "nt" : ""}`);
   return bouts.join(" · ");
+}
+
+// ---------------------------------------------------------------------
+// 12. CE QUI A CHANGÉ — la question qu'on pose vraiment à un dispositif de
+// veille, et à laquelle l'écran ne répondait pas.
+// ---------------------------------------------------------------------
+export function phraseEcart(e, libelle) {
+  if (!e || e.ecart === null || e.ecart === undefined) return null;
+  const d = Number(e.ecart);
+  if (Math.abs(d) < 0.1) return `${libelle} : inchangé`;
+  const sens = d > 0 ? "remonte" : "recule";
+  return `${libelle} ${sens} de ${nb(Math.abs(d), 2)} point${Math.abs(d) >= 2 ? "s" : ""}`;
+}
+
+// Un indicateur qui gagne des périodes est une information : la source a
+// publié. Un indicateur qui n'en gagne aucune depuis longtemps en est une
+// autre, et moins bonne.
+export function phraseNouveaute(n) {
+  if (n.entierement_nouveau)
+    return `${n.label} entre au registre — ${n.periodes_maintenant} périodes, jusqu'à ${n.periode_maintenant}`;
+  if (n.periode_maintenant !== n.periode_avant)
+    return `${n.label} avance jusqu'à ${n.periode_maintenant}`;
+  return `${n.label} s'approfondit — ${n.periodes_gagnees} périodes de plus`;
+}
+
+// ---------------------------------------------------------------------
+// 13. Fraîcheur de la DONNÉE, distincte de la fraîcheur de la COLLECTE.
+// « Collecté il y a deux heures » se lit comme « information fraîche » ; si
+// le point le plus récent date de juillet, c'est faux. Un veilleur distingue
+// toujours quand il a regardé de la date de ce qu'il regarde.
+// ---------------------------------------------------------------------
+export function phrasePeriode(p) {
+  if (!p) return "période inconnue";
+  const MOIS = ["janvier","février","mars","avril","mai","juin","juillet",
+                "août","septembre","octobre","novembre","décembre"];
+  const m = String(p).match(/^(\d{4})-(\d{2})$/);
+  if (m) return `${MOIS[Number(m[2]) - 1]} ${m[1]}`;
+  const t = String(p).match(/^(\d{4})-T([1-4])$/);
+  if (t) return `${t[2]}ᵉ trimestre ${t[1]}`;
+  return String(p);
+}
+
+// ---------------------------------------------------------------------
+// 14. Vieillissement des faits. Un fait dont l'échéance est à neuf ans n'est
+// pas une actualité : c'est du contexte durable, et il doit se présenter
+// comme tel plutôt que d'occuper indéfiniment un écran nommé « Ce matin ».
+// ---------------------------------------------------------------------
+export function natureDuFait(s) {
+  const an = (txt) => { const m = String(txt || "").match(/(20\d{2})/); return m ? Number(m[1]) : null; };
+  const echeance = an(s.echeance);
+  const anneeCourante = new Date().getFullYear();
+  if (echeance && echeance - anneeCourante >= 3) return "contexte durable";
+  const j = s.validated_at ? (Date.now() - new Date(s.validated_at)) / 86400000 : null;
+  if (j !== null && j <= 30) return "récent";
+  return "établi";
 }

@@ -176,8 +176,63 @@ function Acheteurs({ acheteurs }) {
   );
 }
 
+// ---------------------------------------------------------------------
+// LES DIX MIEUX CLASSÉS — le cadrage qui rend la file traitable.
+//
+// La file d'examen compte 745 items et croît plus vite qu'elle n'est
+// traitée. Le compteur seul renvoyait vers un écran qui n'existait pas :
+// le bouton promettait « les mieux classés » et livrait autre chose.
+//
+// Une file de sept cent quarante-cinq ne se traite pas par du temps
+// supplémentaire, elle se traite par un CADRAGE : dix items par semaine,
+// les mieux notés par le triage, et le reste attend. C'est la seule
+// discipline qui tienne pour un dirigeant de PME, et elle rend la limite
+// structurelle du scénario semi-automatisé praticable au lieu de la subir.
+// ---------------------------------------------------------------------
+function FilePrioritaire({ items, enAttente }) {
+  if (!items || !items.length) return null;
+  const note = i => (i.anteriorite || 0) + (i.portee || 0) + (i.pertinence_signal || 0);
+  return (
+    <>
+      <h2 className="s-titre" id="file">
+        Vos dix de la semaine
+        <span className="s-sous">
+          les mieux notés par le triage, sur {nb(enAttente)} en attente — le reste peut attendre
+        </span>
+      </h2>
+      <p className="bloc-intro" style={{ maxWidth: 780 }}>
+        Le triage assisté ordonne, il ne décide pas. Ces dix items sont ceux dont la note
+        d'antériorité, de portée et de pertinence est la plus élevée. Les examiner tous les dix
+        chaque semaine suffit à tenir le dispositif : c'est un <strong>cadrage</strong>, pas un
+        rattrapage — la file ne se videra pas, et ce n'est pas son objet.
+      </p>
+      <div className="file-liste">
+        {items.map(i => (
+          <div className="file-item" key={i.item_id}>
+            <span className="file-note" title="antériorité + portée + pertinence">{note(i)}</span>
+            <div className="file-corps">
+              <a href={i.url} target="_blank" rel="noreferrer">{i.titre}</a>
+              {i.resume && <p className="file-resume">{i.resume}</p>}
+              <p className="file-meta">
+                {i.flux}
+                {i.sector_code ? ` · ${i.sector_code}` : ""}
+                {i.watch_question_code ? ` · ${i.watch_question_code}` : ""}
+                {i.date_publication ? ` · ${dateCH(i.date_publication)}` : ""}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="note" style={{ marginTop: 10, maxWidth: 780 }}>
+        La note vient d'un modèle et <strong>ordonne la lecture</strong> ; elle ne vaut pas
+        validation. La promotion d'un item en signal reste un acte nominatif et daté.
+      </p>
+    </>
+  );
+}
+
 export default function AFaire() {
-  const { A, O, erreursV4 } = useDonnees();
+  const { A, O, S, erreursV4 } = useDonnees();
   const [tout, setTout] = useState(false);
 
   if (!A) return (
@@ -250,6 +305,9 @@ export default function AFaire() {
       ) : (
         <div className="fiches">{adressables.map(a => <Fiche key={a.publication_number} a={a} />)}</div>
       )}
+
+      {/* ---------- Les dix de la semaine ---------- */}
+      <FilePrioritaire items={S?.file_prioritaire} enAttente={S?.items_en_attente_examen || 0} />
 
       {/* ---------- Qui achète ---------- */}
       <Acheteurs acheteurs={A.acheteurs} />

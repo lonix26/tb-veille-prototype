@@ -7,7 +7,8 @@ import { Sparkline, Regle } from "../Mini.jsx";
 import {
   etatMarche, directionLongue, phraseEcheance, tonEcheance, phraseFraicheur,
   construireBrief, phraseMouvement, redondances, enLettres, serieAgregee,
-  compositionLatence, phraseComposition
+  compositionLatence, phraseComposition, phraseEcart, phraseNouveaute,
+  phrasePeriode, natureDuFait
 } from "../phrases.jsx";
 
 // =====================================================================
@@ -86,15 +87,99 @@ function CarteMarche({ s, D, onClic }) {
 
       {doublons.length > 0 && (
         <div className="avert" onClick={ev => ev.stopPropagation()}>
-          <strong>Prudence.</strong>{" "}
-          Deux séries de ce score mesurent presque la même chose —{" "}
-          <em>{doublons[0].nomA}</em> et <em>{doublons[0].nomB}</em>, qui évoluent ensemble
+          <strong>Prudence sur le score, pas sur les séries.</strong>{" "}
+          <em>{doublons[0].nomA}</em> et <em>{doublons[0].nomB}</em> évoluent ensemble
           (corrélation {nb(Math.abs(doublons[0].r), 2)} sur {doublons[0].n} points communs).
-          Le score les compte à égalité : il paraît donc plus assuré qu'il ne l'est.
+          Elles restent deux mesures distinctes — c'est souvent l'<strong>écart entre elles</strong>{" "}
+          qui porte l'information. Mais le score en fait une moyenne simple : leur mouvement commun
+          y compte deux fois, et il paraît donc plus assuré qu'il ne l'est.
           {doublons.length > 1 && ` ${enLettres(doublons.length)} paires sont dans ce cas.`}
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// DEPUIS LA DERNIÈRE FOIS — le bloc qui manquait, et c'était le principal.
+//
+// L'écran affichait un NIVEAU sans jamais dire s'il était nouveau. Un
+// dirigeant qui ouvre l'outil chaque lundi ne pouvait pas distinguer une
+// nouveauté d'une permanence, alors que le § 5 du rapport pose que « c'est
+// l'écart entre exécutions qui fait la tendance ».
+//
+// Quand l'écart de score n'est pas calculable — c'est le cas après un
+// changement de périmètre —, le bloc le DIT et se rabat sur ce qui l'est :
+// quels indicateurs ont avancé, et jusqu'où. Un bloc honnête vaut mieux
+// qu'un bloc vide, et mieux encore qu'un bloc qui compare deux grandeurs
+// qui ne portent pas sur le même périmètre.
+// ---------------------------------------------------------------------
+function Depuis({ S, sante }) {
+  const ecarts = (S?.ecart_7j || []).filter(e => e.ecart !== null && e.ecart !== undefined);
+  const nouveautes = S?.nouveautes_7j || [];
+  const nom = code => sante.find(x => x.sector_code === code)?.sector_label || code;
+
+  if (!ecarts.length && !nouveautes.length) return null;
+
+  const bouges = ecarts.filter(e => Math.abs(Number(e.ecart)) >= 0.1);
+  const avancees = nouveautes.filter(n => n.periode_maintenant !== n.periode_avant || n.entierement_nouveau);
+
+  return (
+    <section className="depuis">
+      <h2 className="depuis-titre">Depuis sept jours</h2>
+
+      {ecarts.length > 0 ? (
+        bouges.length === 0 ? (
+          <p className="depuis-rien">
+            Aucun marché n'a bougé de plus d'un dixième de point. Les positions tiennent.
+          </p>
+        ) : (
+          <ul className="depuis-liste">
+            {bouges.map(e => {
+              const d = Number(e.ecart);
+              return (
+                <li key={e.sector_code} className={d > 0 ? "hausse" : "baisse"}>
+                  {d > 0 ? "↗" : "↘"} {phraseEcart(e, nom(e.sector_code))}
+                  <span className="depuis-detail">
+                    {nb(e.score_precedent, 2)} → {nb(e.score_courant, 2)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )
+      ) : (
+        <p className="depuis-rien">
+          <strong>Pas de comparaison possible cette semaine.</strong> Il y a sept jours, la
+          fenêtre d'historique était plus courte et la plupart des séries n'atteignaient pas la
+          profondeur exigée pour qu'un score soit calculé. Comparer deux scores portant sur des
+          périmètres différents dirait n'importe quoi ; l'écart redeviendra lisible à la
+          prochaine semaine pleine.
+        </p>
+      )}
+
+      {avancees.length > 0 && (
+        <>
+          <p className="depuis-sous">
+            {enLettres(avancees.length)} indicateur{avancees.length > 1 ? "s ont" : " a"} reçu de
+            nouvelles observations :
+          </p>
+          <ul className="depuis-liste depuis-donnees">
+            {avancees.slice(0, 6).map(n => (
+              <li key={n.indicator_id}>
+                <span className={"etq lat-" + (n.latence || "coincident")}>
+                  {n.latence === "avance" ? "annonce" : n.latence === "retarde" ? "confirme" : "constate"}
+                </span>
+                {phraseNouveaute(n)}
+              </li>
+            ))}
+          </ul>
+          {avancees.length > 6 && (
+            <p className="depuis-detail">et {avancees.length - 6} autres.</p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -149,10 +234,29 @@ export default function CeMatin() {
   const aExaminer = Number(S.items_en_attente_examen) || 0;
 
   const { retenues: significatives, ecartees } = alertesSignificatives(D);
-  const mouvements = [...significatives]
-    .sort((x, y) => Math.abs(Number(y.glissement_annuel_pct) || 0)
-                  - Math.abs(Number(x.glissement_annuel_pct) || 0))
-    .slice(0, 5);
+
+  // « Ce qui a bougé » doit montrer ce qui a bougé, pas les plus grosses
+  // croissances annuelles. Deux corrections, constatées sur pièce le 25.08 :
+  //   — le classement se fait sur la variation DE PÉRIODE et non sur le
+  //     glissement annuel : la question est « qu'est-ce qui a changé depuis la
+  //     dernière observation ? » ;
+  //   — les séries de moins de huit périodes sont écartées. Quatre des cinq
+  //     mouvements affichés provenaient d'une série ANNUELLE de trois points,
+  //     où « +125 % » décrit la croissance structurelle d'un marché jeune et
+  //     non un mouvement. Huit est le seuil déjà retenu pour le score.
+  const longueurs = useMemo(() => {
+    const m = new Map();
+    for (const v of (D?.valeurs || [])) {
+      if (!m.has(v.indicator_id)) m.set(v.indicator_id, new Set());
+      m.get(v.indicator_id).add(v.period);
+    }
+    return m;
+  }, [D]);
+  const assezLongue = id => (longueurs.get(id)?.size ?? 0) >= 8;
+  const variation = a => Math.abs(Number(a.variation_periode_pct ?? a.glissement_annuel_pct) || 0);
+  const eligibles = significatives.filter(a => assezLongue(a.indicator_id));
+  const ecarteesCourtes = significatives.length - eligibles.length;
+  const mouvements = [...eligibles].sort((x, y) => variation(y) - variation(x)).slice(0, 5);
 
   const brief = construireBrief({ sante, actions, alertes: significatives, aValider, aExaminer, D });
 
@@ -177,11 +281,22 @@ export default function CeMatin() {
         </div>
         <div className="ouv-etat">
           <span className="puce-fraicheur">{phraseFraicheur(run.executed_at)}</span>
+          {/* La fraîcheur de la COLLECTE n'est pas celle de la DONNÉE. « Collecté il
+              y a deux heures » se lit comme « information fraîche » ; si le point le
+              plus récent date de juillet, c'est faux. Les deux sont affichées. */}
+          <span className="ouv-run">
+            donnée la plus récente : {phrasePeriode(S.fraicheur?.point_le_plus_recent)}
+            {S.fraicheur?.point_le_plus_ancien &&
+              ` · la plus ancienne série s'arrête en ${phrasePeriode(S.fraicheur.point_le_plus_ancien)}`}
+          </span>
           <span className="ouv-run">exécution n° {run.run_id ?? "—"} · {dateCH(run.executed_at)}</span>
         </div>
       </header>
 
       <p className="brief">{brief}</p>
+
+      {/* ---------- 1 bis. Ce qui a changé depuis la dernière fois ---------- */}
+      <Depuis S={S} sante={sante} />
 
       {/* ---------- 2. Ce qui demande une décision ---------- */}
       <h2 className="s-titre">Ce qui demande une décision</h2>
@@ -217,8 +332,8 @@ export default function CeMatin() {
           phrase={aExaminer > 300
             ? "la file croît plus vite qu'elle n'est traitée — à trancher par un cadrage, pas par du temps"
             : "items collectés et triés, en attente de lecture humaine"}
-          action="Voir les mieux classés"
-          onClic={() => navigate("/a-faire")}
+          action="Voir les dix mieux classés"
+          onClic={() => navigate("/a-faire#file")}
         />
       </div>
 
@@ -242,7 +357,9 @@ export default function CeMatin() {
       {/* ---------- 4. Ce qui a bougé ---------- */}
       <h2 className="s-titre">
         Ce qui a bougé
-        <span className="s-sous">les cinq mouvements les plus marqués, sur un an</span>
+        <span className="s-sous">
+          les cinq écarts les plus marqués d'une période à la suivante
+        </span>
       </h2>
       {mouvements.length === 0 ? (
         <div className="vide">Aucun mouvement au-delà des seuils de matérialité.</div>
@@ -261,11 +378,14 @@ export default function CeMatin() {
               </span>
             </div>
           ))}
-          {ecartees > 0 && (
+          {(ecartees > 0 || ecarteesCourtes > 0) && (
             <p className="mvt-note">
-              {nb(ecartees)} autres franchissements ne sont pas montrés : ils portent sur des
-              marchés pesant moins de 1 % de leur indicateur, où une forte variation relative
-              est un artefact de petits nombres et non un signal.
+              {ecartees > 0 && <>{nb(ecartees)} franchissements ne sont pas montrés : ils portent
+              sur des marchés pesant moins de 1 % de leur indicateur, où une forte variation
+              relative est un artefact de petits nombres et non un signal.</>}
+              {ecarteesCourtes > 0 && <> {nb(ecarteesCourtes)} autres proviennent de séries de
+              moins de huit périodes, où une variation ne se distingue pas de la croissance
+              structurelle de la série.</>}
             </p>
           )}
         </div>
@@ -282,9 +402,15 @@ export default function CeMatin() {
           </h2>
           <div className="faits">
             {(G.signaux || []).slice(0, 4).map(s => (
-              <div className="fait" key={s.signal_id}>
+              <div className={"fait fait-" + natureDuFait(s).replace(/ /g, "-")} key={s.signal_id}>
                 <div className="fait-tete">
                   <span className="etq e-violet">{s.sector_label}</span>
+                  {/* Un fait dont l'échéance est à neuf ans n'est pas une actualité :
+                      il se présente comme du contexte, sinon il occupe indéfiniment
+                      un écran qui s'appelle « Ce matin ». */}
+                  <span className={"etq " + (natureDuFait(s) === "récent" ? "e-vert" : "e-gris")}>
+                    {natureDuFait(s)}
+                  </span>
                   {s.echeance && <span className="fait-ech">échéance {s.echeance}</span>}
                 </div>
                 <p className="fait-txt">{s.evenement}</p>
@@ -320,7 +446,18 @@ export default function CeMatin() {
                   <div className="com-tete">
                     <strong>{sec?.sector_label || c.sector_code}</strong>
                     <span className="etq e-gris">{c.model}</span>
+                    <span className="com-date">
+                      collecte n° {c.run_id ?? "—"} · validée le {dateCH(c.validated_at)}
+                    </span>
                   </div>
+                  {c.run_id && run.run_id && c.run_id < run.run_id && (
+                    <div className="avert" onClick={ev => ev.stopPropagation()}>
+                      <strong>Lecture antérieure.</strong> Elle a été rédigée sur la collecte
+                      n° {c.run_id} ; la base en est à la n° {run.run_id}. Les chiffres qu'elle
+                      cite peuvent différer de ceux affichés plus haut — c'est le cas, et il vaut
+                      mieux le voir écrit que le découvrir en comparant.
+                    </div>
+                  )}
                   <div className="c-corps"><MarkdownLeger texte={c.text} /></div>
                 </div>
               );

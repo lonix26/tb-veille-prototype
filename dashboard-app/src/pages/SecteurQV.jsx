@@ -597,6 +597,7 @@ export default function SecteurQV() {
   const instanciation = (D.instanciation || []).filter(q => q.sector_code === code);
   const couverture = (D.couverture_qv || []).filter(c => c.sector_code === code);
   const commentaire = (D.commentaires || []).find(c => c.sector_code === code);
+  const runCourant = S?.run_courant?.run_id ?? D?.run_courant?.run_id ?? null;
   const attribution = ((AT && AT.attribution) || []).find(a => a.sector_code === code);
   // QV3 : les zones du secteur, et le constat de divergence s'il y en a un.
   const zonesGeo = ((GEO && GEO.zones) || []).filter(z => z.sector_code === code);
@@ -689,7 +690,18 @@ export default function SecteurQV() {
                     <div className="c-pied">
                       <span className="etq e-vert">validé</span>
                       {commentaire.validated_by} · {dateCH(commentaire.validated_at)}
+                      {commentaire.run_id && <> · collecte n° {commentaire.run_id}</>}
                     </div>
+                    {/* Même règle qu'à l'accueil : une lecture validée sur une collecte
+                        antérieure peut citer des chiffres que l'écran a depuis dépassés.
+                        Le dire vaut mieux que laisser le lecteur les confronter. */}
+                    {commentaire.run_id && runCourant && commentaire.run_id < runCourant && (
+                      <div className="avert" style={{ marginTop: 10 }}>
+                        <strong>Lecture antérieure.</strong> Rédigée sur la collecte
+                        n° {commentaire.run_id} ; la base en est à la n° {runCourant}. Les
+                        chiffres cités ici peuvent différer de ceux affichés sur cette page.
+                      </div>
+                    )}
                   </div>
                 )}
                 {qv === "QV1" && attribution && <AttributionAncree bloc={attribution} />}
