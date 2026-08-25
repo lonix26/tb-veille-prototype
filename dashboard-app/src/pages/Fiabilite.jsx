@@ -104,6 +104,25 @@ export default function Fiabilite() {
   const runs = D?.sante_runs || [];
   const rev = D?.revisions || [];
 
+  // Couverture des questions de veille PAR LA VITRINE — l'ancienne vue de
+  // couverture comptait la grille d'avant l'élagage. Recalculée ici depuis ce
+  // qui est réellement suivi : c'est la « calculabilité de l'absence » du
+  // cadre invariant, appliquée à la grille élaguée. Une question découverte
+  // se VOIT, au lieu d'être recouverte nominalement par une série illisible.
+  const couverture = useMemo(() => {
+    const vitrine = S?.vitrine || [];
+    const inst = D?.instanciation || [];
+    const qDe = id => String((D?.referentiel || []).find(r => r.indicator_id === id)?.questions || "")
+      .split(",").filter(Boolean);
+    return inst.map(q => {
+      const porteurs = vitrine
+        .filter(v => v.sector_code === q.sector_code && qDe(v.indicator_id).includes(q.watch_question_code))
+        .map(v => v.indicator_id);
+      return { ...q, porteurs };
+    });
+  }, [D, S]);
+  const decouvertes = couverture.filter(q => q.porteurs.length === 0).length;
+
   const f = filtre.trim().toLowerCase();
   const lignes = ref.filter(i => !f ||
     [i.indicator_id, i.sector_label, i.label, i.source_organisation].join(" ").toLowerCase().includes(f));
@@ -170,6 +189,35 @@ export default function Fiabilite() {
       )}
 
       {vue === "grille" && (
+        <>
+        <div className="carte" style={{ marginBottom: 14 }}>
+          <h3 className="sous-titre">Les questions de veille, et qui y répond</h3>
+          <p className="reserve-corps" style={{ marginBottom: 10 }}>
+            Chaque indicateur de la grille est rattaché à une question — un déclencheur en base
+            l'impose. Après l'élagage, {decouvertes === 0
+              ? "toutes les questions restent couvertes."
+              : `${enLettres(decouvertes)} question${decouvertes > 1 ? "s" : ""} ne ${decouvertes > 1 ? "sont" : "est"} plus couverte${decouvertes > 1 ? "s" : ""} — et cela se voit, au lieu d'être recouvert nominalement par une série illisible. C'est la calculabilité de l'absence : un cadre de questions invariant permet de mesurer ce qu'on ne surveille pas.`}
+          </p>
+          <table>
+            <thead>
+              <tr><th>Marché</th><th>Question</th><th>Formulation</th><th>Suivie par</th></tr>
+            </thead>
+            <tbody>
+              {couverture.map((q, i) => (
+                <tr key={i}>
+                  <td>{q.sector_label || q.sector_code}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{q.question_generique || q.watch_question_code}</td>
+                  <td><span className="cell-note" style={{ marginTop: 0 }}>{q.question_sectorielle}</span></td>
+                  <td>
+                    {q.porteurs.length
+                      ? q.porteurs.map(id => <span className="etq e-gris" key={id} style={{ marginRight: 4 }}>{id}</span>)
+                      : <span className="etq e-attn">découverte</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <div className="carte" style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--bord)" }}>
             <input className="filtre" style={{ width: "100%" }}
@@ -204,6 +252,7 @@ export default function Fiabilite() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {vue === "collectes" && (

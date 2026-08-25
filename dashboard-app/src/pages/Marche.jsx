@@ -32,7 +32,7 @@ const SOUS = {
   transversal: "l'activité de la profession, le carnet qui l'annonce, l'écosystème suisse et le change"
 };
 
-function FicheIndicateur({ v, serie }) {
+function FicheIndicateur({ v, serie, questions }) {
   const sens = Number(v.sens_favorable) || 1;
   const dv = v.variation_periode_pct === null ? null : Number(v.variation_periode_pct);
   const ga = v.glissement_annuel_pct === null ? null : Number(v.glissement_annuel_pct);
@@ -47,6 +47,23 @@ function FicheIndicateur({ v, serie }) {
       </div>
       {v.description_metier && (
         <p className="fi-desc">{String(v.description_metier).split(" [HORS VITRINE")[0]}</p>
+      )}
+
+      {/* La question de veille, EN TOUTES LETTRES et jamais en code. C'est la
+          réponse à la seule interrogation qu'un lecteur ait devant une série —
+          pourquoi est-ce que je regarde ça ? — et la thèse du dispositif rendue
+          visible : pas d'indicateur sans question (un déclencheur l'impose en
+          base ; l'écran, jusqu'ici, n'en montrait rien). */}
+      {questions && questions.length > 0 && (
+        <p className="fi-question">
+          Suit la question{questions.length > 1 ? "s" : ""} :{" "}
+          {questions.map((q, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && " · "}
+              <em>« {q} »</em>
+            </React.Fragment>
+          ))}
+        </p>
       )}
 
       <div className="fi-chiffres">
@@ -109,11 +126,15 @@ function FicheIndicateur({ v, serie }) {
 // qui monte, tout le monde croît — la question est qui croît plus vite
 // que le marché. Les points de part le disent, les pourcentages non.
 // =====================================================================
+// `qv` : la question de veille à laquelle le bloc répond, affichée en toutes
+// lettres sous le titre. Les destinations répondent à la demande (QV2) ; les
+// déclarants, à la géographie des pôles (QV3) ; les budgets militaires, aux
+// impulsions publiques (QV5).
 const GEO_IND = {
-  horlogerie:  { id: "H1", note: "exportations horlogères suisses par destination — Comtrade, USD" },
-  medical:     { id: "M1", note: "commerce mondial d'instruments médicaux par déclarant — Comtrade, USD" },
-  automobile:  { id: "A4", note: "commerce de parties et accessoires automobiles par déclarant — Comtrade, USD" },
-  aerospatial: { id: "S4", note: "dépenses militaires par pays — SIPRI, USD courants" }
+  horlogerie:  { id: "H1", qv: "QV2", note: "exportations horlogères suisses par destination — Comtrade, USD" },
+  medical:     { id: "M1", qv: "QV3", note: "commerce mondial d'instruments médicaux par déclarant — Comtrade, USD" },
+  automobile:  { id: "A4", qv: "QV3", note: "commerce de parties et accessoires automobiles par déclarant — Comtrade, USD" },
+  aerospatial: { id: "S4", qv: "QV5", note: "dépenses militaires par pays — SIPRI, USD courants" }
 };
 
 function homologue(p) {
@@ -126,6 +147,8 @@ function homologue(p) {
 
 function DynamiqueGeo({ D, code }) {
   const conf = GEO_IND[code];
+  const question = conf ? (D?.instanciation || []).find(
+    q => q.sector_code === code && q.watch_question_code === conf.qv)?.question_sectorielle : null;
   const calc = useMemo(() => {
     if (!conf) return null;
     const pts = (D?.valeurs || []).filter(v =>
@@ -172,6 +195,9 @@ function DynamiqueGeo({ D, code }) {
     <>
       <h2 className="section">Où le marché se déplace</h2>
       <div className="carte">
+        {question && <p className="fi-question" style={{ marginBottom: 12 }}>
+          Répond à la question : <em>« {question} »</em>
+        </p>}
         <div className="geo-tuiles">
           <div className="geo-tuile">
             <span className="geo-tuile-l">Concentration</span>
@@ -271,6 +297,20 @@ export default function Marche() {
   const faits = (G?.signaux || []).filter(s => s.sector_code === code);
   const acheteurs = (A?.acheteurs || []).filter(a => a.sector_code === code)
     .sort((x, y) => (y.avis_publies || 0) - (x.avis_publies || 0));
+  // Les questions instanciées de chaque indicateur, en toutes lettres.
+  const questionsDe = useMemo(() => {
+    const inst = D?.instanciation || [];
+    const m = {};
+    for (const v of vitrine) {
+      const codes = String((D?.referentiel || []).find(r => r.indicator_id === v.indicator_id)?.questions || "")
+        .split(",").filter(Boolean);
+      m[v.indicator_id] = codes
+        .map(c => inst.find(q => q.sector_code === code && q.watch_question_code === c)?.question_sectorielle)
+        .filter(Boolean);
+    }
+    return m;
+  }, [D, vitrine, code]);
+
   const ecartes = (D?.referentiel || [])
     .filter(i => i.sector_code === code && !vitrine.some(v => v.indicator_id === i.indicator_id))
     .length;
@@ -295,7 +335,8 @@ export default function Marche() {
       <p className="bloc-intro" style={{ marginTop: -14 }}>{SOUS[code] || ""}</p>
 
       {vitrine.map(v => (
-        <FicheIndicateur key={v.indicator_id} v={v} serie={series[v.indicator_id]} />
+        <FicheIndicateur key={v.indicator_id} v={v} serie={series[v.indicator_id]}
+                         questions={questionsDe[v.indicator_id]} />
       ))}
 
       <DynamiqueGeo D={D} code={code} />

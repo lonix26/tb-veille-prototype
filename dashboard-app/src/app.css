@@ -329,3 +329,7 @@ tr:last-child td{border-bottom:0}
 .pays-part{text-align:right;font-variant-numeric:tabular-nums;font-weight:650}
 .pays-d{text-align:right;font-variant-numeric:tabular-nums;font-size:11.5px}
 @media (max-width:700px){.geo-listes{grid-template-columns:1fr}.pays-ligne{grid-template-columns:90px 1fr 50px 56px}}
+
+/* La question de veille, en toutes lettres, sur chaque fiche d'indicateur. */
+.fi-question{font-size:12.5px;line-height:1.55;color:var(--accent2);margin:2px 0 6px}
+.fi-question em{font-style:italic}
