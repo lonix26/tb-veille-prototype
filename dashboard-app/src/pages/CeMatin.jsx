@@ -6,7 +6,8 @@ import {
 import { Sparkline, Regle } from "../Mini.jsx";
 import {
   etatMarche, directionLongue, phraseEcheance, tonEcheance, phraseFraicheur,
-  construireBrief, phraseMouvement, redondances, enLettres, serieAgregee
+  construireBrief, phraseMouvement, redondances, enLettres, serieAgregee,
+  compositionLatence, phraseComposition
 } from "../phrases.jsx";
 
 // =====================================================================
@@ -50,6 +51,7 @@ function CarteMarche({ s, D, onClic }) {
   const dir = directionLongue(Number(s.tendance_moyenne));
   const serie = useMemo(() => serieRepresentative(D, s.indicateurs), [D, s.indicateurs]);
   const doublons = useMemo(() => redondances(D, s.indicateurs), [D, s.indicateurs]);
+  const compo = useMemo(() => compositionLatence(D, s.indicateurs), [D, s.indicateurs]);
 
   return (
     <div className="carte marche cliquable" onClick={onClic} role="button" tabIndex={0}
@@ -71,7 +73,16 @@ function CarteMarche({ s, D, onClic }) {
             : `score calculé sur ${enLettres(s.n_indicateurs_orientables)} série${s.n_indicateurs_orientables > 1 ? "s" : ""}, sur ${enLettres(s.indicateurs_certifies)} certifiées`}
         </span>
         {serie && <span className="marche-serie" title={serie.label}>courbe : {serie.label}</span>}
+        <span className="marche-compo">{phraseComposition(compo)}</span>
       </div>
+
+      {compo.avance === 0 && (
+        <div className="avert avert-fort" onClick={ev => ev.stopPropagation()}>
+          <strong>Aucun signal d'avance.</strong> Toutes les séries de ce score décrivent ce qui
+          s'est déjà produit. Sur ce marché, le tableau de bord <em>constate</em> — il n'avertit
+          pas. Un retournement n'y serait visible qu'après coup.
+        </div>
+      )}
 
       {doublons.length > 0 && (
         <div className="avert" onClick={ev => ev.stopPropagation()}>

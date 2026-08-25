@@ -262,3 +262,34 @@ export function avecArticle(libelle) {
   const l = String(libelle || "").toLowerCase();
   return /^[aeiouyâàéèêëîïôöûü]|^h/.test(l) ? `L'${l}` : `Le ${l}`;
 }
+
+// ---------------------------------------------------------------------
+// 11. AVANCE, PRÉSENT, CONFIRMATION — la distinction la plus utile du métier.
+//
+// Un indicateur avancé annonce, un coïncident constate, un retardé confirme.
+// Les mélanger dans une même moyenne est une erreur de catégorie : l'avancé
+// est neutralisé par le retardé au moment précis où il servirait.
+//
+// Le dispositif porte cet attribut en base depuis l'origine et ne s'en
+// servait nulle part. C'est lui qui révèle que l'horlogerie et l'automobile
+// — les deux marchés historiques de l'entreprise — étaient suivis sans
+// aucun signal d'avance.
+// ---------------------------------------------------------------------
+export function compositionLatence(D, ids) {
+  const ref = D?.referentiel || [];
+  const c = { avance: 0, coincident: 0, retarde: 0, inconnue: 0 };
+  for (const id of ids || []) {
+    const l = ref.find(r => r.indicator_id === id)?.latence;
+    if (l === "avance" || l === "coincident" || l === "retarde") c[l]++;
+    else c.inconnue++;
+  }
+  return c;
+}
+
+export function phraseComposition(c) {
+  const bouts = [];
+  if (c.avance) bouts.push(`${enLettres(c.avance)} qui annonce${c.avance > 1 ? "nt" : ""}`);
+  if (c.coincident) bouts.push(`${enLettres(c.coincident)} qui constate${c.coincident > 1 ? "nt" : ""}`);
+  if (c.retarde) bouts.push(`${enLettres(c.retarde)} qui confirme${c.retarde > 1 ? "nt" : ""}`);
+  return bouts.join(" · ");
+}
