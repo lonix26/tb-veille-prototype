@@ -179,6 +179,61 @@ $_$;
 COMMENT ON FUNCTION public.periode_annee_precedente(p text) IS 'Étiquette de la période homologue de l''année précédente. Renvoie NULL sur un format non reconnu plutôt que de deviner.';
 
 
+--
+-- Name: sante_a_la_date(timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sante_a_la_date(p_limite timestamp with time zone) RETURNS TABLE(sector_code text, n_series bigint, score numeric)
+    LANGUAGE sql STABLE
+    AS $$
+  WITH courant AS (
+    SELECT DISTINCT ON (iv.indicator_id, iv.period, iv.geo)
+           iv.indicator_id, iv.period, iv.geo, iv.value
+      FROM indicator_values iv
+     WHERE iv.validation_status = ANY (ARRAY['valide_source','pre_valide_consensus','valide_humain'])
+       AND iv.collected_at <= p_limite
+     ORDER BY iv.indicator_id, iv.period, iv.geo, iv.run_id DESC
+  ), rang AS (
+    SELECT c.indicator_id, c.period, c.value,
+           row_number() OVER (PARTITION BY c.indicator_id ORDER BY c.period)::numeric AS t
+      FROM courant c
+      JOIN indicators i ON i.indicator_id = c.indicator_id
+                       AND i.geo_reference IS NOT NULL AND c.geo = i.geo_reference
+  ), droite AS (
+    SELECT rang.indicator_id,
+           regr_slope(rang.value::double precision, rang.t::double precision)     AS pente,
+           regr_intercept(rang.value::double precision, rang.t::double precision) AS ordonnee,
+           count(*) AS n_points
+      FROM rang GROUP BY rang.indicator_id
+  ), residus AS (
+    SELECT r.indicator_id, r.t,
+           r.value::double precision - (d.ordonnee + d.pente * r.t::double precision) AS residu
+      FROM rang r JOIN droite d USING (indicator_id)
+  ), resume AS (
+    SELECT re.indicator_id,
+           stddev_samp(re.residu)::numeric AS sd_residu,
+           (array_agg(re.residu ORDER BY re.t DESC))[1]::numeric AS dernier_residu
+      FROM residus re GROUP BY re.indicator_id
+  ), par_indicateur AS (
+    SELECT i.sector_code, i.indicator_id,
+           r.dernier_residu / NULLIF(r.sd_residu, 0) * i.sens_favorable::numeric AS z
+      FROM resume r JOIN droite d USING (indicator_id) JOIN indicators i USING (indicator_id)
+     WHERE i.sens_favorable IN (-1, 1) AND i.status = 'certifie'
+       AND r.sd_residu IS NOT NULL AND r.sd_residu > 0 AND d.n_points >= 8
+  )
+  SELECT p.sector_code, count(*),
+         CASE WHEN count(*) >= 2 THEN round(avg(p.z), 2) END
+    FROM par_indicateur p GROUP BY p.sector_code;
+$$;
+
+
+--
+-- Name: FUNCTION sante_a_la_date(p_limite timestamp with time zone); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.sante_a_la_date(p_limite timestamp with time zone) IS 'Score de santé sectorielle tel qu''il était à une date donnée. Identique à v_sante_secteur, borné aux observations collectées avant cette date. Le registre étant en ajout seul, l''état passé est intact : ce n''est pas une reconstitution.';
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -641,6 +696,7 @@ CREATE TABLE public.indicators (
     sens_favorable smallint,
     latence text,
     geo_reference text,
+    en_vitrine boolean DEFAULT false NOT NULL,
     CONSTRAINT indicators_category_check CHECK ((category = ANY (ARRAY['hard'::text, 'composite'::text]))),
     CONSTRAINT indicators_frequency_check CHECK ((frequency = ANY (ARRAY['mensuelle'::text, 'trimestrielle'::text, 'semestrielle'::text, 'annuelle'::text, 'bisannuelle'::text]))),
     CONSTRAINT indicators_latence_check CHECK ((latence = ANY (ARRAY['retarde'::text, 'coincident'::text, 'avance'::text, 'flux'::text]))),
@@ -668,6 +724,13 @@ COMMENT ON COLUMN public.indicators.latence IS 'Position temporelle de l''indica
 --
 
 COMMENT ON COLUMN public.indicators.geo_reference IS 'Zone de la série retenue pour le calcul de la santé sectorielle. DÉCLARATION HUMAINE : NULL = non déclaré, l''indicateur n''entre pas dans v_sante_secteur. Remplace l''heuristique « zone la plus fournie » du 23.08, qui désignait l''Andorre pour H1 (42 zones à égalité, départage alphabétique). Troisième application de la doctrine admet_negatifs / sens_favorable : ce que le code présumerait, la base l''exige écrit.';
+
+
+--
+-- Name: COLUMN indicators.en_vitrine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.indicators.en_vitrine IS 'L''indicateur fait-il partie de la grille suivie et affichée ? Distinct de `status`, qui qualifie la source. Un indicateur écarté de la vitrine reste au référentiel avec ses observations et redevient disponible sans requalification.';
 
 
 --
@@ -1468,8 +1531,8 @@ CREATE VIEW public.v_bilan_referentiel AS
     count(*) FILTER (WHERE ((status = 'certifie'::text) AND (category = 'hard'::text))) AS certifies_hard,
     count(*) FILTER (WHERE ((status = 'certifie'::text) AND (category = 'composite'::text))) AS certifies_composite,
     count(*) FILTER (WHERE (status = 'a_confirmer'::text)) AS a_confirmer,
-    count(*) FILTER (WHERE (status = ANY (ARRAY['certifie'::text, 'a_confirmer'::text]))) AS en_grille,
-    count(*) FILTER (WHERE (status <> ALL (ARRAY['certifie'::text, 'a_confirmer'::text]))) AS ecartes
+    count(*) FILTER (WHERE en_vitrine) AS en_grille,
+    count(*) FILTER (WHERE (NOT en_vitrine)) AS ecartes
    FROM public.indicators
   GROUP BY ROLLUP(sector_code)
   ORDER BY sector_code;
@@ -1479,7 +1542,7 @@ CREATE VIEW public.v_bilan_referentiel AS
 -- Name: VIEW v_bilan_referentiel; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.v_bilan_referentiel IS 'Décompte de la grille, produit par requête et faisant foi (§ 8.4.5). `en_grille` = certifiés + à confirmer, ce que le rapport appelle « la grille ». `ecartes` = indicateurs restés au référentiel mais retirés de la grille, leurs observations étant au registre en ajout seul. `total` = somme des deux.';
+COMMENT ON VIEW public.v_bilan_referentiel IS 'Décompte faisant foi (§ 8.4.5). `en_grille` = indicateurs en vitrine, c''est-à-dire suivis et affichés. `ecartes` = qualifiés et conservés au référentiel, hors grille. `certifies` reste le décompte de qualification des SOURCES, qui ne se perd pas.';
 
 
 --
@@ -2103,6 +2166,49 @@ COMMENT ON VIEW public.v_nouveaute_par_run IS 'Écart entre exécutions datées,
 
 
 --
+-- Name: v_nouveautes_7j; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_nouveautes_7j AS
+ WITH avant AS (
+         SELECT indicator_values.indicator_id,
+            max(indicator_values.period) AS p_max,
+            count(DISTINCT indicator_values.period) AS n_periodes
+           FROM public.indicator_values
+          WHERE (indicator_values.collected_at <= (now() - '7 days'::interval))
+          GROUP BY indicator_values.indicator_id
+        ), maintenant AS (
+         SELECT indicator_values.indicator_id,
+            max(indicator_values.period) AS p_max,
+            count(DISTINCT indicator_values.period) AS n_periodes
+           FROM public.indicator_values
+          GROUP BY indicator_values.indicator_id
+        )
+ SELECT m.indicator_id,
+    i.sector_code,
+    i.label,
+    i.latence,
+    i.unit,
+    a.p_max AS periode_avant,
+    m.p_max AS periode_maintenant,
+    COALESCE(a.n_periodes, (0)::bigint) AS periodes_avant,
+    m.n_periodes AS periodes_maintenant,
+    (m.n_periodes - COALESCE(a.n_periodes, (0)::bigint)) AS periodes_gagnees,
+    (a.indicator_id IS NULL) AS entierement_nouveau
+   FROM ((maintenant m
+     JOIN public.indicators i USING (indicator_id))
+     LEFT JOIN avant a USING (indicator_id))
+  WHERE ((a.indicator_id IS NULL) OR (m.p_max > a.p_max) OR (m.n_periodes > a.n_periodes));
+
+
+--
+-- Name: VIEW v_nouveautes_7j; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_nouveautes_7j IS 'Indicateurs ayant gagné des périodes depuis sept jours. Répond à « qu''est-ce qui est arrivé ? » quand l''écart de score n''est pas calculable — par exemple après un changement de périmètre.';
+
+
+--
 -- Name: v_sante_des_runs; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -2121,6 +2227,43 @@ CREATE VIEW public.v_sante_des_runs AS
      LEFT JOIN public.indicator_values iv ON ((iv.run_id = r.run_id)))
   GROUP BY r.run_id, r.executed_at, r.status
   ORDER BY r.run_id DESC;
+
+
+--
+-- Name: v_sante_ecart; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_sante_ecart AS
+ WITH avant AS (
+         SELECT sante_a_la_date.sector_code,
+            sante_a_la_date.n_series,
+            sante_a_la_date.score
+           FROM public.sante_a_la_date((now() - '7 days'::interval)) sante_a_la_date(sector_code, n_series, score)
+        ), maintenant AS (
+         SELECT sante_a_la_date.sector_code,
+            sante_a_la_date.n_series,
+            sante_a_la_date.score
+           FROM public.sante_a_la_date(now()) sante_a_la_date(sector_code, n_series, score)
+        )
+ SELECT COALESCE(m.sector_code, a.sector_code) AS sector_code,
+    7 AS jours,
+    m.score AS score_courant,
+    a.score AS score_precedent,
+        CASE
+            WHEN ((m.score IS NOT NULL) AND (a.score IS NOT NULL)) THEN round((m.score - a.score), 2)
+            ELSE NULL::numeric
+        END AS ecart,
+    m.n_series AS series_courantes,
+    a.n_series AS series_precedentes
+   FROM (maintenant m
+     FULL JOIN avant a USING (sector_code));
+
+
+--
+-- Name: VIEW v_sante_ecart; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_sante_ecart IS 'Écart du score de santé sur sept jours, par secteur. Répond à la seule question qu''on pose vraiment à un dispositif de veille : qu''est-ce qui a changé depuis la dernière fois ?';
 
 
 --
@@ -2148,13 +2291,11 @@ CREATE VIEW public.v_sante_secteur AS
             regr_slope((rang.value)::double precision, (rang.t)::double precision) AS pente,
             regr_intercept((rang.value)::double precision, (rang.t)::double precision) AS ordonnee,
             (corr((rang.value)::double precision, (rang.t)::double precision))::numeric AS tendance,
-            count(*) AS n_points,
-            max(rang.t) AS t_max
+            count(*) AS n_points
            FROM rang
           GROUP BY rang.indicator_id
         ), residus AS (
          SELECT r.indicator_id,
-            r.period,
             r.t,
             ((r.value)::double precision - (d.ordonnee + (d.pente * (r.t)::double precision))) AS residu
            FROM (rang r
@@ -2175,7 +2316,7 @@ CREATE VIEW public.v_sante_secteur AS
            FROM ((resume r
              JOIN droite d USING (indicator_id))
              JOIN public.indicators i USING (indicator_id))
-          WHERE ((i.sens_favorable = ANY (ARRAY['-1'::integer, 1])) AND (i.status = 'certifie'::text) AND (r.sd_residu IS NOT NULL) AND (r.sd_residu > (0)::numeric) AND (d.n_points >= 8))
+          WHERE (i.en_vitrine AND (i.sens_favorable = ANY (ARRAY['-1'::integer, 1])) AND (r.sd_residu IS NOT NULL) AND (r.sd_residu > (0)::numeric) AND (d.n_points >= 8))
         )
  SELECT sector_code,
     count(*) AS n_indicateurs_orientables,
@@ -2192,7 +2333,7 @@ CREATE VIEW public.v_sante_secteur AS
     round(avg(tendance), 2) AS tendance_moyenne,
     ( SELECT count(*) AS count
            FROM public.indicators x
-          WHERE ((x.sector_code = p.sector_code) AND (x.status = 'certifie'::text))) AS indicateurs_certifies
+          WHERE ((x.sector_code = p.sector_code) AND x.en_vitrine)) AS indicateurs_certifies
    FROM par_indicateur p
   GROUP BY sector_code;
 
@@ -2445,6 +2586,51 @@ CREATE VIEW public.v_triage_a_echantillonner AS
      JOIN public.flux_triage_ia t ON ((t.item_id = e.item_id)))
   GROUP BY e.decision, t.pertinence
   ORDER BY e.decision, t.pertinence;
+
+
+--
+-- Name: v_vitrine; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_vitrine AS
+ SELECT DISTINCT ON (i.indicator_id) i.indicator_id,
+    i.sector_code,
+    sec.label AS sector_label,
+    i.label,
+    i.description_metier,
+    i.unit,
+    i.frequency,
+    i.latence,
+    i.category,
+    i.sens_favorable,
+    i.geo_reference,
+    m.period,
+    m.value,
+    m.variation_periode_pct,
+    m.glissement_annuel_pct,
+    m.moyenne_mobile_annuelle,
+    m.ecart_a_la_moyenne_pct,
+    m.nb_points_moyenne,
+    m.seuil_materialite_pct,
+    m.franchissement,
+    s.organisation AS source_organisation,
+    s.url AS source_url,
+    ( SELECT count(DISTINCT v.period) AS count
+           FROM public.indicator_values v
+          WHERE ((v.indicator_id = i.indicator_id) AND (v.geo = i.geo_reference))) AS n_periodes
+   FROM (((public.indicators i
+     JOIN public.sectors sec ON ((sec.code = i.sector_code)))
+     LEFT JOIN public.sources s ON ((s.source_id = i.source_id)))
+     LEFT JOIN public.v_metriques m ON (((m.indicator_id = i.indicator_id) AND (m.geo = i.geo_reference))))
+  WHERE i.en_vitrine
+  ORDER BY i.indicator_id, m.period DESC NULLS LAST;
+
+
+--
+-- Name: VIEW v_vitrine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_vitrine IS 'Les indicateurs suivis, prêts à l''affichage : dernière valeur, variation, écart à leur propre moyenne, rôle (annonce/constate/confirme) et source. Remplace le score sectoriel sur l''écran de décision — treize séries nommées sont plus interprétables qu''un nombre agrégé.';
 
 
 --

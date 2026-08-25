@@ -1,127 +1,125 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDonnees, nb, dateCH } from "../api.jsx";
-import { Sparkline } from "../Mini.jsx";
-import {
-  etatMarche, phraseEcheance, phraseFraicheur, phrasePeriode,
-  redondances, compositionLatence, enLettres, avecArticle
-} from "../phrases.jsx";
+import { useDonnees, nb, pct } from "../api.jsx";
+import { phraseEcheance, phraseFraicheur, phrasePeriode, enLettres } from "../phrases.jsx";
 
 // =====================================================================
-// AUJOURD'HUI — l'écran unique, et il tient dans une hauteur d'écran.
+// AUJOURD'HUI — treize indicateurs, et plus aucun score.
 //
-// Ce qu'il remplace : un accueil de neuf sections empilées, où le verdict
-// se trouvait quelque part entre un paragraphe de méthode, trois
-// avertissements imbriqués et deux commentaires de modèle. Personne n'y
-// comprenait rien, et c'était mérité — j'avais répondu à chacune de mes
-// critiques par un bloc de plus.
+// TROIS ITÉRATIONS POUR EN ARRIVER LÀ, et l'erreur était toujours la même :
+// je corrigeais la présentation d'une grille trop grosse au lieu de tailler
+// la grille. Quarante-quatre indicateurs, dont huit sans aucune donnée, six
+// trop courts pour être lus, deux arrêtés en 2022, et des paires corrélées
+// à 0,99. Aucune mise en page ne rend cela lisible.
 //
-// Il répond à UNE question : dois-je faire quelque chose ?
-//   1. un verdict en une phrase ;
-//   2. ce qui a une échéance, s'il y en a ;
-//   3. l'état des quatre marchés, en un coup d'œil ;
-//   4. ce qui attend un geste de ma part, sur une ligne.
+// LA DÉCISION. La grille passe à TREIZE indicateurs (§ 8.8), et le score
+// sectoriel quitte cet écran. Avec deux séries par marché, « la moyenne des
+// écarts détendancés » n'est plus une mesure : c'est la moyenne de deux
+// nombres, et personne ne sait l'interpréter. Il reste calculé, documenté
+// et visible sur l'écran Fiabilité comme ce qu'il est — une
+// expérimentation méthodologique.
 //
-// Tout le reste — méthode, réserves, séries, sources, limites — n'a pas
-// disparu : il a un écran à lui. Voir `Fiabilite.jsx`.
+// À la place : les séries elles-mêmes. Chacune porte son rôle, sa dernière
+// valeur, sa variation et sa position par rapport à sa propre moyenne. Plus
+// long à lire qu'un nombre. Infiniment plus interprétable.
 // =====================================================================
 
-function verdictDuJour({ urgentes, marches, ecarts }) {
-  const horsNorme = marches.filter(m => m.score_sante !== null && Math.abs(Number(m.score_sante)) >= 1);
-  // Le verdict ne parle QUE des marchés affichés. Le socle transversal a son
-  // écran ; le nommer ici renvoyait le lecteur à une tuile qui n'existe pas.
-  const codes = new Set(marches.map(m => m.sector_code));
-  const bouges = (ecarts || [])
-    .filter(e => codes.has(e.sector_code) && e.ecart !== null && Math.abs(Number(e.ecart)) >= 0.1);
-  const comparables = (ecarts || []).filter(e => codes.has(e.sector_code) && e.ecart !== null);
+const ROLE = { avance: "annonce", coincident: "constate", retarde: "confirme" };
 
-  // 1. La phrase principale : ce qui presse, ou rien.
-  let titre;
-  if (urgentes.length === 0) titre = "Rien ne presse aujourd'hui.";
-  else if (urgentes.length === 1)
-    titre = `Un appel d'offres se clôt ${phraseEcheance(urgentes[0].jours_restants)}.`;
-  else
-    titre = `${enLettres(urgentes.length)} appels d'offres se closent d'ici quinze jours.`;
-  titre = titre.charAt(0).toUpperCase() + titre.slice(1);
-
-  // 2. La suite : l'état des marchés, en une phrase, sans chiffre.
-  const bouts = [];
-  if (horsNorme.length === 0) bouts.push("Vos quatre marchés se tiennent dans leur norme habituelle");
-  else if (horsNorme.length === 1) {
-    const m = horsNorme[0];
-    const e = etatMarche(Number(m.score_sante));
-    bouts.push(`${avecArticle(m.sector_label)} ressort ${e.mot} de son niveau habituel ; les trois autres sont dans leur norme`);
-  } else {
-    bouts.push(`${enLettres(horsNorme.length)} marchés s'écartent de leur norme habituelle`);
+// Un nombre se lit mieux quand son ordre de grandeur est dit en mots.
+function valeurLisible(v, unite) {
+  if (v === null || v === undefined) return "—";
+  const u = String(unite || "");
+  const a = Math.abs(v);
+  if (/unité|avis|autoris|pièce|objet/i.test(u)) {
+    if (a >= 1e6) return `${nb(v / 1e6, 2)} mio`;
+    if (a >= 1e4) return `${nb(v / 1e3, 0)} k`;
+    return nb(v, 0);
   }
-  if (comparables.length === 0) { /* pas de comparaison : on n'invente pas de phrase */ }
-  else if (bouges.length === 0) bouts.push("aucun n'a bougé depuis une semaine");
-  else if (bouges.length === 1) {
-    const b = bouges[0];
-    const m = marches.find(x => x.sector_code === b.sector_code);
-    bouts.push(`${(m?.sector_label || b.sector_code).toLowerCase()} ${Number(b.ecart) > 0 ? "remonte" : "recule"} depuis une semaine`);
-  } else bouts.push(`${enLettres(bouges.length)} ont bougé depuis une semaine`);
-
-  return { titre, suite: bouts.join(", ") + "." };
+  return nb(v, a >= 100 ? 0 : 1);
 }
 
-function Tuile({ m, D, ecart, onClic }) {
-  const score = m.score_sante === null ? null : Number(m.score_sante);
-  const e = etatMarche(score);
-  const serie = useMemo(() => {
-    // Une seule courbe par tuile, celle qui couvre le plus de périodes parmi
-    // les séries qui portent le score. Elle donne la forme, pas la valeur.
-    let best = null, n = -1;
-    for (const id of m.indicateurs || []) {
-      const pts = (D?.valeurs || []).filter(v => v.indicator_id === id);
-      if (!pts.length) continue;
-      const parGeo = new Map();
-      for (const p of pts) parGeo.set(p.geo, [...(parGeo.get(p.geo) || []), p]);
-      for (const [, arr] of parGeo) if (arr.length > n) { n = arr.length; best = arr; }
-    }
-    return best ? [...best].sort((a, b) => String(a.period).localeCompare(String(b.period))).slice(-48) : null;
-  }, [D, m.indicateurs]);
+function uniteCourte(u) {
+  const c = {
+    "nombre d'avis": "avis", "nombre d'autorisations": "autorisations",
+    "milliers de pièces": "k pièces", "mio CHF": "mio CHF",
+    indice: "", pourcentage: "%", solde: "solde", taux: "", unités: "immatric."
+  };
+  return c[u] ?? u ?? "";
+}
 
-  // Le nombre de réserves, pas leur contenu. Le contenu est sur Fiabilité.
-  const reserves = useMemo(() => {
-    const r = redondances(D, m.indicateurs).length;
-    const c = compositionLatence(D, m.indicateurs);
-    return r + (c.avance === 0 ? 1 : 0);
-  }, [D, m.indicateurs]);
-
-  const classeEtat = score === null ? "plat" : score >= 1 ? "haut" : score <= -1 ? "bas" : "plat";
-  const d = ecart && ecart.ecart !== null ? Number(ecart.ecart) : null;
+function Ligne({ v }) {
+  const sens = Number(v.sens_favorable) || 1;
+  const dv = v.variation_periode_pct === null ? null : Number(v.variation_periode_pct);
+  const ecart = v.ecart_a_la_moyenne_pct === null ? null : Number(v.ecart_a_la_moyenne_pct);
+  // Une variation nulle n'est ni bonne ni mauvaise : la peindre en rouge
+  // ferait passer une stabilité pour une dégradation.
+  const bon = dv === null || dv === 0 ? null : dv * sens > 0;
+  const trop_court = Number(v.n_periodes) < 8;
 
   return (
-    <button className="tuile" onClick={onClic}>
-      <span className="tuile-nom">{m.sector_label}</span>
-      <span className={"tuile-etat " + classeEtat}>{e.mot}</span>
-      {serie && <span className="tuile-spark"><Sparkline points={serie} ton={e.ton} largeur={170} hauteur={30} /></span>}
-      <span className="tuile-pied">
-        {d === null ? "" :
-         Math.abs(d) < 0.1 ? "inchangé depuis 7 j" :
-         `${d > 0 ? "+" : "−"}${nb(Math.abs(d), 2)} en 7 j`}
-        {reserves > 0 && (
-          <span className="tuile-reserve">
-            {reserves} réserve{reserves > 1 ? "s" : ""}
-          </span>
-        )}
+    <div className="ind">
+      <span className={"ind-role r-" + (v.latence || "coincident")}>
+        {ROLE[v.latence] || "—"}
       </span>
-    </button>
+
+      <span className="ind-quoi">
+        {v.label}
+        <span className="ind-src">
+          {v.source_organisation} · {phrasePeriode(v.period)}
+          {trop_court && <> · <em>série courte, {v.n_periodes} points</em></>}
+        </span>
+      </span>
+
+      <span className="ind-val">
+        {valeurLisible(v.value, v.unit)}
+        <span className="ind-u"> {uniteCourte(v.unit)}</span>
+      </span>
+
+      <span className={"ind-var " + (bon === null ? "nul" : bon ? "bon" : "mauvais")}>
+        {dv === null ? "—" : <>{dv > 0 ? "▲" : dv < 0 ? "▼" : "="} {pct(dv)}</>}
+      </span>
+
+      <span className="ind-pos">
+        {ecart === null ? "" :
+         Math.abs(ecart) < 3 ? "à sa moyenne" :
+         `${pct(ecart)} vs sa moyenne`}
+      </span>
+    </div>
+  );
+}
+
+function Bloc({ titre, sous, lignes, onClic }) {
+  if (!lignes.length) return null;
+  return (
+    <section className="bloc-ind">
+      <header className="bloc-ind-tete" onClick={onClic} role={onClic ? "button" : undefined}>
+        <h3>{titre}</h3>
+        <span className="bloc-ind-sous">{sous}</span>
+        {onClic && <span className="bloc-ind-plus">détail →</span>}
+      </header>
+      {lignes.map(v => <Ligne key={v.indicator_id} v={v} />)}
+    </section>
   );
 }
 
 export default function Aujourdhui() {
-  const { D, S, A, erreursV4 } = useDonnees();
+  const { S, A, erreursV4 } = useDonnees();
   const navigate = useNavigate();
 
-  const marches = useMemo(
-    () => (S?.sante || []).filter(x => x.sector_code !== "transversal"), [S]);
   const urgentes = useMemo(() => (A?.actions || [])
     .filter(a => a.adressable >= 1 && a.jours_restants !== null && a.jours_restants <= 15)
     .sort((x, y) => x.jours_restants - y.jours_restants), [A]);
-  const v = useMemo(
-    () => verdictDuJour({ urgentes, marches, ecarts: S?.ecart_7j }), [urgentes, marches, S]);
+
+  const vitrine = S?.vitrine || [];
+  const parSecteur = useMemo(() => {
+    const m = new Map();
+    for (const v of vitrine) {
+      if (!m.has(v.sector_code)) m.set(v.sector_code, []);
+      m.get(v.sector_code).push(v);
+    }
+    return m;
+  }, [vitrine]);
 
   if (!S) return (
     <div className="page">
@@ -140,6 +138,15 @@ export default function Aujourdhui() {
     .toLocaleDateString("fr-CH", { weekday: "long", day: "numeric", month: "long" })
     .replace(",", "");
 
+  const titre = urgentes.length === 0 ? "Rien ne presse aujourd'hui."
+    : urgentes.length === 1 ? `Un appel d'offres se clôt ${phraseEcheance(urgentes[0].jours_restants)}.`
+    : `${enLettres(urgentes.length)} appels d'offres se closent d'ici quinze jours.`;
+
+  const SECTEURS = [
+    ["horlogerie", "Horlogerie"], ["medical", "Médical"],
+    ["automobile", "Automobile"], ["aerospatial", "Aérospatial"]
+  ];
+
   return (
     <div className="page">
       <header className="jour-tete">
@@ -150,8 +157,7 @@ export default function Aujourdhui() {
         </span>
       </header>
 
-      <h1 className="verdict">{v.titre}</h1>
-      <p className="verdict-suite">{v.suite}</p>
+      <h1 className="verdict">{titre.charAt(0).toUpperCase() + titre.slice(1)}</h1>
 
       {urgentes.length > 0 && (
         <div className="bande">
@@ -179,23 +185,20 @@ export default function Aujourdhui() {
         </div>
       )}
 
-      <h2 className="section-titre">Vos marchés</h2>
-      {/* La phrase est dite UNE fois. Répétée sur les quatre tuiles, elle
-          donnait l'application pour cassée alors qu'elle est exacte. */}
-      {(S.ecart_7j || []).filter(e => e.ecart !== null && e.sector_code !== "transversal").length === 0 && (
-        <p className="tuiles-note">
-          Pas de comparaison hebdomadaire cette semaine : la fenêtre d'historique a été élargie le
-          24 août, et les scores d'il y a sept jours portaient sur un autre périmètre. L'écart
-          redeviendra lisible à la prochaine semaine pleine.
-        </p>
-      )}
-      <div className="tuiles">
-        {marches.map(m => (
-          <Tuile key={m.sector_code} m={m} D={D}
-                 ecart={(S.ecart_7j || []).find(e => e.sector_code === m.sector_code)}
-                 onClic={() => navigate("/marche/" + m.sector_code)} />
-        ))}
-      </div>
+      <h2 className="section-titre">
+        Ce que disent les chiffres · {enLettres(vitrine.length)} indicateurs suivis
+      </h2>
+
+      <Bloc titre="Votre métier et votre marge"
+            sous="l'activité de la profession, le carnet qui l'annonce, et le change"
+            lignes={parSecteur.get("transversal") || []}
+            onClic={() => navigate("/marche/transversal")} />
+
+      {SECTEURS.map(([code, nom]) => (
+        <Bloc key={code} titre={nom} sous="marché client"
+              lignes={parSecteur.get(code) || []}
+              onClic={() => navigate("/marche/" + code)} />
+      ))}
 
       <div className="attente">
         {aValider > 0 || aExaminer > 0 ? (
@@ -208,10 +211,14 @@ export default function Aujourdhui() {
             </span>
             <a className="attente-lien" href="#/a-faire">Traiter les dix de la semaine →</a>
           </>
-        ) : (
-          <span>Rien n'attend votre lecture.</span>
-        )}
+        ) : <span>Rien n'attend votre lecture.</span>}
       </div>
+
+      <p className="pied-note">
+        Trente et un autres indicateurs ont été qualifiés puis <strong>écartés de la grille</strong> —
+        sans données, trop courts, périmés ou redondants. Le motif de chacun est sur l'écran{" "}
+        <a href="#/fiabilite">Fiabilité</a>, avec les réserves qui pèsent sur ce qui reste.
+      </p>
     </div>
   );
 }

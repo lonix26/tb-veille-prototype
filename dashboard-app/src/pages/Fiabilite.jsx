@@ -146,6 +146,7 @@ export default function Fiabilite() {
         ["grille", "La grille"],
         ["collectes", "Les collectes"],
         ["revisions", `Révisions (${rev.length})`],
+        ["elagage", "L'élagage"],
         ["methode", "La méthode"]
       ]} />
 
@@ -263,6 +264,51 @@ export default function Fiabilite() {
         </div>
       )}
 
+      {vue === "elagage" && (
+        <div className="carte">
+          <h3 className="sous-titre">De quarante-quatre indicateurs à treize</h3>
+          <p className="reserve-corps">
+            La grille comptait quarante-quatre indicateurs. Un décideur n'en lit pas
+            quarante-quatre, et le volume masquait ce que la grille avait à dire. L'élagage du
+            25 août 2026 en retient <strong>treize</strong>. Les trente et un autres restent au
+            référentiel, qualifiés, avec leurs observations : ils sont écartés de la vitrine, pas
+            supprimés, et redeviennent disponibles sans requalification.
+          </p>
+          <h3 className="sous-titre">Les cinq critères, appliqués dans cet ordre</h3>
+          <ol className="liste-manques">
+            <li><strong>Il collecte</strong> — au moins douze points sur sa zone de référence.</li>
+            <li><strong>Il est frais</strong> — moins de trois mois de retard pour une série
+              infra-annuelle, moins de dix-huit pour une annuelle.</li>
+            <li><strong>Il n'est pas redondant</strong> — corrélation inférieure à 0,90 avec tout
+              autre indicateur retenu.</li>
+            <li><strong>Il parle au métier</strong> — il porte sur l'étage adressable par un
+              usineur de précision, ou sur le marché de son client direct. Pas deux étages plus
+              loin.</li>
+            <li><strong>Il apporte un rôle</strong> — annonce, constat ou confirmation que le
+              secteur n'a pas déjà.</li>
+          </ol>
+          <h3 className="sous-titre">Ce qui a décidé, quand deux séries se ressemblaient</h3>
+          <p className="reserve-corps">
+            Entre deux séries corrélées, la grille garde <strong>la plus proche du métier</strong>,
+            et non la plus longue. Une série de cent cinquante points sur un marché final vaut
+            moins, pour un sous-traitant, qu'une série de dix-neuf points sur les pièces qu'il
+            usine. C'est ainsi que H7 et H9 — la valeur et le volume des exportations horlogères —
+            l'emportent sur H1, H8 et H3, et que A6 (équipements, l'étage adressable) l'emporte
+            sur A5 (assemblage de véhicules, en aval du sous-traitant).
+          </p>
+          <h3 className="sous-titre">Ce que l'élagage a coûté</h3>
+          <p className="reserve-corps">
+            Il faut le dire, parce que c'est le prix du choix. L'automobile ne compte plus que deux
+            indicateurs, dont un — les immatriculations — n'a que sept points : ce marché n'est
+            plus <em>scorable</em>, et le tableau de bord ne prétend plus le scorer. La couverture
+            des questions de veille se resserre également : plusieurs questions n'ont plus qu'un
+            indicateur, et deux n'en ont plus du tout. Ces lacunes sont calculables, elles se
+            lisent dans l'onglet « La grille », et elles valent mieux qu'une couverture nominale
+            assurée par des séries qu'on ne peut pas lire.
+          </p>
+        </div>
+      )}
+
       {vue === "methode" && (
         <div className="carte">
           <h3 className="sous-titre">L'état d'un marché</h3>
@@ -283,6 +329,18 @@ export default function Fiabilite() {
             <li><strong>Se passer de vous.</strong> Les lectures produites par modèle sortent au
               statut « à valider » et n'atteignent l'écran qu'après relecture humaine.</li>
           </ul>
+          <h3 className="sous-titre">Pourquoi le score n'ouvre plus la journée</h3>
+          <p className="reserve-corps">
+            Le score sectoriel — la moyenne des écarts détendancés des séries d'un marché — a été
+            retiré de l'écran de décision le 25 août 2026. Avec deux séries par marché après
+            l'élagage, « la moyenne des écarts détendancés » n'est plus une mesure : c'est la
+            moyenne de deux nombres. Le construit était déjà le plus fragile du dispositif —
+            moyenne non pondérée, périodicités mêlées, séries corrélées comptées deux fois — et
+            réduire le nombre de séries le rend indéfendable comme chiffre affiché à un dirigeant.
+            Il reste calculé, il reste au rapport, et il reste ici : c'est une <strong>
+            expérimentation méthodologique</strong> — comment construire une position cyclique
+            détendancée, et pourquoi elle n'est pas décisionnelle en l'état.
+          </p>
           <h3 className="sous-titre">Annonce, constat, confirmation</h3>
           <p className="reserve-corps">
             Chaque indicateur porte son rôle : un <strong>avancé</strong> annonce, un
