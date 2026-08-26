@@ -807,12 +807,20 @@ CREATE TABLE public.indicators (
     latence text,
     geo_reference text,
     en_vitrine boolean DEFAULT false NOT NULL,
+    note_conception text,
     CONSTRAINT indicators_category_check CHECK ((category = ANY (ARRAY['hard'::text, 'composite'::text]))),
     CONSTRAINT indicators_frequency_check CHECK ((frequency = ANY (ARRAY['mensuelle'::text, 'trimestrielle'::text, 'semestrielle'::text, 'annuelle'::text, 'bisannuelle'::text]))),
     CONSTRAINT indicators_latence_check CHECK ((latence = ANY (ARRAY['retarde'::text, 'coincident'::text, 'avance'::text, 'flux'::text]))),
     CONSTRAINT indicators_sens_favorable_check CHECK ((sens_favorable = ANY (ARRAY['-1'::integer, 0, 1]))),
     CONSTRAINT indicators_status_check CHECK ((status = ANY (ARRAY['certifie'::text, 'a_confirmer'::text, 'restreint'::text])))
 );
+
+
+--
+-- Name: COLUMN indicators.description_metier; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.indicators.description_metier IS 'Destiné au LECTEUR du tableau de bord : ce que l''indicateur mesure, pourquoi il compte pour un atelier, comment le lire sans se tromper. Ni date de décision, ni code de règle, ni mention de score ou de vitrine — cela relève de note_conception.';
 
 
 --
@@ -841,6 +849,13 @@ COMMENT ON COLUMN public.indicators.geo_reference IS 'Zone de la série retenue 
 --
 
 COMMENT ON COLUMN public.indicators.en_vitrine IS 'L''indicateur fait-il partie de la grille suivie et affichée ? Distinct de `status`, qui qualifie la source. Un indicateur écarté de la vitrine reste au référentiel avec ses observations et redevient disponible sans requalification.';
+
+
+--
+-- Name: COLUMN indicators.note_conception; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.indicators.note_conception IS 'Destiné au JURY et à la reprise du dispositif : journal des décisions portant sur cet indicateur (retraits du score, redondances mesurées, changements de source, mises hors vitrine, inapplicabilité de règles). Jamais affiché sur un écran de décision.';
 
 
 --

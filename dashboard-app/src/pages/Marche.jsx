@@ -46,7 +46,7 @@ function FicheIndicateur({ v, serie, questions }) {
         <h3>{v.label}</h3>
       </div>
       {v.description_metier && (
-        <p className="fi-desc">{String(v.description_metier).split(" [HORS VITRINE")[0]}</p>
+        <p className="fi-desc">{v.description_metier}</p>
       )}
 
       {/* La question de veille, EN TOUTES LETTRES et jamais en code. C'est la

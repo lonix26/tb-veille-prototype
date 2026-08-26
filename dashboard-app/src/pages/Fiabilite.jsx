@@ -267,7 +267,16 @@ export default function Fiabilite({ vueInitiale }) {
                       {i.source_url && <div><LienSource href={i.source_url}>source</LienSource></div>}</td>
                   <td>{Number(i.observations) > 0
                         ? <>{nb(i.observations)} obs.<div className="cell-note">{i.p_min} → {i.p_max}</div></>
-                        : <span className="etq e-gris">rien</span>}</td>
+                        : <span className="etq e-gris">rien</span>}
+                      {/* Le journal des décisions portant sur cet indicateur — retraits du
+                          score, redondances mesurées, changements de source, mises hors
+                          vitrine. Il vivait jusqu'au 26.08 dans la description affichée aux
+                          écrans de décision, où il n'avait rien à faire : jusqu'à mille
+                          caractères de prose méthodologique entre le titre d'un indicateur
+                          et sa valeur. Séparé en base (`note_conception`), il reparaît ici,
+                          sur l'écran destiné à la relecture du dispositif. Rien n'est perdu,
+                          rien ne s'affiche là où cela gênait. */}
+                      {i.note_conception && <div className="cell-note">{i.note_conception}</div>}</td>
                 </tr>
               ))}
             </tbody>

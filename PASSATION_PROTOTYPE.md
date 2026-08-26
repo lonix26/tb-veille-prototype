@@ -51,3 +51,41 @@ probablement le meilleur rapport valeur/temps qui reste avant le dépôt.
   principal ne trouve rien tant que les écritures sont dans le `-wal`. À purger avant de figer.
 - `dashboard-app/verification/rendu.jsx` ne visitait que l'onglet par défaut de Fiabilité.
   Corrigé : `Fiabilite` accepte `vueInitiale`, et les sept onglets sont désormais rendus.
+
+## 26.08.2026 — `description_metier` scindée : le lecteur d'un côté, le journal de décisions de l'autre
+
+**Le défaut.** Le champ s'était chargé de deux textes de natures différentes. Le premier
+explique l'indicateur à qui le lit. Le second est un **journal de décisions** — « RETIRÉ DU
+SCORE le 24.08.2026 : corrélation des résidus de 0,910 », « seuil de matérialité nul à dessein
+(RI4 inapplicable) », « [HORS VITRINE le 25.08.2026 — …] ». Le second était affiché sur les
+écrans de décision, entre le titre d'un indicateur et sa valeur : jusqu'à **1 572 caractères**
+de prose méthodologique (M6), 1 273 sur A7.
+
+Le symptôme était déjà dans le code : `Marche.jsx` coupait la chaîne à `" [HORS VITRINE"` pour
+ne pas l'afficher. Rustine d'affichage sur un défaut de modèle — retirée.
+
+**Le choix : séparer, pas supprimer.** Effacer le journal contredirait la thèse du travail.
+Nouvelle colonne `indicators.note_conception`, avec `COMMENT ON COLUMN` sur les deux champs pour
+que la frontière ne se redissolve pas. Migration `2026-08-26_description_lecteur.sql`, rédigée
+indicateur par indicateur — **aucun contenu inventé**, découpage et réécriture à sens constant.
+
+| | Avant | Après |
+|---|---|---|
+| Longueur moyenne | 401 car. | **222 car.** |
+| Maximum | 1 572 car. | **483 car.** |
+| Descriptions portant de la prose de rapport | 24 / 46 | **0** |
+| Journaux conservés en base | — | 23 |
+
+Les ouvertures en capitales sont démajusculées (« CE QUI RECOMPOSE LA DEMANDE DE COMPOSANTS »
+→ « Ce qui recompose la demande de composants »). Les capitales d'insistance ne survivent que là
+où elles portent une consigne de lecture — T8 et T10 : « se lit en POINTS, jamais en
+pourcentage ».
+
+**Vérifié avant de retirer** : le workflow `analyse_tendances_alertes` nourrit le modèle avec
+`description_metier`. La phrase supprimée (« interdit au modèle de commenter la variation »)
+n'était pas le garde-fou : celui-ci est structurel — `alert_threshold_pct` est **nul** sur A7,
+M6, T8 et T10, et RI4 est appliquée par la consigne du workflow. La consigne de lecture utile
+(lire en points, pas en pourcentage) est conservée côté lecteur.
+
+**Où le journal reparaît** : onglet « La grille » de l'écran Fiabilité, servi par
+`veille/donnees`. Rien n'est perdu, rien ne s'affiche là où cela gênait.
