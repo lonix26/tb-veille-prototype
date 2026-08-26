@@ -13,11 +13,13 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { Ctx } from "../src/api.jsx";
-import Aujourdhui from "../src/pages/Aujourdhui.jsx";
+import Accueil from "../src/pages/Accueil.jsx";
+import Secteur from "../src/pages/Secteur.jsx";
+import Referentiel from "../src/pages/Referentiel.jsx";
+import Executions from "../src/pages/Executions.jsx";
 import AFaire from "../src/pages/AFaire.jsx";
 import Fiabilite from "../src/pages/Fiabilite.jsx";
 import Anticiper from "../src/pages/Anticiper.jsx";
-import Marche from "../src/pages/Marche.jsx";
 
 const BASE = process.env.API_BASE || "http://localhost:5678/webhook/veille";
 
@@ -31,15 +33,17 @@ async function lire(chemin) {
 // d'URL (les marchés lisent `:code`) ne se teste pas hors de son routage,
 // sinon elle rend son état vide et le test passe en croyant vérifier.
 const ECRANS = [
-  ["Aujourd'hui", Aujourdhui, "/aujourdhui", "/aujourdhui"],
-  ["À faire", AFaire, "/a-faire", "/a-faire"],
-  ["Fiabilité", Fiabilite, "/fiabilite", "/fiabilite"],
+  ["Vue d'ensemble", Accueil, "/", "/"],
+  ["Actions", AFaire, "/actions", "/actions"],
   ["Anticiper", Anticiper, "/anticiper", "/anticiper"],
-  ["Marché — horlogerie", Marche, "/marche/horlogerie", "/marche/:code"],
-  ["Marché — automobile", Marche, "/marche/automobile", "/marche/:code"],
-  ["Marché — médical", Marche, "/marche/medical", "/marche/:code"],
-  ["Marché — aérospatial", Marche, "/marche/aerospatial", "/marche/:code"],
-  ["Socle transversal", Marche, "/marche/transversal", "/marche/:code"]
+  ["Fiabilité", Fiabilite, "/fiabilite", "/fiabilite"],
+  ["Référentiel", Referentiel, "/referentiel", "/referentiel"],
+  ["Exécutions", Executions, "/executions", "/executions"],
+  ["Secteur — horlogerie", Secteur, "/secteur/horlogerie", "/secteur/:code"],
+  ["Secteur — automobile", Secteur, "/secteur/automobile", "/secteur/:code"],
+  ["Secteur — médical", Secteur, "/secteur/medical", "/secteur/:code"],
+  ["Secteur — aérospatial", Secteur, "/secteur/aerospatial", "/secteur/:code"],
+  ["Socle transversal", Secteur, "/secteur/transversal", "/secteur/:code"]
 ];
 
 // react-dom/server avertit sur useLayoutEffect à chaque écran ; l'avertissement

@@ -1,42 +1,46 @@
 import React from "react";
 import { Routes, Route, NavLink, Navigate } from "react-router-dom";
-import { FournisseurDonnees, useDonnees, API_URL, heureCH } from "./api.jsx";
-import Aujourdhui from "./pages/Aujourdhui.jsx";
+import { FournisseurDonnees, useDonnees, API_URL, heureCH, alertesSignificatives } from "./api.jsx";
+import Accueil from "./pages/Accueil.jsx";
+import Secteur from "./pages/Secteur.jsx";
+import Referentiel from "./pages/Referentiel.jsx";
+import Executions from "./pages/Executions.jsx";
 import AFaire from "./pages/AFaire.jsx";
-import Marche from "./pages/Marche.jsx";
-import Fiabilite from "./pages/Fiabilite.jsx";
 import Anticiper from "./pages/Anticiper.jsx";
+import Fiabilite from "./pages/Fiabilite.jsx";
 
 // =====================================================================
-// v7 — QUATRE ÉCRANS, UNE FEUILLE DE STYLE, RIEN D'AUTRE DANS LE BUNDLE.
+// v8 — RETOUR À LA STRUCTURE V3, décision de l'étudiant du 26.08.2026.
 //
-//   Aujourd'hui  — dois-je faire quelque chose ?
-//   À faire      — sur quoi je me positionne, et quand ?
-//   Un marché    — pourquoi ce marché est-il dans cet état ?
-//   Fiabilité    — puis-je m'y fier, et que sait-on mal ?
+// La v3 est la version qu'il a validée à l'écran le 17.08 : riche, une
+// carte complète par indicateur — valeur, badge de statut, graphique,
+// provenance — et les classements par pays. Les refontes v5-v7 ont gagné
+// en calme et perdu en information ; c'était l'inverse de la demande.
 //
-// Les écrans des itérations précédentes ont été RETIRÉS du bundle. Ils
-// mêlaient trois systèmes visuels et des attentes de données que l'API ne
-// sert plus — d'où des pages cassées. Leur code reste dans git et leur
-// histoire au rapport (§ 11) ; leurs adresses redirigent vers l'écran
-// équivalent, un lien partagé ne meurt pas.
+// La v8 remet la v3 au centre, en conservant les acquis des itérations :
+//   Vue d'ensemble  — l'accueil v3 (KPI, secteurs, commentaires)
+//   Secteurs (×5)   — la page v3 complète : TOUS les indicateurs du
+//                     référentiel, classements, gagnants/perdants
+//   Actions         — les appels d'offres, le tamis, les dix items
+//   Anticiper       — les indicateurs dérivés du 26.08
+//   Référentiel · Exécutions — les preuves, comme en v3
+//   Fiabilité       — les réserves calculées
 // =====================================================================
-
-const SECTEURS = [
-  ["horlogerie", "Horlogerie"], ["medical", "Médical"],
-  ["automobile", "Automobile"], ["aerospatial", "Aérospatial"],
-  ["transversal", "Métier et marge"]
-];
 
 function Navigation() {
-  const { A } = useDonnees();
+  const { D, A } = useDonnees();
+  const r = D?.referentiel || [];
+  const secteurs = [...new Map(r.map(i => [i.sector_code, i.sector_label])).entries()]
+    .filter(([c]) => c !== "transversal");
+  const retenues = alertesSignificatives(D).retenues;
+  const nbAlertes = c => retenues.filter(a => a.sector_code === c).length;
   const urgentes = (A?.actions || [])
     .filter(a => a.adressable >= 1 && a.jours_restants !== null && a.jours_restants <= 15).length;
 
-  const lien = (vers, libelle, pastille, ton) => (
+  const lien = (vers, libelle, pastille) => (
     <NavLink to={vers} className={({ isActive }) => "nav" + (isActive ? " actif" : "")}>
-      <span>{libelle}</span>
-      {pastille ? <span className={"pastille" + (ton ? " p-" + ton : "")}>{pastille}</span> : null}
+      {libelle}
+      {pastille ? <span className="pastille">{pastille}</span> : null}
     </NavLink>
   );
 
@@ -46,18 +50,23 @@ function Navigation() {
         Veille économique
         <small>CODEC SA · cas d'illustration</small>
       </div>
-      {lien("/aujourdhui", "Aujourd'hui")}
-      {lien("/a-faire", "À faire", urgentes || null, "alerte")}
+      {lien("/", "Vue d'ensemble")}
+      {lien("/actions", "Actions", urgentes || null)}
       {lien("/anticiper", "Anticiper")}
-      {lien("/fiabilite", "Fiabilité")}
-      <div className="nav-titre">Vos marchés</div>
-      {SECTEURS.map(([c, l]) => (
-        <React.Fragment key={c}>{lien("/marche/" + c, l)}</React.Fragment>
+      <div className="nav-titre">Marchés</div>
+      {secteurs.map(([c, l]) => (
+        <React.Fragment key={c}>{lien("/secteur/" + c, l, nbAlertes(c) || null)}</React.Fragment>
       ))}
+      {lien("/secteur/transversal", "Socle transversal")}
+      <div className="nav-titre">Dispositif</div>
+      {lien("/referentiel", "Référentiel")}
+      {lien("/executions", "Exécutions")}
+      {lien("/fiabilite", "Fiabilité")}
       <div className="nav-pied">
-        Prototype de travail de bachelor · HEG Arc<br />
-        Semi-automatisé — rien n'est diffusé sans relecture humaine<br />
-        Sources ouvertes uniquement
+        Restitution v8 — structure v3, validée le 17.08, rétablie le 26.08<br />
+        Scénario B · human-in-the-loop<br />
+        Sources ouvertes uniquement<br />
+        Prototype de travail de bachelor — HEG Arc
       </div>
     </aside>
   );
@@ -74,10 +83,11 @@ function Entete() {
 function Squelette() {
   return (
     <main>
-      <div className="squelette" style={{ height: 16, width: 150, marginBottom: 22 }} />
-      <div className="squelette" style={{ height: 66, width: 440, marginBottom: 30 }} />
-      <div className="squelette" style={{ height: 130, marginBottom: 30 }} />
-      <div className="squelette" style={{ height: 220 }} />
+      <div className="squelette" style={{ height: 34, width: 280, marginBottom: 20 }} />
+      <div className="grille g4">
+        {[0, 1, 2, 3].map(i => <div key={i} className="squelette" style={{ height: 110 }} />)}
+      </div>
+      <div className="squelette" style={{ height: 300, marginTop: 14 }} />
     </main>
   );
 }
@@ -87,9 +97,8 @@ function Erreur({ erreur, recharger }) {
     <main>
       <div className="vide">
         <strong>La base ne répond pas.</strong><br />
-        Cette application ne contient aucune donnée en dur : sans l'interface de lecture, elle
-        n'affiche rien — et le dit, plutôt que de montrer un écran vide qui passerait pour un
-        marché calme.<br />
+        Cette application ne contient aucune donnée en dur : sans l'interface de lecture,
+        elle n'affiche rien — et le dit.<br />
         <span style={{ fontSize: 12, color: "var(--gris)" }}>{erreur} · {API_URL}</span><br /><br />
         <button className="rafraichir" onClick={recharger}>Réessayer</button>
       </div>
@@ -106,35 +115,35 @@ function Coquille() {
       <Navigation />
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/aujourdhui" replace />} />
-          <Route path="/aujourdhui" element={<Aujourdhui />} />
-          <Route path="/a-faire" element={<AFaire />} />
+          <Route path="/" element={<Accueil />} />
+          <Route path="/secteur/:code" element={<Secteur />} />
+          <Route path="/actions" element={<AFaire />} />
           <Route path="/anticiper" element={<Anticiper />} />
+          <Route path="/referentiel" element={<Referentiel />} />
+          <Route path="/executions" element={<Executions />} />
           <Route path="/fiabilite" element={<Fiabilite />} />
-          <Route path="/marche/:code" element={<Marche />} />
 
-          {/* Adresses des itérations précédentes. */}
-          <Route path="/qv/:code" element={<Marche />} />
-          <Route path="/secteur/:code" element={<Marche />} />
-          <Route path="/ce-matin" element={<Navigate to="/aujourdhui" replace />} />
-          <Route path="/cette-semaine" element={<Navigate to="/aujourdhui" replace />} />
-          <Route path="/accueil" element={<Navigate to="/aujourdhui" replace />} />
+          {/* Adresses des itérations précédentes : un lien partagé ne meurt pas. */}
+          <Route path="/accueil" element={<Navigate to="/" replace />} />
+          <Route path="/aujourdhui" element={<Navigate to="/" replace />} />
+          <Route path="/ce-matin" element={<Navigate to="/" replace />} />
+          <Route path="/cette-semaine" element={<Navigate to="/" replace />} />
+          <Route path="/marche/:code" element={<Secteur />} />
+          <Route path="/qv/:code" element={<Secteur />} />
+          <Route path="/a-faire" element={<Navigate to="/actions" replace />} />
+          <Route path="/opportunites" element={<Navigate to="/actions" replace />} />
           <Route path="/dispositif" element={<Navigate to="/fiabilite" replace />} />
-          <Route path="/referentiel" element={<Navigate to="/fiabilite" replace />} />
-          <Route path="/executions" element={<Navigate to="/fiabilite" replace />} />
-          <Route path="/actions" element={<Navigate to="/a-faire" replace />} />
-          <Route path="/opportunites" element={<Navigate to="/a-faire" replace />} />
-          <Route path="/radar" element={<Navigate to="/aujourdhui" replace />} />
-          <Route path="/signaux" element={<Navigate to="/aujourdhui" replace />} />
+          <Route path="/radar" element={<Navigate to="/" replace />} />
+          <Route path="/signaux" element={<Navigate to="/" replace />} />
 
-          <Route path="*" element={<Navigate to="/aujourdhui" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        <footer className="pied">
+        <div className="note" style={{ marginTop: 30, display: "flex", gap: 12, alignItems: "center" }}>
           <button className="rafraichir" disabled={chargement} onClick={recharger}>
-            {chargement ? "Actualisation…" : "Actualiser"}
+            {chargement ? "Actualisation…" : "Actualiser les données"}
           </button>
-          {misAJour && <span>Affichage rafraîchi à {heureCH(misAJour)}</span>}
-        </footer>
+          {misAJour && <span>Données rechargées à {heureCH(misAJour)}</span>}
+        </div>
       </main>
     </>
   );

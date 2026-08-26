@@ -10,11 +10,12 @@
 import { readFileSync } from "node:fs";
 
 const VIVANTS = [
-  "src/App.jsx", "src/pages/Aujourdhui.jsx", "src/pages/AFaire.jsx",
-  "src/pages/Marche.jsx", "src/pages/Fiabilite.jsx",
+  "src/App.jsx", "src/pages/Accueil.jsx", "src/pages/Secteur.jsx",
+  "src/pages/Referentiel.jsx", "src/pages/Executions.jsx",
+  "src/pages/AFaire.jsx", "src/pages/Anticiper.jsx", "src/pages/Fiabilite.jsx",
   "src/api.jsx", "src/Mini.jsx", "src/Chart.jsx"
 ];
-const FEUILLE = readFileSync("src/app.css", "utf8");
+const FEUILLE = readFileSync("src/styles.css", "utf8");
 const definies = new Set([...FEUILLE.matchAll(/\.([a-z][a-z0-9_-]*)/gi)].map(m => m[1]));
 
 // Classes produites dynamiquement par concaténation — la base est déclarée,

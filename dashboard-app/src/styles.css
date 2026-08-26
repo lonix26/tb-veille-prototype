@@ -671,3 +671,44 @@ main{max-width:1240px;padding:30px 40px 40px}
 .file-corps a:hover{text-decoration:underline}
 .file-resume{font-size:12.5px;line-height:1.55;color:var(--encre2);margin-top:5px}
 .file-meta{font-size:11.5px;color:var(--gris);margin-top:5px}
+
+/* =====================================================================
+   EXTENSIONS v8 (26.08.2026) — les classes des écrans Actions, Anticiper
+   et Fiabilité, raccordées à la palette v3. Une seule feuille : le
+   contrôle `verification/classes.mjs` vérifie qu'aucune classe utilisée
+   par un écran vivant n'est orpheline.
+   ===================================================================== */
+.tete{display:flex;align-items:baseline;justify-content:space-between;gap:18px;
+  flex-wrap:wrap;margin-bottom:18px}
+.tete-date{font-size:13px;color:var(--gris)}
+.tete-date::first-letter{text-transform:uppercase}
+.tete-etat{font-size:12px;color:var(--gris);text-align:right;line-height:1.7}
+.verdict{font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1.3;
+  max-width:30ch;margin-bottom:20px}
+.section{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--gris);margin:28px 0 12px}
+.tuiles{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+
+.fiche-ind{background:var(--carte);border-radius:var(--r);box-shadow:var(--ombre);
+  padding:18px 20px;margin-bottom:14px}
+.fi-tete{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.fi-tete h3{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.fi-src{font-size:11.5px;color:var(--gris);margin-top:10px}
+.fi-src a{color:var(--gris)}
+
+.fi-sommaire{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  margin-bottom:22px}
+.fi-case{background:var(--carte);border-radius:var(--r);box-shadow:var(--ombre);padding:13px 15px}
+.fi-n{font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.fi-l{font-size:11.5px;color:var(--gris);margin-top:4px;line-height:1.4}
+
+.reserve{background:var(--carte);border-left:4px solid var(--ambre);border-radius:var(--r);
+  box-shadow:var(--ombre);padding:15px 18px;margin-bottom:11px}
+.reserve.grave{border-left-color:var(--rouge)}
+.reserve-tete{font-size:14px;font-weight:650;margin-bottom:4px}
+.reserve-corps{font-size:13px;line-height:1.6;color:var(--encre2)}
+.reserve-ou{font-size:11px;color:var(--gris);margin-top:6px}
+/* Alias v7 → palette v3 : e-ok/e-attn (utilisés par Actions, Anticiper, Fiabilité). */
+.e-ok{background:var(--vert-bg);color:var(--vert)}
+.e-attn{background:var(--ambre-bg);color:var(--ambre)}
+.e-mal{background:var(--rouge-bg);color:var(--rouge)}
