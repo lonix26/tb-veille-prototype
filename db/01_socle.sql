@@ -79,6 +79,39 @@ COMMENT ON SCHEMA sandbox IS 'Espace de l''artefact agentique du scénario C (§
 
 
 --
+-- Name: appliquer_filtrage_flux(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.appliquer_filtrage_flux() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE r record; n integer := 0;
+BEGIN
+  FOR r IN
+    SELECT rg.regle_code, rg.seuil,
+           t.item_id,
+           t.anteriorite + t.portee + t.pertinence AS note,
+           t.anteriorite
+      FROM flux_filtrage_regles rg
+      JOIN flux_triage_ia t ON t.doctrine = 'signal'
+     WHERE rg.active
+       AND rg.regle_code = 'seuil_v1'
+       AND t.anteriorite + t.portee + t.pertinence < rg.seuil
+       AND t.anteriorite < 2                                   -- garde-fou
+       AND NOT EXISTS (SELECT 1 FROM flux_filtrage f WHERE f.item_id = t.item_id)
+       AND NOT EXISTS (SELECT 1 FROM flux_examens x WHERE x.item_id = t.item_id)
+  LOOP
+    INSERT INTO flux_filtrage (item_id, regle_code, note_ia, anteriorite, motif)
+    VALUES (r.item_id, r.regle_code, r.note, r.anteriorite,
+            format('Note %s/6 (< %s), antériorité %s : écarté par règle %s.',
+                   r.note, r.seuil, r.anteriorite, r.regle_code));
+    n := n + 1;
+  END LOOP;
+  RETURN n;
+END $$;
+
+
+--
 -- Name: cle_evenement(text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -123,6 +156,19 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+
+--
+-- Name: f_filtrage_ajout_seul(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.f_filtrage_ajout_seul() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'flux_filtrage est en ajout seul (D-18) : un filtrage ne se '
+                  'corrige pas par écrasement mais par un verdict d''audit.';
+END $$;
 
 
 --
@@ -454,6 +500,70 @@ CREATE SEQUENCE public.flux_examens_examen_id_seq
 --
 
 ALTER SEQUENCE public.flux_examens_examen_id_seq OWNED BY public.flux_examens.examen_id;
+
+
+--
+-- Name: flux_filtrage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.flux_filtrage (
+    item_id bigint NOT NULL,
+    regle_code text NOT NULL,
+    note_ia smallint NOT NULL,
+    anteriorite smallint,
+    motif text NOT NULL,
+    filtre_le timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: flux_filtrage_audit; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.flux_filtrage_audit (
+    audit_id bigint NOT NULL,
+    item_id bigint NOT NULL,
+    echantillon text NOT NULL,
+    verdict text NOT NULL,
+    audite_par text NOT NULL,
+    audite_le timestamp with time zone DEFAULT now() NOT NULL,
+    note text,
+    CONSTRAINT flux_filtrage_audit_verdict_check CHECK ((verdict = ANY (ARRAY['confirme'::text, 'faux_negatif'::text])))
+);
+
+
+--
+-- Name: flux_filtrage_audit_audit_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.flux_filtrage_audit_audit_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: flux_filtrage_audit_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.flux_filtrage_audit_audit_id_seq OWNED BY public.flux_filtrage_audit.audit_id;
+
+
+--
+-- Name: flux_filtrage_regles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.flux_filtrage_regles (
+    regle_code text NOT NULL,
+    libelle text NOT NULL,
+    enonce text NOT NULL,
+    seuil smallint NOT NULL,
+    active boolean DEFAULT true NOT NULL,
+    cree_le timestamp with time zone DEFAULT now() NOT NULL,
+    fondement text NOT NULL
+);
 
 
 --
@@ -1521,6 +1631,88 @@ COMMENT ON VIEW public.v_appels_ouverts IS 'Appels d''offres dont la date limite
 
 
 --
+-- Name: v_flux_a_examiner; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_flux_a_examiner AS
+ SELECT fi.item_id,
+    fs.famille,
+    fs.libelle AS flux,
+    COALESCE(s.sector_code, e.sector_code) AS sector_code,
+    COALESCE(s.watch_question_code, e.watch_question_code) AS watch_question_code,
+    e.pertinence,
+    s.anteriorite,
+    s.portee,
+    s.pertinence AS pertinence_signal,
+    COALESCE(s.resume, e.resume) AS resume,
+    fi.titre,
+    fi.url,
+    fi.date_publication,
+    fi.collecte_le
+   FROM (((public.flux_items fi
+     JOIN public.flux_sources fs ON ((fs.flux_id = fi.flux_id)))
+     LEFT JOIN public.flux_triage_ia e ON (((e.item_id = fi.item_id) AND (e.doctrine = 'evenement'::text))))
+     LEFT JOIN public.flux_triage_ia s ON (((s.item_id = fi.item_id) AND (s.doctrine = 'signal'::text))))
+  WHERE ((NOT (EXISTS ( SELECT 1
+           FROM public.flux_examens x
+          WHERE (x.item_id = fi.item_id)))) AND ((NOT (EXISTS ( SELECT 1
+           FROM public.flux_filtrage f
+          WHERE (f.item_id = fi.item_id)))) OR (EXISTS ( SELECT 1
+           FROM public.flux_filtrage_audit a
+          WHERE ((a.item_id = fi.item_id) AND (a.verdict = 'faux_negatif'::text))))))
+  ORDER BY s.anteriorite DESC NULLS LAST, s.portee DESC NULLS LAST, e.pertinence DESC NULLS LAST, fi.date_publication DESC;
+
+
+--
+-- Name: VIEW v_flux_a_examiner; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_flux_a_examiner IS 'File de lecture du veilleur, UNE ligne par item. Porte les scores des deux doctrines côte à côte ; l''ordre suit la doctrine « signal » (antériorité, puis portée) avec repli sur la pertinence événementielle. Corrigée le 23.08.2026 : la version précédente joignait flux_triage_ia sans filtrer la doctrine et doublait chaque item.';
+
+
+--
+-- Name: v_bilan_filtrage; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_bilan_filtrage AS
+ WITH b AS (
+         SELECT ( SELECT count(*) AS count
+                   FROM public.flux_items) AS items_collectes,
+            ( SELECT count(*) AS count
+                   FROM public.flux_filtrage) AS items_filtres,
+            ( SELECT count(*) AS count
+                   FROM public.v_flux_a_examiner) AS file_humaine,
+            ( SELECT count(*) AS count
+                   FROM public.flux_examens) AS examens_humains,
+            ( SELECT count(*) AS count
+                   FROM public.flux_filtrage_audit) AS items_audites,
+            ( SELECT count(*) AS count
+                   FROM public.flux_filtrage_audit
+                  WHERE (flux_filtrage_audit.verdict = 'faux_negatif'::text)) AS faux_negatifs
+        )
+ SELECT items_collectes,
+    items_filtres,
+    file_humaine,
+    examens_humains,
+    items_audites,
+    faux_negatifs,
+        CASE
+            WHEN ((items_filtres + file_humaine) > 0) THEN round(((100.0 * (items_filtres)::numeric) / ((items_filtres + file_humaine))::numeric), 1)
+            ELSE NULL::numeric
+        END AS part_filtree_pct,
+        CASE
+            WHEN (items_audites > 0) THEN round(((100.0 * (faux_negatifs)::numeric) / (items_audites)::numeric), 1)
+            ELSE NULL::numeric
+        END AS taux_faux_negatifs_pct,
+        CASE
+            WHEN (items_audites = 0) THEN 'Règle appliquée, jamais auditée : le taux de faux négatifs est inconnu.'::text
+            WHEN (faux_negatifs = 0) THEN format('Aucun faux négatif sur %s items audités.'::text, items_audites)
+            ELSE format('%s faux négatifs sur %s items audités — la règle doit être révisée.'::text, faux_negatifs, items_audites)
+        END AS enonce_audit
+   FROM b;
+
+
+--
 -- Name: v_bilan_referentiel; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -1992,39 +2184,28 @@ CREATE VIEW public.v_fiabilite_decouverte AS
 
 
 --
--- Name: v_flux_a_examiner; Type: VIEW; Schema: public; Owner: -
+-- Name: v_filtrage_echantillon; Type: VIEW; Schema: public; Owner: -
 --
 
-CREATE VIEW public.v_flux_a_examiner AS
- SELECT fi.item_id,
+CREATE VIEW public.v_filtrage_echantillon AS
+ SELECT to_char(now(), 'YYYY-MM'::text) AS echantillon,
+    row_number() OVER (ORDER BY (md5(((f.item_id)::text || to_char(now(), 'YYYY-MM'::text))))) AS rang,
+    f.item_id,
+    f.note_ia,
+    f.anteriorite,
+    f.regle_code,
     fs.famille,
-    fs.libelle AS flux,
-    COALESCE(s.sector_code, e.sector_code) AS sector_code,
-    COALESCE(s.watch_question_code, e.watch_question_code) AS watch_question_code,
-    e.pertinence,
-    s.anteriorite,
-    s.portee,
-    s.pertinence AS pertinence_signal,
-    COALESCE(s.resume, e.resume) AS resume,
     fi.titre,
     fi.url,
     fi.date_publication,
-    fi.collecte_le
-   FROM (((public.flux_items fi
+    s.resume
+   FROM (((public.flux_filtrage f
+     JOIN public.flux_items fi ON ((fi.item_id = f.item_id)))
      JOIN public.flux_sources fs ON ((fs.flux_id = fi.flux_id)))
-     LEFT JOIN public.flux_triage_ia e ON (((e.item_id = fi.item_id) AND (e.doctrine = 'evenement'::text))))
-     LEFT JOIN public.flux_triage_ia s ON (((s.item_id = fi.item_id) AND (s.doctrine = 'signal'::text))))
+     LEFT JOIN public.flux_triage_ia s ON (((s.item_id = f.item_id) AND (s.doctrine = 'signal'::text))))
   WHERE (NOT (EXISTS ( SELECT 1
-           FROM public.flux_examens x
-          WHERE (x.item_id = fi.item_id))))
-  ORDER BY s.anteriorite DESC NULLS LAST, s.portee DESC NULLS LAST, e.pertinence DESC NULLS LAST, fi.date_publication DESC;
-
-
---
--- Name: VIEW v_flux_a_examiner; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON VIEW public.v_flux_a_examiner IS 'File de lecture du veilleur, UNE ligne par item. Porte les scores des deux doctrines côte à côte ; l''ordre suit la doctrine « signal » (antériorité, puis portée) avec repli sur la pertinence événementielle. Corrigée le 23.08.2026 : la version précédente joignait flux_triage_ia sans filtrer la doctrine et doublait chaque item.';
+           FROM public.flux_filtrage_audit a
+          WHERE ((a.item_id = f.item_id) AND (a.echantillon = to_char(now(), 'YYYY-MM'::text))))));
 
 
 --
@@ -2925,6 +3106,13 @@ ALTER TABLE ONLY public.flux_examens ALTER COLUMN examen_id SET DEFAULT nextval(
 
 
 --
+-- Name: flux_filtrage_audit audit_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage_audit ALTER COLUMN audit_id SET DEFAULT nextval('public.flux_filtrage_audit_audit_id_seq'::regclass);
+
+
+--
 -- Name: flux_items item_id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3069,6 +3257,38 @@ ALTER TABLE ONLY public.flux_examens
 
 ALTER TABLE ONLY public.flux_examens
     ADD CONSTRAINT flux_examens_pkey PRIMARY KEY (examen_id);
+
+
+--
+-- Name: flux_filtrage_audit flux_filtrage_audit_item_id_echantillon_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage_audit
+    ADD CONSTRAINT flux_filtrage_audit_item_id_echantillon_key UNIQUE (item_id, echantillon);
+
+
+--
+-- Name: flux_filtrage_audit flux_filtrage_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage_audit
+    ADD CONSTRAINT flux_filtrage_audit_pkey PRIMARY KEY (audit_id);
+
+
+--
+-- Name: flux_filtrage flux_filtrage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage
+    ADD CONSTRAINT flux_filtrage_pkey PRIMARY KEY (item_id);
+
+
+--
+-- Name: flux_filtrage_regles flux_filtrage_regles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage_regles
+    ADD CONSTRAINT flux_filtrage_regles_pkey PRIMARY KEY (regle_code);
 
 
 --
@@ -3307,6 +3527,13 @@ CREATE UNIQUE INDEX ted_lecture_ia_cle ON public.ted_lecture_ia USING btree (pub
 
 
 --
+-- Name: flux_filtrage trg_filtrage_ajout_seul; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_filtrage_ajout_seul BEFORE DELETE OR UPDATE ON public.flux_filtrage FOR EACH ROW EXECUTE FUNCTION public.f_filtrage_ajout_seul();
+
+
+--
 -- Name: flux_items trg_flux_ajout_seul; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3397,6 +3624,30 @@ ALTER TABLE ONLY public.flux_examens
 
 ALTER TABLE ONLY public.flux_examens
     ADD CONSTRAINT flux_examens_signal_id_fkey FOREIGN KEY (signal_id) REFERENCES public.signals(signal_id);
+
+
+--
+-- Name: flux_filtrage_audit flux_filtrage_audit_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage_audit
+    ADD CONSTRAINT flux_filtrage_audit_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.flux_items(item_id);
+
+
+--
+-- Name: flux_filtrage flux_filtrage_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage
+    ADD CONSTRAINT flux_filtrage_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.flux_items(item_id);
+
+
+--
+-- Name: flux_filtrage flux_filtrage_regle_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_filtrage
+    ADD CONSTRAINT flux_filtrage_regle_code_fkey FOREIGN KEY (regle_code) REFERENCES public.flux_filtrage_regles(regle_code);
 
 
 --
