@@ -150,7 +150,7 @@
         "operation": "executeQuery",
         "query": "UPDATE runs SET status = CASE WHEN $2::int = 0 THEN 'echec' WHEN $4::int > 0 THEN 'partiel' ELSE 'ok' END, closed_at = now(), note = $3 WHERE run_id = $1 RETURNING run_id, status, note;",
         "options": {
-          "queryReplacement": "={{ (() => { let ecrits = 0; try { ecrits = $('Écrire les scores').all().length; } catch (e) { ecrits = 0; } const items = $('Normaliser et controler').all().map(x => x.json); const inc = (items[0] && items[0]._incidents) || []; const doc = (items[0] && items[0]._doctrine) || '?'; let filtres = 0; try { filtres = $('Appliquer le filtrage a seuil').first().json.items_filtres || 0; } catch (e) { filtres = 0; } const note = 'Triage IA des flux — ' + ecrits + ' score(s) ecrit(s), doctrine ' + doc + ', ' + filtres + ' item(s) ecarte(s) par regle seuil_v1.' + (inc.length ? ' Incidents : ' + inc.join(' | ') + '.' : ''); return [ $('Ouvrir le run').first().json.run_id, ecrits, note, inc.length ]; })() }}"
+          "queryReplacement": "={{ (() => { let ecrits = 0; try { ecrits = $('Écrire les scores').all().length; } catch (e) { ecrits = 0; } const items = $('Normaliser et controler').all().map(x => x.json); const inc = (items[0] && items[0]._incidents) || []; const doc = (items[0] && items[0]._doctrine) || '?'; const note = 'Triage IA des flux — ' + ecrits + ' score(s) ecrit(s), doctrine ' + doc + '.' + (inc.length ? ' Incidents : ' + inc.join(' | ') + '.' : ''); return [ $('Ouvrir le run').first().json.run_id, ecrits, note, inc.length ]; })() }}"
         }
       },
       "id": "clôturer-le-run",
@@ -198,27 +198,6 @@
         0
       ],
       "notes": "UN RUN QUI N'A RIEN FAIT NE DOIT PAS EXISTER. Ouvrir le run avant de savoir s'il y a matière laissait une exécution ouverte à chaque rejeu à vide — cas NOMINAL d'un dispositif relancé régulièrement. Le garde est donc placé AVANT l'ouverture, et non après."
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "-- Le triage n'ordonne plus seulement, il FILTRE. La fonction applique la\n-- regle active (seuil_v1) aux items qu'elle vient de noter : ceux dont la\n-- note est inferieure au seuil et dont l'anteriorite n'est pas maximale\n-- sont ecartes sans examen humain, avec leur motif inscrit au registre.\n-- La fonction est idempotente : rejouer le workflow ne refiltre rien.\n--\n-- Le controle humain ne disparait pas, il se deplace : il porte desormais\n-- sur la REGLE, verifiee par echantillon mensuel (v_filtrage_echantillon),\n-- et non plus sur chaque item. Un faux negatif reconnu a l'audit revient\n-- dans la file par ajout dans flux_filtrage_audit, jamais par effacement.\nSELECT appliquer_filtrage_flux() AS items_filtres;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        1250,
-        180
-      ],
-      "id": "filtrage-seuil-2026-08-26",
-      "name": "Appliquer le filtrage a seuil",
-      "credentials": {
-        "postgres": {
-          "id": "QdVRYX9pjTj9C8G3",
-          "name": "postgres veille"
-        }
-      }
     }
   ],
   "connections": {
@@ -292,7 +271,7 @@
       "main": [
         [
           {
-            "node": "Appliquer le filtrage a seuil",
+            "node": "Clôturer le run",
             "type": "main",
             "index": 0
           }
@@ -309,17 +288,6 @@
           }
         ],
         []
-      ]
-    },
-    "Appliquer le filtrage a seuil": {
-      "main": [
-        [
-          {
-            "node": "Clôturer le run",
-            "type": "main",
-            "index": 0
-          }
-        ]
       ]
     }
   },

@@ -70,29 +70,12 @@ function reservesDuDispositif(D, S) {
     });
   }
 
-  // 6. La file d'examen, et la règle qui la borne.
-  //
-  // Depuis le 26.08, la file n'est plus la réserve : la RÈGLE l'est. Le
-  // filtrage à seuil a déplacé le contrôle humain de l'item vers l'énoncé,
-  // et un énoncé non audité est une décision sans preuve. Tant que
-  // l'échantillon n'a pas été relu, le taux de faux négatifs est INCONNU —
-  // et l'écran doit l'écrire, pas le taire.
+  // 6. La file d'examen.
   const file = Number(S?.items_en_attente_examen) || 0;
-  const flt = S?.filtrage;
-  if (flt && Number(flt.items_filtres) > 0 && Number(flt.items_audites) === 0) r.push({
-    gravite: "grave", ou: "Exploitation",
-    titre: "Le filtrage automatique n'a jamais été audité",
-    corps: `${nb(flt.items_filtres)} items — ${nb(flt.part_filtree_pct)} % du collecté triable — ont été écartés sans lecture humaine par la règle de seuil. La règle repose sur une base mince : sur 37 items examinés, aucun de ceux notés 2 ou moins n'avait produit de signal. Quatorze observations ne fondent pas une loi. Tant que l'échantillon mensuel n'a pas été relu, le taux de faux négatifs est inconnu — le dispositif ne peut pas affirmer qu'il n'a rien manqué.`
-  });
-  if (flt && Number(flt.faux_negatifs) > 0) r.push({
-    gravite: "grave", ou: "Exploitation",
-    titre: "L'audit a trouvé des items mal écartés",
-    corps: `${nb(flt.faux_negatifs)} faux négatifs sur ${nb(flt.items_audites)} items audités. La règle de seuil laisse passer des items pertinents : elle doit être relevée ou son garde-fou élargi. Les items concernés sont revenus dans la file d'examen.`
-  });
   if (file > 300) r.push({
-    gravite: "moyenne", ou: "Exploitation",
-    titre: "La file d'examen reste plus longue qu'un traitement hebdomadaire",
-    corps: `${nb(file)} items attendent une lecture humaine, filtrage déduit. C'est la limite structurelle du choix semi-automatisé : elle se traite par un cadrage — les dix mieux notés par semaine — et non par du temps supplémentaire.`
+    gravite: "grave", ou: "Exploitation",
+    titre: "La file d'examen ne se vide pas",
+    corps: `${nb(file)} items attendent une lecture humaine, et la file croît plus vite qu'elle n'est traitée. C'est la limite structurelle du choix semi-automatisé : elle se traite par un cadrage — les dix mieux notés par semaine — et non par du temps supplémentaire.`
   });
 
   return r;
@@ -109,12 +92,9 @@ function Onglets({ courant, poser, items }) {
   );
 }
 
-// `vueInitiale` n'est pas une option d'interface : elle permet à la vérification
-// de rendre CHAQUE onglet. Un panneau derrière un onglet non visité est un
-// panneau non testé — c'est ainsi que la page s'était cassée le 25.08.
-export default function Fiabilite({ vueInitiale }) {
+export default function Fiabilite() {
   const { D, S } = useDonnees();
-  const [vue, setVue] = useState(vueInitiale || "reserves");
+  const [vue, setVue] = useState("reserves");
   const [filtre, setFiltre] = useState("");
 
   const reserves = useMemo(() => reservesDuDispositif(D, S), [D, S]);
@@ -168,7 +148,7 @@ export default function Fiabilite({ vueInitiale }) {
         </div>
         <div className="fi-case">
           <div className="fi-n">{total.en_grille ?? total.total ?? "—"}</div>
-          <div className="fi-l">indicateurs suivis, choisis parmi {total.certifies} certifiés</div>
+          <div className="fi-l">indicateurs en grille, dont {total.certifies} certifiés</div>
         </div>
         <div className="fi-case">
           <div className="fi-n">{sources.size}</div>
@@ -186,7 +166,6 @@ export default function Fiabilite({ vueInitiale }) {
         ["collectes", "Les collectes"],
         ["revisions", `Révisions (${rev.length})`],
         ["elagage", "L'élagage"],
-        ["filtrage", "Le filtrage"],
         ["methode", "La méthode"]
       ]} />
 
@@ -378,95 +357,6 @@ export default function Fiabilite({ vueInitiale }) {
           </p>
         </div>
       )}
-
-      {vue === "filtrage" && (() => {
-        const flt = S?.filtrage, regle = S?.filtrage_regle, ech = S?.filtrage_echantillon || [];
-        if (!flt) return <div className="vide">Le bilan de filtrage ne répond pas.</div>;
-        return (
-          <>
-            <p className="bloc-intro">
-              Le triage ordonnait la file sans jamais la réduire : <strong>926 items attendaient
-              une lecture humaine</strong>, dont trois quarts notés 2 ou moins sur 6. Un dispositif
-              semi-automatisé qui laisse une file inépuisable ne fait pas gagner de temps — il
-              déplace le goulot de la collecte vers la validation.
-            </p>
-            <p className="bloc-intro">
-              La règle ci-dessous écarte ces items sans examen. <strong>Le contrôle humain ne
-              disparaît pas : il change d'objet.</strong> Il ne porte plus sur chaque item mais sur
-              l'énoncé de la règle, vérifié chaque mois sur un échantillon tiré au sort. Ce
-              déplacement a une propriété que l'examen exhaustif n'avait pas : <strong>il produit
-              une mesure</strong>. « Zéro faux négatif sur dix items audités » est un résultat ;
-              « 926 items non examinés » est un aveu.
-            </p>
-
-            <div className="tuiles" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", marginBottom: 18 }}>
-              <div className="carte kpi"><div className="k-l">Items collectés</div>
-                <div className="k-v">{nb(flt.items_collectes)}</div>
-                <div className="k-s">depuis l'ouverture de l'étage 2</div></div>
-              <div className="carte kpi"><div className="k-l">Écartés par règle</div>
-                <div className="k-v">{nb(flt.items_filtres)}</div>
-                <div className="k-s">{nb(flt.part_filtree_pct)} % du triable</div></div>
-              <div className="carte kpi"><div className="k-l">File humaine</div>
-                <div className="k-v">{nb(flt.file_humaine)}</div>
-                <div className="k-s">{nb(flt.examens_humains)} examen(s) déjà rendu(s)</div></div>
-              <div className="carte kpi"><div className="k-l">Faux négatifs</div>
-                <div className="k-v">{flt.items_audites > 0 ? nb(flt.taux_faux_negatifs_pct) + " %" : "inconnu"}</div>
-                <div className="k-s">{nb(flt.items_audites)} item(s) audité(s)</div></div>
-            </div>
-
-            {regle && (
-              <div className="carte" style={{ marginBottom: 16 }}>
-                <h3 className="bloc-titre">La règle — {regle.libelle}</h3>
-                <p className="bloc-intro"><strong>Énoncé.</strong> {regle.enonce}</p>
-                <p className="bloc-intro" style={{ marginBottom: 0 }}>
-                  <strong>Ce qui la fonde, et ce qui la limite.</strong> {regle.fondement}
-                </p>
-              </div>
-            )}
-
-            <div className="carte" style={{ marginBottom: 16 }}>
-              <h3 className="bloc-titre">L'état de l'audit</h3>
-              <p className={"avert" + (flt.items_audites === 0 || flt.faux_negatifs > 0 ? " avert-fort" : "")}
-                 style={{ marginBottom: 0 }}>{flt.enonce_audit}</p>
-            </div>
-
-            <h2 className="section">L'échantillon du mois — {ech.length} items à relire</h2>
-            <p className="bloc-intro">
-              Tirage <strong>reproductible</strong> : même mois, même échantillon, quel que soit le
-              nombre d'interrogations. Le dispositif doit pouvoir rejouer son propre contrôle. Un
-              item reconnu mal écarté revient dans la file d'examen — <strong>par ajout, jamais par
-              effacement</strong> (D-18).
-            </p>
-            {ech.length === 0
-              ? <div className="vide">Échantillon du mois entièrement audité.</div>
-              : (
-                <div style={{ overflowX: "auto" }}>
-                  <table className="tableau">
-                    <thead><tr>
-                      <th>Rang</th><th>Note</th><th>Famille</th><th>Titre</th><th>Publié</th>
-                    </tr></thead>
-                    <tbody>
-                      {ech.map(e => (
-                        <tr key={e.item_id}>
-                          <td>{e.rang}</td>
-                          <td>{e.note_ia}/6</td>
-                          <td>{e.famille}</td>
-                          <td><LienSource url={e.url} libelle={e.titre} /></td>
-                          <td>{dateCH(e.date_publication)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            <p className="fi-src">
-              Verdicts à inscrire dans <code>flux_filtrage_audit</code>. Bilan recalculé à chaque
-              affichage depuis <code>v_bilan_filtrage</code> — aucun chiffre de cet écran n'est écrit
-              à la main.
-            </p>
-          </>
-        );
-      })()}
 
       {vue === "methode" && (
         <div className="carte">

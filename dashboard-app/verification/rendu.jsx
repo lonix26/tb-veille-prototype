@@ -37,6 +37,13 @@ const ECRANS = [
   ["Actions", AFaire, "/actions", "/actions"],
   ["Anticiper", Anticiper, "/anticiper", "/anticiper"],
   ["Fiabilité", Fiabilite, "/fiabilite", "/fiabilite"],
+  // Les onglets de Fiabilité : chacun porte un panneau distinct.
+  ["Fiabilité · grille", Fiabilite, "/fiabilite", "/fiabilite", { vueInitiale: "grille" }],
+  ["Fiabilité · collectes", Fiabilite, "/fiabilite", "/fiabilite", { vueInitiale: "collectes" }],
+  ["Fiabilité · révisions", Fiabilite, "/fiabilite", "/fiabilite", { vueInitiale: "revisions" }],
+  ["Fiabilité · élagage", Fiabilite, "/fiabilite", "/fiabilite", { vueInitiale: "elagage" }],
+  ["Fiabilité · filtrage", Fiabilite, "/fiabilite", "/fiabilite", { vueInitiale: "filtrage" }],
+  ["Fiabilité · méthode", Fiabilite, "/fiabilite", "/fiabilite", { vueInitiale: "methode" }],
   ["Référentiel", Referentiel, "/referentiel", "/referentiel"],
   ["Exécutions", Executions, "/executions", "/executions"],
   ["Secteur — horlogerie", Secteur, "/secteur/horlogerie", "/secteur/:code"],
@@ -58,13 +65,13 @@ const valeur = { D, S, G, O, A, AT, GEO, erreur: null, erreursV4: {}, chargement
                  misAJour: new Date(), recharger: () => {} };
 
 let echecs = 0;
-for (const [nom, Page, route, motif] of ECRANS) {
+for (const [nom, Page, route, motif, props] of ECRANS) {
   try {
     const html = renderToString(
       React.createElement(Ctx.Provider, { value: valeur },
         React.createElement(MemoryRouter, { initialEntries: [route] },
           React.createElement(Routes, null,
-            React.createElement(Route, { path: motif, element: React.createElement(Page) })))));
+            React.createElement(Route, { path: motif, element: React.createElement(Page, props || null) })))));
     if (process.env.TEXTE && nom.includes(process.env.TEXTE)) {
       // Le texte tel qu'un lecteur le verra : c'est lui qu'on relit, pas le balisage.
       console.log("\n──────── " + nom + " ────────");
