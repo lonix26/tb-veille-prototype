@@ -22,6 +22,18 @@ q() { "${Q[@]}" -c "$1" 2>/dev/null; }
 
 GENERE_LE=$(q "SELECT to_char(now(), 'DD.MM.YYYY');")
 
+# Date de la DERNIÈRE campagne de test des URL, réellement exécutée.
+# À ne mettre à jour qu'après avoir relancé la vérification — elle était
+# auparavant confondue avec la date de génération, ce qui faisait affirmer
+# au texte une campagne qui n'avait pas eu lieu.
+VERIF_LE="30.08.2026"
+
+# Décompte des URL externes : par requête, jamais en toutes lettres.
+# La mention « vingt-cinq » codée en dur ici avait dérivé (27 sources au
+# 30.08.2026, dont 26 portent une URL externe) — cinquième dérive de
+# décompte textuel du projet.
+N_URL=$(q "SELECT count(*) FROM sources WHERE url LIKE 'http%';")
+
 cat <<EOF
 # Sources de données
 
@@ -32,8 +44,9 @@ données, cités par producteur, jeu, mode d'accès et date de qualification.*
 **La date indiquée est celle de la qualification**, c'est-à-dire du jour où la source a été
 examinée nominativement et son accès vérifié en réponse réelle — non la date d'une simple
 consultation. Les indicateurs rattachés sont ceux de la grille du chapitre 8 ; le détail figure
-en annexe 1. Les vingt-cinq URL ont été testées le ${GENERE_LE} ; les refus d'accès automatisé
-constatés sont signalés en regard, car ils sont eux-mêmes un résultat du travail (§ 11.7).
+en annexe 1. Les ${N_URL} URL externes du référentiel ont été testées le ${VERIF_LE} ; les refus
+d'accès automatisé constatés sont signalés en regard, car ils sont eux-mêmes un résultat du
+travail (§ 11.7).
 
 EOF
 
@@ -57,27 +70,41 @@ for bloc in "certifiee|Sources certifiées|accès vérifié en réponse réelle,
                   FROM indicators i WHERE i.source_id = s.source_id), 'aucun') || '.'
      || E'\n'
      FROM sources s WHERE s.qualification_status = '${st}'
-     ORDER BY s.organisation;"
+     ORDER BY s.organisation, s.source_id;"
+  # Tri secondaire indispensable : deux sources de la même organisation
+  # (les deux entrées OMPI) permutaient d'une génération à l'autre,
+  # produisant un diff parasite sans changement de fond.
 done
 
-cat <<'EOF'
+cat <<EOF
 
 ## Note sur les refus d'accès automatisé
 
-Trois producteurs — l'Agence internationale de l'énergie, le Fonds monétaire international et,
-selon l'en-tête employé, l'ACEA — refusent les requêtes automatisées par un code 403 alors que
-leurs pages sont publiques. Le fait est consigné plutôt que masqué : il conditionne
-l'automatisation de la collecte pour ces sources, et il rejoint le constat de la couche de
-découverte, où six candidats sur vingt-six ont été journalisés comme non vérifiables pour la
-même raison — un refus d'accès automatisé n'est ni une inexistence, ni une invention.
+Deux producteurs — l'Agence internationale de l'énergie et le Fonds monétaire international —
+refusent les requêtes automatisées par un code 403 alors que leurs pages sont publiques ; le
+constat est reproduit à la campagne du ${VERIF_LE}. L'ACEA figurait dans cette liste lors des
+campagnes antérieures, selon l'en-tête employé ; le refus **ne s'est pas reproduit** le
+${VERIF_LE}, ni sur la page d'accueil ni sur un communiqué PDF, avec ou sans en-tête de
+navigateur. Le fait est consigné dans les deux sens plutôt que figé : un refus d'accès
+automatisé peut être intermittent, ce qui est en soi une contrainte d'exploitation. Il rejoint
+le constat de la couche de découverte, où six candidats sur vingt-six ont été journalisés comme
+non vérifiables pour la même raison — un refus d'accès automatisé n'est ni une inexistence, ni
+une invention.
 
 ## Note sur la vérification des liens
 
-La vérification systématique conduite le jour de la génération a rendu **deux liens morts** au
-référentiel : celui du CPB Netherlands Bureau for Economic Policy Analysis (404) et celui de
-la base des dépenses militaires du SIPRI (échec de négociation TLS). Les deux ont été corrigés
-en base — et non dans le seul texte — au moyen des adresses que les liaisons de collecte
-utilisaient déjà et qui répondent. Le fait mérite d'être noté pour lui-même : la source de
-vérité existait dans la base, à un autre endroit que celui où la bibliographie allait la
-chercher, et sans cette vérification le rapport aurait publié deux liens morts.
+La campagne du 27.08.2026 avait rendu **deux liens morts** au référentiel : celui du CPB
+Netherlands Bureau for Economic Policy Analysis (404) et celui de la base des dépenses
+militaires du SIPRI (échec de négociation TLS). Les deux ont été corrigés en base — et non dans
+le seul texte — au moyen des adresses que les liaisons de collecte utilisaient déjà et qui
+répondent ; ils répondent toujours à la campagne du ${VERIF_LE}.
+
+La campagne du ${VERIF_LE} n'a relevé **aucun lien mort**, mais une inexactitude de nature
+différente : l'entrée de l'Office fédéral de la statistique portait une adresse générique et un
+format (« CSV / Excel ») qui ne décrivaient pas l'accès réellement pratiqué — les liaisons de H2
+et M4 interrogent l'API PX-Web en POST, format JSON-stat2. L'entrée a été corrigée en base
+(migration \`2026-08-30_source_ofs_url_reelle.sql\`). Le fait mérite d'être noté pour lui-même,
+et pour la même raison que les deux liens morts : la source de vérité existait dans la base, à
+un autre endroit que celui où la bibliographie allait la chercher. Un lien qui répond n'est pas
+pour autant le bon lien.
 EOF

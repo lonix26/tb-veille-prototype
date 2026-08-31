@@ -912,6 +912,7 @@ CREATE TABLE public.sector_watch_questions (
     formulation text NOT NULL,
     mecanisme text NOT NULL,
     criticite text NOT NULL,
+    reponse_gabarit text,
     CONSTRAINT sector_watch_questions_criticite_check CHECK ((criticite = ANY (ARRAY['dominante'::text, 'significative'::text, 'marginale'::text])))
 );
 
@@ -921,6 +922,13 @@ CREATE TABLE public.sector_watch_questions (
 --
 
 COMMENT ON TABLE public.sector_watch_questions IS 'Instanciation sectorielle (§ 8.1.2). Le § 8.1.2 annonçait cette instanciation depuis la phase 1 sans la matérialiser : cette table clôt cet écart. Le champ mecanisme est ce qui distingue une instanciation d''une paraphrase.';
+
+
+--
+-- Name: COLUMN sector_watch_questions.reponse_gabarit; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sector_watch_questions.reponse_gabarit IS 'Gabarit de la réponse calculée affichée sous la question (jetons {ID.champ} résolus à l''écran depuis v_dernier_point). NULL = pas de réponse composable (question découverte ou porteur sans point). Créé le 28.08.2026.';
 
 
 --
@@ -1850,6 +1858,39 @@ CREATE VIEW public.v_couverture_qv AS
 
 
 --
+-- Name: v_couverture_vitrine; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_couverture_vitrine AS
+ SELECT s.code AS sector_code,
+    q.code AS watch_question_code,
+    sw.criticite,
+    count(i.indicator_id) AS nb_en_vitrine,
+    count(i.indicator_id) FILTER (WHERE (i.status = 'certifie'::text)) AS nb_certifies,
+    count(i.indicator_id) FILTER (WHERE (i.status = 'a_confirmer'::text)) AS nb_a_confirmer,
+    string_agg(i.indicator_id, ', '::text ORDER BY i.indicator_id) AS porteurs,
+        CASE
+            WHEN (count(i.indicator_id) FILTER (WHERE (i.status = 'certifie'::text)) > 0) THEN 'couverte'::text
+            WHEN (count(i.indicator_id) > 0) THEN 'couverte_a_confirmer'::text
+            ELSE 'non_couverte'::text
+        END AS couverture
+   FROM ((((public.sectors s
+     CROSS JOIN public.watch_questions q)
+     JOIN public.sector_watch_questions sw ON (((sw.sector_code = s.code) AND (sw.watch_question_code = q.code))))
+     LEFT JOIN public.indicator_watch_questions iwq ON ((iwq.watch_question_code = q.code)))
+     LEFT JOIN public.indicators i ON (((i.indicator_id = iwq.indicator_id) AND (i.sector_code = s.code) AND i.en_vitrine)))
+  GROUP BY s.code, q.code, sw.criticite
+  ORDER BY s.code, q.code;
+
+
+--
+-- Name: VIEW v_couverture_vitrine; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_couverture_vitrine IS 'Couverture des questions de veille par les indicateurs EN VITRINE (ce que le décideur voit). À confronter à v_couverture_qv (référentiel complet) : l''écart entre les deux est un résultat du § 8. Créée le 27.08.2026.';
+
+
+--
 -- Name: v_dernier_point; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -2297,13 +2338,14 @@ CREATE VIEW public.v_instanciation_qv AS
     swq.mecanisme,
     swq.criticite,
     count(iwq.indicator_id) AS nb_indicateurs,
-    count(iwq.indicator_id) FILTER (WHERE (i.status = 'certifie'::text)) AS nb_certifies
+    count(iwq.indicator_id) FILTER (WHERE (i.status = 'certifie'::text)) AS nb_certifies,
+    swq.reponse_gabarit
    FROM ((((public.sector_watch_questions swq
      JOIN public.sectors s ON ((s.code = swq.sector_code)))
      JOIN public.watch_questions q ON ((q.code = swq.watch_question_code)))
      LEFT JOIN public.indicators i ON ((i.sector_code = swq.sector_code)))
      LEFT JOIN public.indicator_watch_questions iwq ON (((iwq.indicator_id = i.indicator_id) AND (iwq.watch_question_code = swq.watch_question_code))))
-  GROUP BY swq.sector_code, s.label, swq.watch_question_code, q.label, swq.formulation, swq.mecanisme, swq.criticite
+  GROUP BY swq.sector_code, s.label, swq.watch_question_code, q.label, swq.formulation, swq.mecanisme, swq.criticite, swq.reponse_gabarit
   ORDER BY swq.sector_code, swq.watch_question_code;
 
 
@@ -2312,6 +2354,57 @@ CREATE VIEW public.v_instanciation_qv AS
 --
 
 COMMENT ON VIEW public.v_instanciation_qv IS 'Le cadre à deux niveaux, restitué. Une criticité « dominante » sans indicateur certifié est une lacune à énoncer au rapport, pas à masquer.';
+
+
+--
+-- Name: v_intensite_signalement; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_intensite_signalement AS
+ WITH attribue AS (
+         SELECT DISTINCT t.item_id,
+            to_char((fi.date_publication)::timestamp with time zone, 'YYYY-MM'::text) AS periode,
+            t.sector_code,
+            t.watch_question_code,
+            t.pertinence
+           FROM (public.flux_triage_ia t
+             JOIN public.flux_items fi USING (item_id))
+          WHERE ((fi.date_publication IS NOT NULL) AND (t.sector_code IS NOT NULL))
+        ), denominateur AS (
+         SELECT attribue.periode,
+            attribue.sector_code,
+            count(DISTINCT attribue.item_id) AS n_tries
+           FROM attribue
+          GROUP BY attribue.periode, attribue.sector_code
+        ), numerateur AS (
+         SELECT attribue.periode,
+            attribue.sector_code,
+            attribue.watch_question_code,
+            count(DISTINCT attribue.item_id) AS n_pertinents
+           FROM attribue
+          WHERE (attribue.pertinence >= 1)
+          GROUP BY attribue.periode, attribue.sector_code, attribue.watch_question_code
+        )
+ SELECT n.periode,
+    n.sector_code,
+    n.watch_question_code,
+    n.n_pertinents,
+    d.n_tries,
+    round(((100.0 * (n.n_pertinents)::numeric) / (d.n_tries)::numeric), 1) AS part_pct,
+    (d.n_tries >= 20) AS calculable,
+    i.indicator_id
+   FROM (((numerateur n
+     JOIN denominateur d USING (periode, sector_code))
+     LEFT JOIN public.indicator_watch_questions iwq ON ((iwq.watch_question_code = n.watch_question_code)))
+     LEFT JOIN public.indicators i ON (((i.indicator_id = iwq.indicator_id) AND (i.sector_code = n.sector_code) AND (i.source_id = 'triage_flux'::text))))
+  ORDER BY n.sector_code, n.watch_question_code, n.periode;
+
+
+--
+-- Name: VIEW v_intensite_signalement; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_intensite_signalement IS 'Part mensuelle des items triés attribués à chaque couple secteur × question (pertinence >= 1, item compté une fois). Plancher de calculabilité : 20 items triés/secteur/mois (résolution : 1 item <= 5 points de part). indicator_id non nul = case instrumentée. Créée le 27.08.2026.';
 
 
 --
@@ -2367,6 +2460,29 @@ CREATE VIEW public.v_mix_horloger AS
 --
 
 COMMENT ON VIEW public.v_mix_horloger IS 'Mix mécanique des exportations horlogères suisses (source FH, en francs). Rend observable le point de vigilance du mécanisme QV1 horloger : une montée en valeur qui masquerait l''érosion du tissu de sous-traitance. Un atelier facture des pièces, pas des francs.';
+
+
+--
+-- Name: v_motorisations_automobile; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_motorisations_automobile AS
+ SELECT ev.period,
+    ev.value AS ventes_ev,
+    part.value AS part_ev_pct,
+    round(((ev.value / NULLIF(part.value, (0)::numeric)) * 100.0), 0) AS ventes_totales,
+    round((((ev.value / NULLIF(part.value, (0)::numeric)) * 100.0) - ev.value), 0) AS ventes_thermiques
+   FROM (public.v_current ev
+     JOIN public.v_current part ON (((part.indicator_id = 'A11'::text) AND (part.period = ev.period) AND (part.geo = ev.geo))))
+  WHERE ((ev.indicator_id = 'A3'::text) AND (ev.geo = 'World'::text))
+  ORDER BY ev.period;
+
+
+--
+-- Name: VIEW v_motorisations_automobile; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_motorisations_automobile IS 'Ventes mondiales de voitures décomposées par motorisation : EV collecté (A3), part collectée (A11), total et thermique DÉRIVÉS (total = EV / part). Part d''une motorisation, jamais « part de marché » d''un acteur. Créée le 27.08.2026.';
 
 
 --
