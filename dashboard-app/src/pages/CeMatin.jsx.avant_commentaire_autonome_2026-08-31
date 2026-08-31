@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  useDonnees, nb, pct, dateCH, alertesSignificatives, LienSource, MarkdownLeger,
-  relu, BadgeCommentaire
+  useDonnees, nb, pct, dateCH, alertesSignificatives, LienSource, MarkdownLeger
 } from "../api.jsx";
 import { Sparkline, Regle } from "../Mini.jsx";
 import {
@@ -449,7 +448,7 @@ export default function CeMatin() {
         <>
           <h2 className="s-titre">
             La lecture du moment
-            <span className="s-sous">rédigée par un modèle ; celles qu'aucun humain n'a relues sont signalées comme telles</span>
+            <span className="s-sous">rédigée par un modèle, validée par vous — seul le validé s'affiche</span>
           </h2>
           <div className="grille g2">
             {commentaires.slice(0, 2).map(c => {
@@ -459,12 +458,8 @@ export default function CeMatin() {
                   <div className="com-tete">
                     <strong>{sec?.sector_label || c.sector_code}</strong>
                     <span className="etq e-gris">{c.model}</span>
-                    <BadgeCommentaire c={c} />
                     <span className="com-date">
-                      collecte n° {c.run_id ?? "—"} ·{" "}
-                      {relu(c)
-                        ? "validée le " + dateCH(c.validated_at)
-                        : "rédigée le " + dateCH(c.created_at)}
+                      collecte n° {c.run_id ?? "—"} · validée le {dateCH(c.validated_at)}
                     </span>
                   </div>
                   {c.run_id && run.run_id && c.run_id < run.run_id && (
@@ -482,7 +477,7 @@ export default function CeMatin() {
           </div>
           {commentaires.length > 2 && (
             <p className="note" style={{ marginTop: 8 }}>
-              {commentaires.length - 2} autres lectures, une par marché, sur les pages de marché.
+              {commentaires.length - 2} autres lectures validées, une par marché, sur les pages de marché.
             </p>
           )}
         </>

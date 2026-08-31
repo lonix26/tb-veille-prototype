@@ -2,8 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDonnees, nb, pct, clsVar, nomZone, dateCH, MarkdownLeger, LienSource,
          alertesSignificatives, SEUIL_POIDS_PCT,
-         BadgeCommentaire, signatureCommentaire,
-         sensMouvement, SENS_ETQ } from "../api.jsx";
+         BadgeCommentaire, signatureCommentaire } from "../api.jsx";
 
 // =====================================================================
 // ÉCRAN 1 — « Cette semaine ». Question : dois-je m'inquiéter, et de quoi ?
@@ -324,9 +323,9 @@ export default function CetteSemaine() {
         </div>
       )}
 
-      <h2 className="s-titre">Mouvements inhabituels</h2>
+      <h2 className="s-titre">Seuils franchis</h2>
       {alertes.length === 0 ? (
-        <div className="vide">Aucun mouvement inhabituel diffusable.</div>
+        <div className="vide">Aucun franchissement de seuil diffusable.</div>
       ) : (
         <>
           {/* Un écran d'ouverture ne déroule pas 194 lignes : les plus marqués,
@@ -342,9 +341,8 @@ export default function CetteSemaine() {
                 <span className={"sig-ech " + clsVar(a.glissement_annuel_pct)}>
                   {pct(a.glissement_annuel_pct)} sur un an
                 </span>
-                <span className={"etq " + SENS_ETQ[sensMouvement(D, a)][0]}>{SENS_ETQ[sensMouvement(D, a)][1]}</span>
                 <span className="prov">
-                  vu &lt; 1 fois sur 10 sur cette série
+                  seuil {nb(a.seuil_materialite_pct, 0)} %
                   {a.poids_pct !== null && <> · poids {nb(a.poids_pct, 1)} %</>}
                 </span>
                 <LienSource href={a.source_url} titre={a.source_organisation} />

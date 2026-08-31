@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useDonnees, nb, pct, dateCH, LienSource, MarkdownLeger, estAgregat, nomZone,
-         relu, BadgeCommentaire } from "../api.jsx";
+import { useDonnees, nb, pct, dateCH, LienSource, MarkdownLeger, estAgregat, nomZone } from "../api.jsx";
 import Chart, { TreemapParts } from "../Chart.jsx";
 import { phrasePeriode, enLettres } from "../phrases.jsx";
 
@@ -344,16 +343,13 @@ export default function Marche() {
 
       {commentaire && (
         <>
-          <h2 className="section">
-            {relu(commentaire) ? "La lecture validée" : "La lecture du moment"}
-          </h2>
+          <h2 className="section">La lecture validée</h2>
           <div className="commentaire">
             <div className="com-tete">
-              <BadgeCommentaire c={commentaire} />
-              <span>{relu(commentaire) ? commentaire.validated_by : "aucune relecture humaine"}</span>
+              <span className="etq e-ok">validée</span>
+              <span>{commentaire.validated_by}</span>
               <span className="com-date">
-                collecte n° {commentaire.run_id ?? "—"} ·{" "}
-                {dateCH(relu(commentaire) ? commentaire.validated_at : commentaire.created_at)}
+                collecte n° {commentaire.run_id ?? "—"} · {dateCH(commentaire.validated_at)}
               </span>
             </div>
             {commentaire.run_id && runCourant && commentaire.run_id < runCourant && (

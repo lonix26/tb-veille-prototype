@@ -1,10 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   useDonnees, nb, pct, clsVar, dateCH, estAgregat, nomZone,
-  serieDe, zonesDe, metrDe, BadgeStatut, MarkdownLeger, relu,
-  sensMouvement, SENS_ETQ, QV_LIBELLES, qvDe, syntheseZones, SEUIL_POIDS_PCT,
-  alertesSignificatives
+  serieDe, zonesDe, metrDe, BadgeStatut, MarkdownLeger, relu
 } from "../api.jsx";
 import Chart, { TreemapParts } from "../Chart.jsx";
 import { phrasePeriode } from "../phrases.jsx";
@@ -29,20 +27,11 @@ function Lecture({ code, inds }) {
             surdéclarait l'urgence. */}
         {franchis.length
           ? (() => {
-              // 31.08.2026 : le compteur de signalements bruts (« 127 au
-              // total ») était un artefact du p90 multiplié par les zones —
-              // aucun gain d'information. On compte des SÉRIES, signées.
-              const series = [...new Set(franchis.map(a => a.indicator_id))];
-              // Le sens d'une série se juge sur ses zones PESANTES (même base
-              // que le bloc détaillé) — sinon une zone marginale à −99 % sur
-              // 32 USD suffirait à peindre la série en défavorable.
-              const pesantes = alertesSignificatives(D).retenues.filter(a => a.sector_code === code);
-              const defav = series.filter(id =>
-                pesantes.some(a => a.indicator_id === id && sensMouvement(D, a) === "defavorable")).length;
-              return <strong>{series.length} série{series.length > 1 ? "s" : ""} au comportement
-                inhabituel{defav ? <>, dont {defav} en mouvement défavorable</> : ", aucune en mouvement défavorable"} — détail plus bas.</strong>;
+              const nSeries = new Set(franchis.map(a => a.indicator_id)).size;
+              return <strong>{nSeries} série{nSeries > 1 ? "s" : ""} en franchissement de seuil
+                ({franchis.length} signalement{franchis.length > 1 ? "s" : ""} au total, détail plus bas).</strong>;
             })()
-          : <>Aucun mouvement inhabituel : rien ne sort de l'ordinaire des séries suivies.</>}
+          : <>Aucun franchissement de seuil diffusable : rien ne sort de l'ordinaire des séries.</>}
         {retenues.length > 0 && <>{" "}{retenues.length} signal{retenues.length > 1 ? "s" : ""} retenu{retenues.length > 1 ? "s" : ""} (statut insuffisant), visible{retenues.length > 1 ? "s" : ""} plus bas.</>}
       </div>
       <div className="l-n">Lecture composée par calcul depuis la base — aucun modèle de langage n'écrit cette phrase.</div>
@@ -72,25 +61,19 @@ function Commentaire({ code }) {
   );
 }
 
-/* ---------- mouvements inhabituels, retenues comprises ---------- */
-// RÉFORME DU 31.08.2026 (décision de l'étudiant : « 127 signalements,
-// aucun gain d'information »). Trois changements, mesurés avant d'être
-// décidés (13 zones sur les 123 de H1 pèsent ≥ 1 % du flux et portent
-// 87 % de la valeur ; en queue, Namibie −99 % sur 32 USD) :
-//  1. chaque franchissement de série est SIGNÉ par sens_favorable et
-//     rattaché à sa question de veille — une hausse d'exportations n'est
-//     pas une anomalie rouge, c'est une bonne nouvelle pour QV2 ;
-//  2. « (seuil 8 %) » devient « amplitude vue moins d'une fois sur dix » —
-//     le sens réel du p90, dit en français ;
-//  3. les franchissements de ZONES d'une même série sont UN fait : une
-//     ligne pondérée, la zone la plus lourde citée, les < 1 % écartés et
-//     COMPTÉS, le détail renvoyé à la dynamique géographique (QV3) où il
-//     se lit en points de part. Repli du 27.08 conservé pour l'audit.
+/* ---------- franchissements de seuil, retenues comprises ---------- */
+// REGROUPEMENT DU 27.08.2026 (revue visuelle v9). L'extension des séries
+// par pays (H1 : 123 franchissements, A3 : 63) transformait le bloc en mur
+// de lignes qui repoussait tout le décisionnel sous le pli. Règle d'écran :
+// une alerte de ZONE ne vaut pas une alerte de SÉRIE — au-delà de trois
+// franchissements sur un même indicateur, ils se comptent en une ligne et
+// se déplient à la demande. Rien n'est retiré, tout reste consultable ; le
+// détail replié n'est PAS classé par variation (le palmarès des petites
+// zones records est le piège déjà documenté sur la carte A11).
 export function Alertes({ code }) {
   const { D } = useDonnees();
-  const navigate = useNavigate();
   if (D.alertes === undefined)
-    return <div className="note">Mouvements inhabituels : non interrogés (clé absente de la charge utile).</div>;
+    return <div className="note">Franchissements de seuil : non interrogés (clé absente de la charge utile).</div>;
   const liste = (D.alertes || []).filter(a => code === undefined || a.sector_code === code);
   if (!liste.length) return null;
 
@@ -101,92 +84,46 @@ export function Alertes({ code }) {
   }
   const simples = [], groupes = [];
   for (const [, rows] of parIndicateur) (rows.length <= 3 ? simples : groupes).push(rows);
-
-  const PT = { favorable: "var(--vert)", defavorable: "var(--rouge)", neutre: "#98a2b3" };
-  const chipsQV = (id) => {
-    const qv = qvDe(D, id);
-    return qv ? <span className="etq e-violet">{qv} · {QV_LIBELLES[qv] || ""}</span> : null;
-  };
-  const chipSens = (a) => {
-    const [cls, lbl] = SENS_ETQ[sensMouvement(D, a)];
-    return <span className={"etq " + cls}>{lbl}</span>;
-  };
-
   const ligne = (a, i) => (
     <div className="alerte" key={i}>
-      <span className="a-pt" style={{ background: a.diffusable ? PT[sensMouvement(D, a)] : "#98a2b3" }} />
+      <span className="a-pt" style={{ background: a.diffusable ? "var(--rouge)" : "#98a2b3" }} />
       <div>
         <div>
           <strong>{a.indicator_id}</strong> · {a.indicator_label} — {nomZone(a.geo)}, {a.period} :{" "}
           <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>
             {pct(a.glissement_annuel_pct ?? a.variation_periode_pct)}
           </span>{" "}
-          {chipSens(a)} {chipsQV(a.indicator_id)}
+          (seuil {nb(a.seuil_materialite_pct, 1)} %)
         </div>
-        <div className="a-m">amplitude vue moins d'une fois sur dix sur cette série</div>
         {!a.diffusable && <div className="a-m">{a.motif_de_retenue}</div>}
       </div>
     </div>
   );
 
-  const nMouvements = simples.length + groupes.length
-    ? simples.flat().length + groupes.length
-    : 0;
-  const nDefav = [
-    ...simples.flat(),
-    ...groupes.map(rows => syntheseZones(D, rows).laPlusLourde).filter(Boolean)
-  ].filter(a => a.diffusable && sensMouvement(D, a) === "defavorable").length;
-
   return (
     <div className="carte">
       <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 4 }}>
-        Mouvements inhabituels{" "}
+        Franchissements de seuil{" "}
         <span className="etq e-gris">
-          {nMouvements} mouvement{nMouvements > 1 ? "s" : ""}{nDefav ? ` · ${nDefav} défavorable${nDefav > 1 ? "s" : ""}` : ""}
+          {liste.filter(a => a.diffusable).length} diffusable(s) · {liste.filter(a => !a.diffusable).length} retenu(s)
         </span>
       </div>
       {simples.flat().map(ligne)}
-      {groupes.map((rows, gi) => {
-        const { retenues, ecartees, laPlusLourde } = syntheseZones(D, rows);
-        const l = laPlusLourde;
-        const lis = l ? valeurLisible(l.value, l.unit) : null;
-        return (
-          <div className="alerte" key={"g" + gi}>
-            <span className="a-pt" style={{ background: l && l.diffusable ? PT[sensMouvement(D, l)] : "#98a2b3" }} />
-            <div>
-              <div>
-                <strong>{rows[0].indicator_id}</strong> · {rows[0].indicator_label} — géographie en
-                mouvement : <strong>{retenues.length}</strong> zone{retenues.length > 1 ? "s" : ""} pesant
-                ≥ {SEUIL_POIDS_PCT} % du flux à amplitude inhabituelle
-                {l && <>, la plus lourde {nomZone(l.geo)} ({pct(l.glissement_annuel_pct ?? l.variation_periode_pct)},
-                  {" "}{lis.val} {lis.unit})</>}{" "}
-                {chipsQV(rows[0].indicator_id)}
-              </div>
-              <div className="a-m">
-                {ecartees > 0 && <>{ecartees} zone{ecartees > 1 ? "s" : ""} marginale{ecartees > 1 ? "s" : ""} (&lt; {SEUIL_POIDS_PCT} % du
-                flux chacune) écartée{ecartees > 1 ? "s" : ""} — artefact de petits nombres, pas un signal.{" "}</>}
-                Le déplacement se lit en points de part dans la{" "}
-                <span className="src-inline" onClick={() => navigate("/qv/" + rows[0].sector_code)}>
-                  dynamique géographique (QV3) ↗
-                </span>
-              </div>
-              <details style={{ marginTop: 4 }}>
-                <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--gris)" }}>
-                  les {retenues.length} zones pesantes, par poids décroissant
-                </summary>
-                <div style={{ marginTop: 6 }}>{retenues.map(ligne)}</div>
-              </details>
-            </div>
-          </div>
-        );
-      })}
+      {groupes.map((rows, gi) => (
+        <details key={"g" + gi} style={{ margin: "6px 0" }}>
+          <summary style={{ cursor: "pointer", fontSize: 13 }}>
+            <strong>{rows[0].indicator_id}</strong> · {rows[0].indicator_label} —{" "}
+            {rows.length} franchissements zone par zone
+            {rows.some(a => !a.diffusable) ? ` (dont ${rows.filter(a => !a.diffusable).length} retenus)` : ""} · déplier le détail
+          </summary>
+          <div style={{ marginTop: 6 }}>{rows.map(ligne)}</div>
+        </details>
+      ))}
       <div className="note">
-        « Inhabituel » a un sens précis : le mouvement dépasse le seuil de matérialité calibré sur
-        l'historique de sa propre série (~1 observation sur 10 le franchit). Il est signé selon le
-        sens de lecture déclaré au référentiel — une hausse n'est pas une alerte quand elle est
-        favorable. Un mouvement « retenu » n'est pas caché : sa valeur n'a pas le statut de
-        validation requis (RI5), le motif est affiché. Les zones marginales sont écartées et
-        comptées, jamais tues.
+        Un franchissement « retenu » n'est pas caché : sa valeur n'a simplement pas le statut de
+        validation requis pour une notification (RI5). Le motif est affiché. Les franchissements
+        zone par zone sont comptés puis repliés — un mouvement de série se lit en une ligne, pas
+        en cent.
       </div>
     </div>
   );

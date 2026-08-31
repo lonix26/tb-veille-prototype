@@ -1,7 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useDonnees, nb, pct, clsVar, nomZone, relu, BadgeCommentaire,
-         sensMouvement, SENS_ETQ } from "../api.jsx";
+import { useDonnees, nb, pct, clsVar, nomZone } from "../api.jsx";
 import { Synthetique } from "./Secteur.jsx";
 
 // Extrait « Ce qu'il faut retenir » du commentaire VALIDÉ — texte repris
@@ -62,29 +61,27 @@ export default function Accueil() {
               </div>
               {extrait
                 ? <div style={{ fontSize: 13, lineHeight: 1.45, margin: "6px 0" }}>{extrait}</div>
-                : <div className="note" style={{ margin: "6px 0" }}>Aucun commentaire pour ce marché.</div>}
+                : <div className="note" style={{ margin: "6px 0" }}>Aucun commentaire validé pour ce marché.</div>}
               <div className="k-s">
                 {al
                   ? <span className="etq e-rouge">{al} série{al > 1 ? "s" : ""} en franchissement</span>
                   : <span className="etq e-gris">rien d'inhabituel</span>}
-                {com && <BadgeCommentaire c={com} />}
+                {com && <span className="etq e-vert">commentaire validé par {com.validated_by || "?"}</span>}
               </div>
             </div>
           );
         })}
       </div>
       <div className="note" style={{ marginTop: 6 }}>
-        L'extrait de chaque marché provient de son commentaire exécutif le plus récent.
-        Depuis le 31.08.2026, les commentaires <strong>qu'aucun humain n'a relus</strong> sont
-        affichés eux aussi, sous étiquette ambre — le même régime que les valeurs pré-validées
-        par consensus. L'étiquette dit toujours par quel chemin le texte est arrivé. Les
-        compteurs du dispositif (observations, révisions, exécutions) se consultent dans Fiabilité.
+        L'extrait de chaque marché provient de son commentaire exécutif <strong>validé
+        humainement</strong> — seul le validé s'affiche. Les compteurs du dispositif
+        (observations, révisions, exécutions) se consultent dans Fiabilité.
       </div>
 
       <h2>À examiner</h2>
       <div className="grille g2">
         <div className="carte">
-          <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 4 }}>Mouvements inhabituels</div>
+          <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 4 }}>Franchissements de seuil</div>
           {diff.length === 0 && (
             <div className="note">Aucun franchissement diffusable : rien ne sort de l'ordinaire des séries suivies.</div>
           )}
@@ -102,15 +99,13 @@ export default function Accueil() {
             return m;
           }, new Map()).values()].slice(0, 6).map((a, i) => (
             <div className="alerte" key={i}>
-              {/* 31.08 : le point se signe par sens_favorable — tout n'est plus rouge. */}
-              <span className="a-pt" style={{ background:
-                { favorable: "var(--vert)", defavorable: "var(--rouge)", neutre: "#98a2b3" }[sensMouvement(D, a)] }} />
+              <span className="a-pt" style={{ background: "var(--rouge)" }} />
               <div>
                 <strong>{a.indicator_id}</strong> {a.indicator_label} — {nomZone(a.geo)}, {a.period} :{" "}
                 <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>
                   {pct(a.glissement_annuel_pct ?? a.variation_periode_pct)}
                 </span>{" "}
-                <span className={"etq " + SENS_ETQ[sensMouvement(D, a)][0]}>{SENS_ETQ[sensMouvement(D, a)][1]}</span>{a._n > 1 && <span style={{ color: "var(--gris)" }}> · {a._n} zones concernées</span>}
+                (seuil {nb(a.seuil_materialite_pct, 1)} %){a._n > 1 && <span style={{ color: "var(--gris)" }}> · {a._n} zones en franchissement</span>}
               </div>
             </div>
           ))}

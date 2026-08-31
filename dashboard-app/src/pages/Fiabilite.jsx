@@ -168,15 +168,28 @@ export default function Fiabilite({ vueInitiale }) {
         </div>
         <div className="fi-case">
           <div className="fi-n">{total.en_grille ?? total.total ?? "—"}</div>
-          <div className="fi-l">indicateurs suivis, choisis parmi {total.certifies} certifiés</div>
+          {/* Depuis le 27.08, la vitrine porte aussi des « à confirmer » (les
+              intensités de signalement) : « choisis parmi N certifiés » serait
+              devenu faux. Le référentiel est cité pour ses deux populations. */}
+          <div className="fi-l">indicateurs suivis — référentiel : {total.certifies} certifiés, {total.a_confirmer} à confirmer</div>
         </div>
         <div className="fi-case">
           <div className="fi-n">{sources.size}</div>
-          <div className="fi-l">sources institutionnelles, toutes ouvertes</div>
+          <div className="fi-l">sources en accès libre, dont une dérivation interne (§ 8.10)</div>
         </div>
         <div className="fi-case">
           <div className="fi-n">{nb(runs[0]?.run_id ?? 0)}</div>
           <div className="fi-l">exécutions, aucune écrasée</div>
+        </div>
+        {/* Rapatriées de l'accueil le 28.08.2026 : les compteurs du
+            dispositif parlent au constructeur — leur place est ici. */}
+        <div className="fi-case">
+          <div className="fi-n">{Number((D?.referentiel || []).reduce((s, i) => s + Number(i.observations || 0), 0)).toLocaleString("fr-CH")}</div>
+          <div className="fi-l">observations au registre</div>
+        </div>
+        <div className="fi-case">
+          <div className="fi-n">{(D?.revisions || []).length}</div>
+          <div className="fi-l">révisions constatées, sur {Number(D?.comparaisons_runs || 0).toLocaleString("fr-CH")} comparaisons entre runs</div>
         </div>
       </div>
 

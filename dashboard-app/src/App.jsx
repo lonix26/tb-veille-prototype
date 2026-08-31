@@ -63,7 +63,7 @@ function Navigation() {
       {lien("/executions", "Exécutions")}
       {lien("/fiabilite", "Fiabilité")}
       <div className="nav-pied">
-        Restitution v8 — structure v3, validée le 17.08, rétablie le 26.08<br />
+        Restitution v9 — structurée par questions de veille le 27.08<br />
         Scénario B · human-in-the-loop<br />
         Sources ouvertes uniquement<br />
         Prototype de travail de bachelor — HEG Arc
