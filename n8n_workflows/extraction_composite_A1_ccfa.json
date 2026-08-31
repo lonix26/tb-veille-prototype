@@ -1,0 +1,688 @@
+{
+  "id": "extraction-composite-a1",
+  "name": "Extraction composite — production mondiale CCFA/OICA (A1)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "declencheur",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual', 'B', 'en_cours', 'Composite A1 — extraction IA du tableau CCFA (production mondiale par pays)') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "id": "ouvrir-run",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Vérification nominative d'abord : même portillon que la CP.\nSELECT doc_id, indicator_id, period, geo, source_doc\n  FROM composite_queue\n WHERE indicator_id = 'A1' AND statut = 'a_traiter'\n ORDER BY period DESC\n LIMIT 1;",
+        "options": {}
+      },
+      "id": "lire-doc",
+      "name": "Lire le document à traiter",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_object_agg(indicator_id, seuil_consensus) AS seuils\n  FROM indicators\n WHERE category = 'composite' AND seuil_consensus IS NOT NULL;",
+        "options": {}
+      },
+      "id": "lire-seuils",
+      "name": "Lire les seuils de consensus",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://ccfa.fr/analyses-et-statistiques/",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "page-ccfa",
+      "name": "Résoudre le lien du document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Résolution du lien : la page est stable, le nom du PDF change chaque année\n// (CCFA-2025-FR-WEB-2.pdf). Même principe que FH et CP. `URL` n'existe pas\n// dans le bac à sable (constat du 30.08) : résolution à la main.\n// ÉDITIONS D'ARCHIVE (ajout du 31.08.2026) : la tendance exige plusieurs\n// points, donc plusieurs ÉDITIONS — le site archive tout depuis 2014\n// (ccfa.fr/analyse-statistiques/). Quand le document en file pointe\n// DIRECTEMENT un PDF, cette URL fait foi ; la résolution depuis la page\n// d'accueil ne vaut que pour l'édition courante. Chaque année figure dans\n// deux éditions : le recouvrement rend les révisions du producteur\n// visibles — c'est l'écart entre runs qui fait la tendance.\nconst docSource = String($('Lire le document à traiter').first().json.source_doc || '');\nif (/\\.pdf(\\?|$)/i.test(docSource)) {\n  return [{ json: { url_resolue: docSource, millesime: 'declare_par_le_document', candidats: 1 } }];\n}\nconst page = $json.data ?? $json.body ?? '';\nconst liens = [...String(page).matchAll(/href=\"([^\"]*CCFA[^\"]*FR[^\"]*\\.pdf)\"/gi)].map(m => m[1]);\nif (!liens.length) throw new Error(\"Aucun PDF CCFA (FR) trouvé sur la page — structure modifiée, incident à instruire.\");\nconst avecMillesime = liens.map(u => ({ u, an: Math.max(0, ...[...u.matchAll(/20(\\d{2})/g)].map(m => 2000 + Number(m[1]))) }));\navecMillesime.sort((a, b) => b.an - a.an);\nlet url = avecMillesime[0].u.replace(/&amp;/g, '&');\nif (url.startsWith('//')) url = 'https:' + url;\nelse if (url.startsWith('/')) url = 'https://ccfa.fr' + url;\nelse if (!/^https?:/i.test(url)) url = 'https://ccfa.fr/' + url;\nreturn [{ json: { url_resolue: url, millesime: String(avecMillesime[0].an), candidats: liens.length } }];"
+      },
+      "id": "lien-pdf",
+      "name": "Extraire le lien du PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url_resolue }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "dl-pdf",
+      "name": "Télécharger le PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "data",
+        "options": {}
+      },
+      "id": "lire-pdf",
+      "name": "Lire le PDF",
+      "type": "n8n-nodes-base.readPDF",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// DÉCOUPE PAR ANCRES : la réponse à « comment ne pas ingérer tout le PDF ».\n//\n// Le document fait 102 pages ; Anthropic et OpenAI plafonnent vers 100 pages\n// et rien ne justifie de payer 102 pages pour un tableau qui en occupe deux.\n// Le texte est déjà extrait (nœud « Lire le PDF ») ; on découpe la section\n// statistique par SENTINELLES DE CONTENU, jamais par numéro de page — le\n// même principe que la résolution de lien (FH, CP) : on déclare ce qu'on\n// cherche, pas où il se trouve, pour survivre aux rééditions.\n//\n// Vérifié le 31.08.2026 sur l'édition 2025 : les lignes du tableau sortent\n// intactes et dans l'ordre (« Allemagne*4 1094 069-1,0 82 »), colonnes\n// concaténées — ambigu pour du code, lisible par un modèle. C'est le motif\n// mesuré de la voie IA sur ce document (décision de l'étudiant, tracée).\nconst t = String($input.first().json.text || '');\nif (t.length < 5000) {\n  throw new Error(\"Texte extrait anormalement court (\" + t.length + \" caractères) — lecture PDF à instruire.\");\n}\n// DEUX CORRECTIONS MESURÉES (runs du 31.08) :\n// v1 — sentinelles sur noms seuls : elles se calaient sur la PROSE des faits\n// marquants, tranche sans tableau, liste vide unanime des trois modèles.\n// v2 — grappe la plus dense de motifs pays+chiffre : elle atterrissait dans\n// les ANNEXES de fin d'annuaire (tableaux de tonnage, plus denses encore).\n// v3, retenue : le tableau visé est identifié par un APPARIEMENT — la ligne\n// d'agrégat « EUROPE » suivie de chiffres LA PLUS PROCHE APRÈS un titre\n// « PRODUCTION MONDIALE DE V » (moins de 6 000 caractères d'écart). Vérifié\n// sur les trois éditions : tranche de ~5 100 caractères portant l'en-tête\n// des années, les ~25 pays et la ligne TOTAL.\nconst titres = [];\nlet i = -1;\nwhile ((i = t.indexOf('PRODUCTION MONDIALE DE V', i + 1)) >= 0) titres.push(i);\nconst europes = [...t.matchAll(/EUROPE\\s*\\n\\s*\\d/g)].map(m => m.index);\nlet choix = null;\nfor (const ti of titres) for (const e of europes) {\n  const ecart = e - ti;\n  if (ecart > 0 && ecart < 6000 && (!choix || ecart < choix.ecart)) choix = { e, ecart };\n}\nif (!choix) {\n  throw new Error(\"Aucune ligne EUROPE chiffrée à moins de 6000 caractères d'un titre PRODUCTION MONDIALE (\" + titres.length + \" titres, \" + europes.length + \" lignes EUROPE) — structure du document modifiée, incident à instruire.\");\n}\nconst debut = Math.max(0, choix.e - 600);\nconst fin = Math.min(t.length, choix.e + 4500);\nconst tranche = t.slice(debut, fin);\nif (!/Allemagne[*)]?\\s?\\d/.test(tranche) || !/Chine\\s?\\d/.test(tranche)) {\n  throw new Error(\"La tranche découpée ne contient pas les lignes attendues (Allemagne, Chine) — découpe à instruire, rien n'est envoyé aux modèles.\");\n}\nreturn [{ json: {\n  tranche,\n  longueur_document: t.length,\n  longueur_tranche: tranche.length,\n  part_ingeree_pct: Math.round(1000 * tranche.length / t.length) / 10\n} }];"
+      },
+      "id": "decouper",
+      "name": "Découper la section statistique",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://oica.net/production-statistics/jsf/jet-engine:statistic-production/tax/statistic_chart_year:{{ $('Lire le document à traiter').first().json.period }}/",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "verite-oica",
+      "name": "Lire la vérité OICA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// La charge : la TRANCHE seulement, jamais le document entier.\nconst prep = $('Découper la section statistique').first().json;\nconst consigne = `Tu es un extracteur de données. Le texte fourni est extrait du tableau « LA PRODUCTION MONDIALE DE VÉHICULES » de l'annuaire CCFA (production automobile par pays, en MILLIERS de véhicules, colonnes : valeur année précédente, valeur dernière année, variation %, base 100 = 2019). Les colonnes sont concaténées sans séparateur : sers-toi de la variation (signée, avec virgule) et de la base (entier final) pour délimiter.\n\nExtrais UNIQUEMENT les lignes de PAYS (jamais les agrégats EUROPE, AMÉRIQUE, ASIE-OCÉANIE, ACEUM, ASEAN, PECO, « Europe occidentale », « Europe centrale et orientale », « Amérique du Sud », AFRIQUE), PLUS la ligne TOTAL du tableau, rendue avec {\"pays\": \"TOTAL\", \"iso3\": \"WLD\"} — c'est la seule ligne d'agrégat admise.\n\nRenvoie STRICTEMENT un objet JSON valide, sans texte autour et sans balises de code :\n{\"annee_recente\": \"2024\", \"annee_precedente\": \"2023\", \"lignes\": [{\"pays\": \"Allemagne\", \"iso3\": \"DEU\", \"v_precedente\": 4109, \"v_recente\": 4069}, ...]}\n\nRègles impératives :\n- Une entrée par pays, dans l'ordre du tableau. Valeurs en milliers TELLES QU'IMPRIMÉES, sans recalcul.\n- iso3 : code ISO 3166-1 alpha-3 du pays.\n- Si une valeur est illisible, mets null. N'utilise AUCUNE source autre que le texte fourni.\n- Les années : lis-les dans l'en-tête du tableau, ne les suppose pas.`;\nreturn [{ json: {\n  tranche: prep.tranche,\n  consigne,\n  part_ingeree_pct: prep.part_ingeree_pct,\n  run_id: $('Ouvrir le run').first().json.run_id,\n  source_doc: $('Extraire le lien du PDF').first().json.url_resolue\n} }];"
+      },
+      "id": "preparer",
+      "name": "Préparer la charge",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.MODELE_OPENAI, input: [{ role: 'user', content: [{ type: 'input_text', text: $json.consigne + '\\n\\n--- TEXTE ---\\n' + $json.tranche }] }] }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "modele-a",
+      "name": "Modèle A (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.MODELE_ANTHROPIC, max_tokens: 8000, messages: [{ role: 'user', content: [{ type: 'text', text: $json.consigne + '\\n\\n--- TEXTE ---\\n' + $json.tranche }] }] }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "modele-b",
+      "name": "Modèle B (Anthropic)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.MODELE_GOOGLE }}:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GOOGLE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.consigne + '\\n\\n--- TEXTE ---\\n' + $json.tranche }] }] }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "modele-c",
+      "name": "Modèle C (Google)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "merge-modeles-a1",
+      "name": "Rassembler les trois réponses",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONSENSUS PAR PAYS, CONTRÔLE PAR LA SOURCE PRIMAIRE.\n//\n// Doctrine (cascade § 10.4) : vérité terrain d'abord, consensus ensuite,\n// humain enfin. Cas exceptionnel et précieux : la source primaire (OICA)\n// publie la vérité en JSON lisible dans sa page (attributs data-data,\n// classements top-10 par année). Chaque valeur extraite par les modèles\n// est donc confrontée à l'OICA quand le pays y figure :\n//   - concordance (±0,1 %, arrondi au millier) : contrôle de rang 1 SATISFAIT ;\n//   - discordance : incident, la valeur va en file quelle que soit l'unanimité ;\n//   - pays hors top-10 OICA : non vérifiable — le consensus seul décide,\n//     comme pour la CP hors contrôle arithmétique, et la note le dit.\nfunction texte(x) {\n  if (Array.isArray(x.output)) return x.output.flatMap(i => i.content || []).filter(p => p.type === 'output_text' || p.type === 'text').map(p => p.text).join('');\n  if (Array.isArray(x.content)) return x.content.filter(b => b.type === 'text').map(b => b.text).join('');\n  if (Array.isArray(x.candidates)) return ((x.candidates[0] || {}).content?.parts || []).filter(p => p.text).map(p => p.text).join('');\n  return '';\n}\nfunction parser(t) {\n  const net = String(t).replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();\n  return JSON.parse(net);\n}\nfunction modale(vals) {\n  const comptes = new Map();\n  for (const v of vals) if (v !== null && v !== undefined) comptes.set(v, (comptes.get(v) || 0) + 1);\n  if (!comptes.size) return { valeur: null, part: 0 };\n  const tri = [...comptes.entries()].sort((a, b) => b[1] - a[1]);\n  if (tri.length > 1 && tri[0][1] === tri[1][1]) return { valeur: null, part: tri[0][1] / vals.length };\n  return { valeur: tri[0][0], part: tri[0][1] / vals.length };\n}\n\n// --- lectures des trois modèles ---\nconst lectures = []; const incidentsModele = [];\nconst noms = ['openai', 'anthropic', 'google'];\n$input.all().forEach((item, i) => {\n  try {\n    const d = parser(texte(item.json));\n    if (!Array.isArray(d.lignes)) throw new Error('pas de champ lignes');\n    lectures.push({ nom: noms[i] || ('modele_' + i), d });\n  } catch (e) { incidentsModele.push(`${noms[i] || i} : ${String(e.message).slice(0, 80)}`); }\n});\nif (lectures.length < 2) throw new Error('Moins de deux lectures exploitables : ' + incidentsModele.join(' | '));\n\n// --- vérité OICA : tous les blocs data-data de la page, pays -> totaux vus ---\nconst brutOica = String($('Lire la vérité OICA').first().json.data ?? '');\n// CORRECTION DU 31.08 (run 181) : la v1 comparait à TOUS les blocs sans année\n// et déclarait « discorde » quand l'OICA n'avait pas publié l'année demandée —\n// 23 valeurs unanimes et justes routées en file pour rien. Une valeur\n// introuvable n'est pas une valeur contredite. Chaque bloc de la page est\n// précédé d'un titre daté (« World Motor Vehicle - Production - 2015 ») :\n// le contrôle est désormais PAR ANNÉE, et seuls les blocs « World Motor\n// Vehicle - Production » (totaux) font foi — jamais les blocs par type.\nconst oica = {};\n{\n  const morceaux = [...brutOica.matchAll(/World Motor Vehicle - Production - (\\d{4})|data-data=\"([^\"]+)\"/g)];\n  let anneeCourante = null;\n  for (const m of morceaux) {\n    if (m[1]) { anneeCourante = m[1]; continue; }\n    if (!anneeCourante) continue;\n    try {\n      const rows = JSON.parse(m[2].replace(/&quot;/g, '\"').replace(/&amp;/g, '&'));\n      for (const r of rows.slice(1)) {\n        const nom = String(r[0]).toUpperCase().trim();\n        const tot = (Number(r[1]) > 0 ? Number(r[1]) : 0) + (Number(r[2]) > 0 ? Number(r[2]) : 0);\n        if (tot > 0) ((oica[anneeCourante] = oica[anneeCourante] || {})[nom] = tot);\n      }\n    } catch (e) { /* bloc illisible : ignoré */ }\n    anneeCourante = null;  // un titre ne vaut que pour le bloc qui le suit\n  }\n}\nconst ISO_VERS_OICA = { CHN:'CHINA', JPN:'JAPAN', IND:'INDIA', DEU:'GERMANY', KOR:'SOUTH KOREA',\n  ESP:'SPAIN', BRA:'BRAZIL', CZE:'CZECHIA', USA:'USA', IDN:'INDONESIA', FRA:'FRANCE', MEX:'MEXICO',\n  CAN:'CANADA', TUR:'TURKEY', RUS:'RUSSIA', GBR:'UK', ITA:'ITALY', SVK:'SLOVAKIA', THA:'THAILAND', MYS:'MALAYSIA' };\nfunction controleOica(iso3, annee, valeurMilliers) {\n  const nom = ISO_VERS_OICA[iso3];\n  const parAnnee = oica[String(annee)];\n  if (!nom || !parAnnee || !(nom in parAnnee)) return 'non_verifiable';\n  const cible = valeurMilliers * 1000, tol = Math.max(1000, cible * 0.001);\n  return Math.abs(parAnnee[nom] - cible) <= tol ? 'concorde' : 'discorde';\n}\n\n// --- consensus par pays et par année ---\nconst seuilsBruts = $('Lire les seuils de consensus').first().json.seuils || {};\nconst s = Number(seuilsBruts['A1']); const seuil = Number.isFinite(s) && s > 0 ? s : 1;\nconst doc = $('Lire le document à traiter').first().json;\nconst charge = $('Préparer la charge').first().json;\nconst anRecent = modale(lectures.map(l => l.d.annee_recente)).valeur;\nconst anPrec = modale(lectures.map(l => l.d.annee_precedente)).valeur;\n\nconst parIso = {};\nfor (const l of lectures) for (const r of (l.d.lignes || [])) {\n  const iso = String(r.iso3 || '').toUpperCase();\n  if (!/^[A-Z]{3}$/.test(iso)) continue;\n  (parIso[iso] = parIso[iso] || {}).__pays = r.pays;\n  (parIso[iso][l.nom] = parIso[iso][l.nom] || {}).vr = r.v_recente;\n  parIso[iso][l.nom].vp = r.v_precedente;\n}\nconst sorties = [];\nfor (const [iso, obj] of Object.entries(parIso)) {\n  for (const [annee, champ] of [[anRecent, 'vr'], [anPrec, 'vp']]) {\n    if (!annee) continue;\n    const vals = lectures.map(l => obj[l.nom] ? obj[l.nom][champ] : undefined).map(v => v === undefined ? null : v);\n    const { valeur, part } = modale(vals);\n    const incidents = [...incidentsModele];\n    let ctrl = 'non_verifiable';\n    if (valeur !== null) {\n      ctrl = controleOica(iso, annee, valeur);\n      if (ctrl === 'discorde') incidents.push(`controle OICA : ${iso} ${annee} = ${valeur} milliers introuvable dans les donnees publiees OICA`);\n    }\n    if (part < seuil) incidents.push(`consensus ${Math.round(part * 100)} % sous le seuil declare de ${Math.round(seuil * 100)} %`);\n    sorties.push({ json: {\n      // la ligne TOTAL du tableau est portée par la zone World — la\n      // convention des indicateurs mondiaux de la grille (A3, A11).\n      indicator_id: 'A1', run_id: charge.run_id, period: String(annee), geo: iso === 'WLD' ? 'World' : iso,\n      value: valeur !== null ? valeur * 1000 : null,   // milliers -> unités (unité du référentiel)\n      consensus_score: Number(part.toFixed(4)), seuil_applique: seuil,\n      controle_oica: ctrl, source_doc: charge.source_doc, doc_id: doc.doc_id,\n      diffusable: valeur !== null && part >= seuil && ctrl !== 'discorde',\n      extractions: JSON.stringify({ pays: obj.__pays, valeurs_par_modele: Object.fromEntries(lectures.map(l => [l.nom, obj[l.nom] ? obj[l.nom][champ] : null])), controle_oica: ctrl, part, incidents }),\n      incidents\n    } });\n  }\n}\nif (!sorties.length) throw new Error('Aucune ligne pays extraite par consensus.');\nreturn sorties;"
+      },
+      "id": "consensus",
+      "name": "Consensus et contrôles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "diffusable",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.diffusable }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "consensus-net",
+      "name": "Consensus net ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO indicator_values\n  (indicator_id, run_id, period, geo, value, obtained_by, validation_status, consensus_score, raw_ref)\nVALUES ($1, $2, $3, $4, $5, 'ia_extraction', 'pre_valide_consensus', $6, $7)\nON CONFLICT (indicator_id, run_id, period, geo) DO NOTHING\nRETURNING value_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.value, $json.consensus_score, $json.source_doc] }}"
+        }
+      },
+      "id": "ecrire-registre",
+      "name": "Écrire au registre (pré-validé consensus)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        2800,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO validation_queue\n  (indicator_id, run_id, period, geo, extractions, consensus_score, source_doc, raw_ref)\nVALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $7)\nRETURNING item_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.extractions, $json.consensus_score, $json.source_doc] }}"
+        }
+      },
+      "id": "file-validation",
+      "name": "File de validation humaine",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        2800,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs\n   SET status = CASE WHEN $2::int = 0 AND $3::int = 0 THEN 'echec'\n                     WHEN $3::int > 0 THEN 'partiel'\n                     ELSE 'ok' END,\n       closed_at = now(),\n       note = 'Composite A1 — ' || $2 || ' observation(s) pre-validees par consensus, '\n              || $3 || ' en file de validation humaine.'\n WHERE run_id = $1\nRETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ [$('Ouvrir le run').first().json.run_id, $('Écrire au registre (pré-validé consensus)').isExecuted ? $('Écrire au registre (pré-validé consensus)').all().length : 0, $('File de validation humaine').isExecuted ? $('File de validation humaine').all().length : 0] }}"
+        }
+      },
+      "id": "cloturer",
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        3000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Sans clôture, ORDER BY period DESC reprendrait toujours la même édition\n-- et les documents d'archive ne seraient jamais traités. L'empreinte de\n-- vérification est conservée (chk_doc_verifie l'exige pour 'traite').\nUPDATE composite_queue SET statut='traite' WHERE doc_id=$1 RETURNING doc_id, statut;",
+        "options": {
+          "queryReplacement": "={{ [$('Lire le document à traiter').first().json.doc_id] }}"
+        }
+      },
+      "id": "clore-doc",
+      "name": "Clore le document traité",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        3200,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Lire le document à traiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le document à traiter": {
+      "main": [
+        [
+          {
+            "node": "Lire les seuils de consensus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les seuils de consensus": {
+      "main": [
+        [
+          {
+            "node": "Résoudre le lien du document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Résoudre le lien du document": {
+      "main": [
+        [
+          {
+            "node": "Extraire le lien du PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire le lien du PDF": {
+      "main": [
+        [
+          {
+            "node": "Télécharger le PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Télécharger le PDF": {
+      "main": [
+        [
+          {
+            "node": "Lire le PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le PDF": {
+      "main": [
+        [
+          {
+            "node": "Découper la section statistique",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Découper la section statistique": {
+      "main": [
+        [
+          {
+            "node": "Lire la vérité OICA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire la vérité OICA": {
+      "main": [
+        [
+          {
+            "node": "Préparer la charge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer la charge": {
+      "main": [
+        [
+          {
+            "node": "Modèle A (OpenAI)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Modèle B (Anthropic)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Modèle C (Google)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle A (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Rassembler les trois réponses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle B (Anthropic)": {
+      "main": [
+        [
+          {
+            "node": "Rassembler les trois réponses",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Modèle C (Google)": {
+      "main": [
+        [
+          {
+            "node": "Rassembler les trois réponses",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Rassembler les trois réponses": {
+      "main": [
+        [
+          {
+            "node": "Consensus et contrôles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consensus et contrôles": {
+      "main": [
+        [
+          {
+            "node": "Consensus net ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consensus net ?": {
+      "main": [
+        [
+          {
+            "node": "Écrire au registre (pré-validé consensus)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File de validation humaine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire au registre (pré-validé consensus)": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File de validation humaine": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clôturer le run": {
+      "main": [
+        [
+          {
+            "node": "Clore le document traité",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
