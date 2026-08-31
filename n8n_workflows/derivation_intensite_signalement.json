@@ -1,0 +1,120 @@
+{
+  "id": "dN8uiR4bud4RopM6",
+  "name": "Veille - Dérivation intensité de signalement",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "declencheur_manuel",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual','B','en_cours','Dérivation intensité de signalement') RETURNING run_id, executed_at;",
+        "options": {}
+      },
+      "id": "ouvrir_le_run",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\nINSERT INTO validation_queue\n  (indicator_id, run_id, period, geo, extractions, consensus_score, source_doc, raw_ref)\nSELECT v.indicator_id,\n       $1::bigint,\n       v.periode,\n       'WORLD',\n       jsonb_build_object(\n         'mesure', 'part des items triés attribués à la question, pertinence >= 1',\n         'modele_triage', 'gemini-3.7-flash',\n         'consensus', 'non établi — modèle de triage unique (choix mesuré, § 9.5.1) : routage humain systématique',\n         'n_pertinents', v.n_pertinents,\n         'n_tries', v.n_tries,\n         'part_pct', v.part_pct,\n         'plancher', '20 items triés/secteur/mois',\n         'items', (SELECT jsonb_agg(jsonb_build_object('item_id', a.item_id, 'titre', left(fi.titre, 160)) ORDER BY a.item_id)\n                     FROM (SELECT DISTINCT t.item_id\n                             FROM flux_triage_ia t\n                             JOIN flux_items f2 USING (item_id)\n                            WHERE t.sector_code = v.sector_code\n                              AND t.watch_question_code = v.watch_question_code\n                              AND t.pertinence >= 1\n                              AND to_char(f2.date_publication,'YYYY-MM') = v.periode) a\n                     JOIN flux_items fi ON fi.item_id = a.item_id)\n       ),\n       0,\n       'flux_triage_ia (vue v_intensite_signalement)',\n       'intensite:' || v.sector_code || ':' || v.watch_question_code || ':' || v.periode\n  FROM v_intensite_signalement v\n WHERE v.calculable\n   AND v.indicator_id IS NOT NULL\n   AND NOT EXISTS (SELECT 1 FROM validation_queue q\n                    WHERE q.indicator_id = v.indicator_id AND q.period = v.periode)\n   AND NOT EXISTS (SELECT 1 FROM indicator_values iv\n                    WHERE iv.indicator_id = v.indicator_id AND iv.period = v.periode\n                      AND iv.validation_status <> 'rejete')\nRETURNING indicator_id, period)\nSELECT count(*)::int AS mis_en_file,\n       coalesce(string_agg(indicator_id || ' ' || period, ', ' ORDER BY indicator_id, period), 'aucun') AS detail\n  FROM ins;",
+        "options": {
+          "queryReplacement": "={{ [ $('Ouvrir le run').first().json.run_id ] }}"
+        }
+      },
+      "id": "ecrire_en_file",
+      "name": "Écrire en file de validation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status = CASE WHEN $2::int = 0 THEN 'partiel' ELSE 'ok' END, closed_at = now(), note = 'Dérivation intensité de signalement — ' || $2::int || ' point(s) mis en file de validation (' || $3 || ').' WHERE run_id = $1 RETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ [ $('Ouvrir le run').first().json.run_id, $('Écrire en file de validation').first().json.mis_en_file, $('Écrire en file de validation').first().json.detail ] }}"
+        }
+      },
+      "id": "clore_le_run",
+      "name": "Clore le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        600,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Écrire en file de validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire en file de validation": {
+      "main": [
+        [
+          {
+            "node": "Clore le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
