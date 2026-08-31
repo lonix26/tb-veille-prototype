@@ -2,7 +2,6 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDonnees, nb, pct, clsVar, nomZone, relu, BadgeCommentaire,
          sensMouvement, SENS_ETQ } from "../api.jsx";
-import { MarkdownLeger } from "../api.jsx";
 import { Synthetique } from "./Secteur.jsx";
 
 // Extrait « Ce qu'il faut retenir » du commentaire VALIDÉ — texte repris
@@ -82,8 +81,6 @@ export default function Accueil() {
         compteurs du dispositif (observations, révisions, exécutions) se consultent dans Fiabilité.
       </div>
 
-      <LecturesTransversales D={D} />
-
       <h2>À examiner</h2>
       <div className="grille g2">
         <div className="carte">
@@ -121,62 +118,5 @@ export default function Accueil() {
         <Synthetique />
       </div>
     </div>
-  );
-}
-
-
-/* ---------- lectures transversales (31.08.2026) ---------- */
-// L'étage où le modèle produit ce que ni le code ni un humain pressé ne
-// produiraient : des HYPOTHÈSES de liaison inter-signaux. Génération
-// CONTRAINTE — le modèle ne reçoit que des faits calculés (F1..Fn) et
-// n'écrit aucun chiffre : les valeurs vivent dans les faits cités,
-// dépliables sous chaque hypothèse. Une hypothèse n'est jamais un fait :
-// l'étiquette et le conditionnel le rappellent, la validation tranche.
-function LecturesTransversales({ D }) {
-  const lectures = D?.lectures_transversales || [];
-  if (!lectures.length) return null;
-  const CONF = { haute: "e-vert", moyenne: "e-gris", basse: "e-ambre" };
-  return (
-    <>
-      <h2>Lectures transversales <span style={{ fontSize: 12, fontWeight: 400, color: "var(--gris)" }}>
-        des hypothèses, pas des faits — chaque liaison cite les séries qui la portent</span></h2>
-      <div className="grille g2">
-        {lectures.map(l => {
-          const faits = Object.entries(l.faits_cites || {});
-          return (
-            <div className="carte" key={l.lecture_id}>
-              <div style={{ marginBottom: 6 }}>
-                <span className="etq e-violet">hypothèse</span>{" "}
-                <span className={"etq " + (CONF[l.confiance] || "e-gris")}>confiance {l.confiance}</span>{" "}
-                {l.statut === "valide"
-                  ? <span className="etq e-vert">validée par {l.validated_by}</span>
-                  : <span className="etq e-ambre">non arbitrée</span>}
-              </div>
-              <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-                {String(l.hypothese).replace(/\[?(F\d+)\]?/g, "")}
-              </div>
-              {l.infirmable_par && (
-                <div className="a-m" style={{ marginTop: 6 }}><strong>Se vérifiera par —</strong> {l.infirmable_par}</div>
-              )}
-              <details style={{ marginTop: 6 }}>
-                <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--gris)" }}>
-                  les {faits.length} faits cités, avec leurs valeurs
-                </summary>
-                <div style={{ marginTop: 6 }}>
-                  {faits.map(([c, f]) => (
-                    <div key={c} className="a-m" style={{ marginBottom: 4 }}><strong>{c}</strong> · {f.texte}</div>
-                  ))}
-                </div>
-              </details>
-            </div>
-          );
-        })}
-      </div>
-      <div className="note" style={{ marginTop: 6 }}>
-        Générées sous contrainte : le modèle ne reçoit que des faits calculés du registre et
-        n'écrit aucun chiffre — les valeurs sont dans les faits cités, dépliables. Une hypothèse
-        non arbitrée n'engage personne ; une hypothèse validée porte le nom de qui l'a jugée.
-      </div>
-    </>
   );
 }

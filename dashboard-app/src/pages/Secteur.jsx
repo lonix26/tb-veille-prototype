@@ -4,7 +4,7 @@ import {
   useDonnees, nb, pct, clsVar, dateCH, estAgregat, nomZone,
   serieDe, zonesDe, metrDe, BadgeStatut, MarkdownLeger, relu,
   sensMouvement, SENS_ETQ, QV_LIBELLES, qvDe, syntheseZones, SEUIL_POIDS_PCT,
-  alertesSignificatives
+  alertesSignificatives, TYPE_EVT, SENS_EVT, BadgeEvenement
 } from "../api.jsx";
 import Chart, { TreemapParts } from "../Chart.jsx";
 import { phrasePeriode } from "../phrases.jsx";
@@ -879,6 +879,7 @@ export default function Secteur() {
         <Commentaire code={code} />
         {contexte && <Synthetique />}
         <Alertes code={code} />
+        <Evenements code={code} />
       </div>
 
       {questions.map(q => {
@@ -919,6 +920,59 @@ export default function Secteur() {
           sait suivre.
         </div>
       )}
+    </div>
+  );
+}
+
+
+/* ---------- événements typés du marché (31.08.2026) ---------- */
+// « 26 items triés » ne dit rien ; « 3 fermetures ce mois » dit tout.
+// Lecture par modèle UNIQUE (le régime du triage, § 9.5.1) : tout est
+// badgé « non relu » tant qu'aucun humain n'a tranché — jamais servi
+// comme fait établi. Route réelle : cette page (Secteur), pas Marche —
+// leçon du 31.08 : Marche.jsx n'est plus routée depuis la v9.
+function Evenements({ code }) {
+  const { D } = useDonnees();
+  const types = (D?.evenements_types || []).filter(v => v.sector_code === code);
+  const recents = (D?.evenements_recents || []).filter(e => e.sector_code === code);
+  if (!types.length && !recents.length) return null;
+  const parType = new Map();
+  for (const v of types) parType.set(v.type_evenement, (parType.get(v.type_evenement) || 0) + v.n);
+  return (
+    <div className="carte">
+      <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 6 }}>
+        Ce qui s'est passé — événements lus dans les flux
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+        {/* « autre » est écarté des puces : un type qui ne type pas n'informe pas —
+            il reste compté dans la note et consultable en base. */}
+        {[...parType.entries()].filter(([ty]) => ty !== "autre").sort((a, b) => b[1] - a[1]).map(([ty, n]) => (
+          <span key={ty} className={"etq " + (TYPE_EVT[ty] || TYPE_EVT.autre)[0]}>
+            {n} · {(TYPE_EVT[ty] || TYPE_EVT.autre)[1]}
+          </span>
+        ))}
+        <span className="etq e-gris">deux derniers mois{parType.has("autre") ? ` · ${parType.get("autre")} sans type` : ""}</span>
+      </div>
+      {recents.slice(0, 6).map(e => (
+        <div className="alerte" key={e.evenement_id}>
+          <span className="a-pt" style={{ background:
+            { opportunite: "var(--vert)", menace: "var(--rouge)", neutre: "#98a2b3" }[e.sens_sous_traitance] }} />
+          <div>
+            <div>
+              <span className={"etq " + (TYPE_EVT[e.type_evenement] || TYPE_EVT.autre)[0]}>{(TYPE_EVT[e.type_evenement] || TYPE_EVT.autre)[1]}</span>{" "}
+              <span className={"etq " + (SENS_EVT[e.sens_sous_traitance] || SENS_EVT.neutre)[0]}>{(SENS_EVT[e.sens_sous_traitance] || SENS_EVT.neutre)[1]}</span>{" "}
+              <strong>{e.acteur || "acteur non précisé"}</strong>{e.zone ? <> · {e.zone}</> : null} · {dateCH(e.date_publication)}
+            </div>
+            <div className="a-m">{e.resume} <BadgeEvenement e={e} /></div>
+          </div>
+        </div>
+      ))}
+      <div className="note">
+        Événements extraits des items de flux jugés pertinents au triage, par un modèle de
+        lecture unique — chaque événement reste rattaché à son article source et porte son
+        statut de relecture. Un décompte d'événements n'est pas une statistique officielle :
+        c'est ce que la presse professionnelle a rapporté.
+      </div>
     </div>
   );
 }

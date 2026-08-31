@@ -1,0 +1,244 @@
+{
+  "id": "extraction-evenements-flux",
+  "name": "Veille - Événements typés (lecture IA des flux pertinents, human-in-the-loop)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "t1",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual', 'B', 'en_cours', 'Événements typés — lecture IA des items pertinents sans lecture') RETURNING run_id;",
+        "options": {}
+      },
+      "id": "t2",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Seuls les items PERTINENTS au triage (>=1) reçoivent une lecture : le\n-- triage a déjà filtré, on ne paie pas deux fois. Jamais deux lectures du\n-- même item (contrainte UNIQUE, et ce filtre).\nSELECT i.item_id, i.titre, s.sector_code\n  FROM flux_items i\n  JOIN flux_sources s USING (flux_id)\n  JOIN flux_triage_ia t USING (item_id)\n  LEFT JOIN flux_evenements e ON e.item_id = i.item_id\n WHERE t.pertinence >= 1 AND e.evenement_id IS NULL AND s.sector_code IS NOT NULL\n ORDER BY i.item_id;",
+        "options": {}
+      },
+      "id": "t3",
+      "name": "Lire les items à traiter",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mise en LOTS de 40 items : le nœud HTTP s'exécute une fois par item\n// entrant — un item = un lot, c'est le mécanisme voulu.\nconst items = $input.all().map(x => x.json);\nif (!items.length) throw new Error('Aucun item pertinent sans lecture événementielle — rien à traiter.');\nconst lots = [];\nfor (let i = 0; i < items.length; i += 40) lots.push(items.slice(i, i + 40));\nconst consigne = `Tu lis des titres d'articles de presse professionnelle. Pour CHAQUE item, dis s'il rapporte un ÉVÉNEMENT concret (quelque chose qui s'est produit : décision, transaction, ouverture, fermeture, règlement) — par opposition à un contenu éditorial (guide d'achat, présentation de produit ancien, histoire, opinion).\n\nRéponds STRICTEMENT en JSON, sans texte autour :\n{\"lectures\":[{\"item_id\":123,\"est_evenement\":true,\"type\":\"investissement\",\"acteur\":\"Nom\",\"zone\":\"pays ou région\",\"sens_sous_traitance\":\"opportunite\",\"resume\":\"une phrase factuelle\"}, {\"item_id\":124,\"est_evenement\":false}]}\n\nRègles impératives :\n- type parmi : investissement, fermeture_reduction, rachat_fusion, reglementation, lancement_produit, resultat_financier, partenariat, autre.\n- sens_sous_traitance parmi : opportunite, menace, neutre — du point de vue d'un sous-traitant mécanique de précision.\n- UNIQUEMENT les item_id fournis. Un item douteux est est_evenement:false — ne force jamais.\n- Le resume ne contient AUCUN chiffre qui ne soit pas dans le titre.`;\nreturn lots.map(l => ({ json: {\n  consigne,\n  charge: l.map(x => `${x.item_id} | [${x.sector_code}] ${x.titre}`).join('\\n'),\n  item_ids: l.map(x => x.item_id),\n  secteurs: Object.fromEntries(l.map(x => [x.item_id, x.sector_code]))\n} }));"
+      },
+      "id": "t4",
+      "name": "Mettre en lots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $env.MODELE_GOOGLE }}:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GOOGLE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.consigne + '\\n\\n--- ITEMS ---\\n' + $json.charge }] }] }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "t5",
+      "name": "Modèle de lecture (unique, régime du triage)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONTRÔLES DÉTERMINISTES sur la sortie du modèle — le rang 1 avant tout :\n//  - JSON valide, item_id appartenant AU LOT (une lecture inventée est jetée\n//    et comptée), vocabulaire fermé respecté ;\n//  - un resume porteur de chiffres absents du titre est signalé (incident),\n//    pas censuré : l'humain jugera sur pièce.\nfunction texte(x) {\n  if (Array.isArray(x.candidates)) return ((x.candidates[0] || {}).content?.parts || []).filter(p => p.text).map(p => p.text).join('');\n  if (Array.isArray(x.content)) return x.content.filter(b => b.type === 'text').map(b => b.text).join('');\n  return '';\n}\nconst TYPES = ['investissement','fermeture_reduction','rachat_fusion','reglementation','lancement_produit','resultat_financier','partenariat','autre'];\nconst SENS = ['opportunite','menace','neutre'];\nconst run_id = $('Ouvrir le run').first().json.run_id;\nconst sorties = []; let jetes = 0, non_evenements = 0, lots_illisibles = 0;\n// Admission GLOBALE : l'appariement lot->réponse par index est fragile\n// (constaté au premier run : 757 lectures jetées pour rien) ; les item_id\n// étant uniques dans tout le corpus, un ensemble global contrôle aussi\n// bien les inventions, sans dépendre de l'ordre des réponses.\nconst admis = new Map();\nfor (const lot of $('Mettre en lots').all())\n  for (const id of lot.json.item_ids) admis.set(Number(id), lot.json.secteurs[String(id)] ?? null);\n$input.all().forEach((item) => {\n  let d;\n  try { d = JSON.parse(String(texte(item.json)).replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim()); }\n  catch (e) { lots_illisibles++; return; }\n  for (const l of (d.lectures || [])) {\n    const id = Number(l.item_id);\n    if (!admis.has(id)) { jetes++; continue; }\n    if (!l.est_evenement) { non_evenements++; continue; }\n    if (!TYPES.includes(l.type) || !SENS.includes(l.sens_sous_traitance)) { jetes++; continue; }\n    sorties.push({ json: {\n      item_id: id, run_id,\n      sector_code: admis.get(id),\n      type_evenement: l.type, acteur: l.acteur ?? null, zone: l.zone ?? null,\n      sens_sous_traitance: l.sens_sous_traitance,\n      resume: String(l.resume || '').slice(0, 500),\n      modele: $env.MODELE_GOOGLE\n    } });\n  }\n});\nif (!sorties.length) throw new Error(`Aucun événement retenu (${non_evenements} non-événements, ${jetes} lectures jetées, ${lots_illisibles} lots illisibles).`);\nsorties[0].json._bilan = { evenements: sorties.length, non_evenements, jetes, lots_illisibles };\nreturn sorties;"
+      },
+      "id": "t6",
+      "name": "Contrôles et mise en forme",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO flux_evenements (item_id, run_id, sector_code, type_evenement, acteur, zone, sens_sous_traitance, resume, modele)\nVALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)\nON CONFLICT (item_id, modele) DO NOTHING\nRETURNING evenement_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.item_id, $json.run_id, $json.sector_code, $json.type_evenement, $json.acteur, $json.zone, $json.sens_sous_traitance, $json.resume, $json.modele] }}"
+        }
+      },
+      "id": "t7",
+      "name": "Écrire les événements (non relus)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status='ok', closed_at=now(),\n  note='Événements typés — ' || $2 || ' événement(s) écrit(s), non relus.'\nWHERE run_id=$1 RETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ [$('Ouvrir le run').first().json.run_id, $('Écrire les événements (non relus)').isExecuted ? $('Écrire les événements (non relus)').all().length : 0] }}"
+        }
+      },
+      "id": "t8",
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        1400,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Lire les items à traiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les items à traiter": {
+      "main": [
+        [
+          {
+            "node": "Mettre en lots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mettre en lots": {
+      "main": [
+        [
+          {
+            "node": "Modèle de lecture (unique, régime du triage)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle de lecture (unique, régime du triage)": {
+      "main": [
+        [
+          {
+            "node": "Contrôles et mise en forme",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contrôles et mise en forme": {
+      "main": [
+        [
+          {
+            "node": "Écrire les événements (non relus)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire les événements (non relus)": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

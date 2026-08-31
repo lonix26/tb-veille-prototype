@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useDonnees, nb, pct, dateCH, LienSource, MarkdownLeger, estAgregat, nomZone,
-         relu, BadgeCommentaire, TYPE_EVT, SENS_EVT, BadgeEvenement } from "../api.jsx";
+         relu, BadgeCommentaire } from "../api.jsx";
 import Chart, { TreemapParts } from "../Chart.jsx";
 import { phrasePeriode, enLettres } from "../phrases.jsx";
 

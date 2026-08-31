@@ -316,28 +316,3 @@ export function syntheseZones(D, rows) {
   const retenues = pesees.filter(a => a.poids_pct === null || a.poids_pct >= SEUIL_POIDS_PCT);
   return { retenues, ecartees: pesees.length - retenues.length, laPlusLourde: retenues[0] || null };
 }
-
-// ---------------------------------------------------------------------------
-// ÉVÉNEMENTS TYPÉS ET LECTURES TRANSVERSALES — 31.08.2026 (décision de
-// l'étudiant, réaffirmée). Deux étages nouveaux, même régime d'honnêteté :
-// ce qu'aucun humain n'a relu se voit, en ambre.
-export const TYPE_EVT = {
-  investissement:      ["e-vert",  "investissement"],
-  fermeture_reduction: ["e-rouge", "fermeture / réduction"],
-  rachat_fusion:       ["e-violet","rachat / fusion"],
-  reglementation:      ["e-bleu",  "réglementation"],
-  lancement_produit:   ["e-gris",  "lancement produit"],
-  resultat_financier:  ["e-gris",  "résultats financiers"],
-  partenariat:         ["e-vert",  "partenariat"],
-  autre:               ["e-gris",  "autre"]
-};
-export const SENS_EVT = {
-  opportunite: ["e-vert",  "opportunité"],
-  menace:      ["e-rouge", "menace"],
-  neutre:      ["e-gris",  "neutre"]
-};
-export function BadgeEvenement({ e }) {
-  return e.statut === "valide"
-    ? <span className="etq e-vert">relu et validé</span>
-    : <span className="etq e-ambre">lu par un modèle, non relu</span>;
-}
