@@ -8,7 +8,7 @@ export default function Executions() {
     <div className="page">
       <div className="topbar"><h1>Exécutions</h1></div>
       <div className="note" style={{ marginBottom: 12 }}>
-        Chaque collecte ajoute ses observations sans écraser les précédentes — c'est l'écart entre
+        Chaque collecte ajoute ses observations sans écraser les précédentes : c'est l'écart entre
         exécutions qui fait la tendance.
       </div>
       <div className="carte">

@@ -91,7 +91,7 @@ export default function Anticiper() {
 
       {/* ---------- 1. Diffusion ---------- */}
       <div className="carte" style={{ marginBottom: 16 }}>
-        <h3 className="bloc-titre">L'indice de diffusion — et ce qu'il cache</h3>
+        <h3 className="bloc-titre">L'indice de diffusion, et ce qu'il cache</h3>
         <p className="bloc-intro">
           On compte des <strong>directions</strong>, jamais des grandeurs : combien d'indicateurs
           suivis sont au-dessus de leur propre moyenne, dans leur sens favorable. Aucune unité
@@ -109,18 +109,19 @@ export default function Anticiper() {
                 l'usinage… ») et a menti dès que T8 a changé de camp — elle est
                 désormais calculée depuis la liste elle-même. */}
             {defavMetier.length >= 3 && (
-              <> — <strong>Et c'est la lecture qui compte : {defavMetier.length} des{" "}
-              {diffusion.defav.length} défavorables sont ceux du métier</strong> —{" "}
-              {defavMetier.map(v => v.indicator_id).join(", ")} : l'étage adressable par la
-              sous-traitance. Un écart durable entre cet étage et les marchés finaux précède
-              les retournements de charge, dans un sens comme dans l'autre.</>
+              <> <strong>Et c'est la lecture qui compte : {defavMetier.length} des{" "}
+              {diffusion.defav.length} défavorables touchent le métier</strong>{" "}
+              ({defavMetier.map(v => v.indicator_id).join(", ")}), c'est-à-dire l'étage que la
+              sous-traitance peut réellement viser. Un écart durable entre cet étage et les
+              marchés finaux précède les retournements de charge, dans un sens comme dans
+              l'autre.</>
             )}
           </p>
         )}
       </div>
 
       {/* ---------- 2. Tension de chaîne ---------- */}
-      <h2 className="section">La tension de chaîne — l'amont tire-t-il plus vite que la production ?</h2>
+      <h2 className="section">La tension de chaîne : l'amont tire-t-il plus vite que la production ?</h2>
       <p className="bloc-intro">
         Pour chaque marché : la position de l'<strong>amont</strong> (demande finale ou signaux
         d'avance) moins celle de la <strong>production adressable</strong>, chacune mesurée contre
@@ -136,7 +137,7 @@ export default function Anticiper() {
               <div className="fi-tete">
                 <h3>{NOMS[marche] || marche}</h3>
                 <span className={"etq " + (d && d.value > 5 ? "e-ok" : d && d.value < -5 ? "e-attn" : "e-gris")}>
-                  {d ? `${d.value > 0 ? "+" : ""}${nb(d.value)} pt (${phrasePeriode(d.period)})` : "—"}
+                  {d ? `${d.value > 0 ? "+" : ""}${nb(d.value)} pt (${phrasePeriode(d.period)})` : "n.d."}
                 </span>
               </div>
               <Chart series={{ tension: serie }} hauteur={140} />
@@ -151,22 +152,21 @@ export default function Anticiper() {
       <div className="carte">
         <p className="bloc-intro">
           La part des États-Unis dans les exportations horlogères suisses, et le poids des trois
-          premiers débouchés. <strong>Le choc douanier de 2025 — l'événement qui fonde la
-          problématique de ce travail — se lit intégralement dans cette série</strong> :
+          premiers débouchés. <strong>Le choc douanier de 2025, l'événement qui a motivé ce
+          travail, se lit intégralement dans cette série</strong> :
           {/* AUDIT DU 01.09.2026 : les chiffres étaient EN DUR (34,1/10,3/27,1) et
               avaient dérivé de la base (33,7/10,1/26,7 après les runs suivants) —
               la faute exacte que « la lecture est calculée » interdit. La phrase
               raconte désormais la forme ; la courbe ci-dessous porte les valeurs. */}
           constitution de stocks au printemps 2025, effondrement à l'automne,
-          remontée à {expo.dernier ? nb(expo.dernier.part_usa_pct) : "—"} % en{" "}
-          {expo.dernier ? phrasePeriode(expo.dernier.period) : "—"}. Un dispositif de veille qui
+          remontée à {expo.dernier ? nb(expo.dernier.part_usa_pct) : "n.d."} % en{" "}
+          {expo.dernier ? phrasePeriode(expo.dernier.period) : "n.d."}. Un dispositif de veille qui
           voit l'événement qui l'a motivé : c'est sa meilleure validation sur pièce.
         </p>
         <Chart series={{ "part des États-Unis (%)": expo.usa, "trois premiers débouchés (%)": expo.top3 }}
                zoom hauteur={230} />
         <p className="fi-src">
-          Calculé depuis H1 (Comtrade, 198 destinations) — indicateur en réserve pour son total,
-          irremplaçable pour sa ventilation. La concentration à{" "}
+          Calculé depuis H1 (Comtrade). La concentration à{" "}
           {expo.dernier ? nb(expo.dernier.top3_pct) : "—"} % sur trois débouchés est un risque en
           soi : ce qui s'est fermé en 2025 peut se refermer.
         </p>

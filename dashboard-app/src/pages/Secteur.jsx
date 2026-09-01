@@ -40,12 +40,11 @@ function Lecture({ code, inds }) {
               const defav = series.filter(id =>
                 pesantes.some(a => a.indicator_id === id && sensMouvement(D, a) === "defavorable")).length;
               return <strong>{series.length} série{series.length > 1 ? "s" : ""} au comportement
-                inhabituel{defav ? <>, dont {defav} en mouvement défavorable</> : ", aucune en mouvement défavorable"} — détail plus bas.</strong>;
+                inhabituel{defav ? <>, dont {defav} en mouvement défavorable</> : ", aucune en mouvement défavorable"}. Le détail est plus bas.</strong>;
             })()
           : <>Aucun mouvement inhabituel : rien ne sort de l'ordinaire des séries suivies.</>}
         {retenues.length > 0 && <>{" "}{retenues.length} signal{retenues.length > 1 ? "s" : ""} retenu{retenues.length > 1 ? "s" : ""} (statut insuffisant), visible{retenues.length > 1 ? "s" : ""} plus bas.</>}
       </div>
-      <div className="l-n">Lecture composée par calcul depuis la base — aucun modèle de langage n'écrit cette phrase.</div>
     </div>
   );
 }
@@ -56,7 +55,7 @@ function Commentaire({ code }) {
   if (D.commentaires === undefined) return null;
   const c = (D.commentaires || []).find(k => k.sector_code === code);
   const att = Number(D.commentaires_en_attente || 0);
-  if (!c) return att ? <div className="note">Commentaire exécutif : aucun pour ce secteur — {att} en attente de relecture.</div> : null;
+  if (!c) return att ? <div className="note">Commentaire exécutif : aucun pour ce secteur ; {att} en attente de relecture.</div> : null;
   return (
     <div className="carte commentaire">
       <div>
@@ -64,10 +63,10 @@ function Commentaire({ code }) {
         <span className="etq e-gris">généré par {c.model} · règles RI0-RI10</span>
         {relu(c)
           ? <span className="etq e-vert">relu et validé par {c.validated_by || "?"} le {dateCH(c.validated_at)}</span>
-          : <span className="etq e-ambre">rédigé le {dateCH(c.created_at)} — aucune relecture humaine</span>}
+          : <span className="etq e-ambre">rédigé le {dateCH(c.created_at)}, sans relecture humaine</span>}
       </div>
       <div className="c-corps"><MarkdownLeger texte={c.text} /></div>
-      {att > 0 && <div className="note">{att} commentaire(s) en attente de relecture — ils sont affichés, sous étiquette ambre, mais personne ne les a vérifiés.</div>}
+      {att > 0 && <div className="note">{att} commentaire(s) en attente de relecture. Ils sont affichés, avec une étiquette orange, mais personne ne les a encore vérifiés.</div>}
     </div>
   );
 }
@@ -125,13 +124,13 @@ export function Alertes({ code }) {
       <span className="a-pt" style={{ background: a.diffusable ? PT[sensMouvement(D, a)] : "#98a2b3" }} />
       <div>
         <div>
-          <strong>{a.indicator_id}</strong> · {a.indicator_label} — {nomZone(a.geo)}, {a.period} :{" "}
+          <strong>{a.indicator_id}</strong> · {a.indicator_label} · {nomZone(a.geo)}, {a.period} :{" "}
           <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>
             {pct(a.glissement_annuel_pct ?? a.variation_periode_pct)}
           </span>{" "}
           {chipSens(a)} {chipsQV(a.indicator_id)}
         </div>
-        <div className="a-m">amplitude vue moins d'une fois sur dix sur cette série</div>
+        <div className="a-m">variation rare pour cette série (moins d'une fois sur dix)</div>
         {!a.diffusable && <div className="a-m">{a.motif_de_retenue}</div>}
       </div>
     </div>
@@ -163,7 +162,7 @@ export function Alertes({ code }) {
             <span className="a-pt" style={{ background: l && l.diffusable ? PT[sensMouvement(D, l)] : "#98a2b3" }} />
             <div>
               <div>
-                <strong>{rows[0].indicator_id}</strong> · {rows[0].indicator_label} — géographie en
+                <strong>{rows[0].indicator_id}</strong> · {rows[0].indicator_label} : géographie en
                 mouvement : <strong>{retenues.length}</strong> zone{retenues.length > 1 ? "s" : ""} pesant
                 ≥ {SEUIL_POIDS_PCT} % du flux à amplitude inhabituelle
                 {l && <>, la plus lourde {nomZone(l.geo)} ({pct(l.glissement_annuel_pct ?? l.variation_periode_pct)},
@@ -172,7 +171,7 @@ export function Alertes({ code }) {
               </div>
               <div className="a-m">
                 {ecartees > 0 && <>{ecartees} zone{ecartees > 1 ? "s" : ""} marginale{ecartees > 1 ? "s" : ""} (&lt; {SEUIL_POIDS_PCT} % du
-                flux chacune) écartée{ecartees > 1 ? "s" : ""} — artefact de petits nombres, pas un signal.{" "}</>}
+                flux chacune) écartée{ecartees > 1 ? "s" : ""} : trop petites pour peser, elles ne font pas un signal.{" "}</>}
                 Le déplacement se lit en points de part dans la{" "}
                 <span className="src-inline" onClick={() => navigate("/qv/" + rows[0].sector_code)}>
                   dynamique géographique (QV3) ↗
@@ -189,12 +188,10 @@ export function Alertes({ code }) {
         );
       })}
       <div className="note">
-        « Inhabituel » a un sens précis : le mouvement dépasse le seuil de matérialité calibré sur
-        l'historique de sa propre série (~1 observation sur 10 le franchit). Il est signé selon le
-        sens de lecture déclaré au référentiel — une hausse n'est pas une alerte quand elle est
-        favorable. Un mouvement « retenu » n'est pas caché : sa valeur n'a pas le statut de
-        validation requis (RI5), le motif est affiché. Les zones marginales sont écartées et
-        comptées, jamais tues.
+        Un mouvement est dit « inhabituel » quand il dépasse le seuil calibré sur l'historique
+        de sa propre série. Vert : le mouvement est favorable ; rouge : défavorable. Un mouvement
+        « retenu » n'est pas caché, son motif est affiché. Les zones trop petites pour peser sont
+        écartées et comptées.
       </div>
     </div>
   );
@@ -285,7 +282,6 @@ function SectionQuestion({ q, cartes, indsQuestion, deja, vide }) {
                              color: "var(--gris)", marginRight: 6 }}>Réponse</strong>
             {reponse}
             <span style={{ display: "block", fontSize: 10.5, color: "var(--gris)", marginTop: 3 }}>
-              composée par gabarit depuis la base — aucun modèle de langage n'écrit cette phrase
             </span>
           </div>
         )}
@@ -295,7 +291,7 @@ function SectionQuestion({ q, cartes, indsQuestion, deja, vide }) {
         </details>
         {deja.length > 0 && (
           <div style={{ fontSize: 11.5, color: "var(--gris)", marginTop: 4 }}>
-            Instruite aussi par {deja.map(d => `${d.id} (→ ${d.sous})`).join(" · ")} — présenté plus haut.
+            Instruite aussi par {deja.map(d => `${d.id} (→ ${d.sous})`).join(" · ")}, présenté plus haut.
           </div>
         )}
       </div>
@@ -347,7 +343,7 @@ function Signaux({ code, qv, compact }) {
       ))}
       <div className="note">
         Document choisi par le veilleur, extraits par trois modèles avec passages source
-        obligatoires, validation humaine — jamais publié sans validation.
+        obligatoires, validation humaine. Rien n'est publié sans validation.
       </div>
     </>
   );
@@ -380,12 +376,12 @@ function Motorisations() {
         ({nb(en_M(picTh.ventes_thermiques), 1)} M de voitures) et n'est jamais remonté :
         {" "}{nb(en_M(dern.ventes_thermiques), 1)} M en {dern.period}, pendant que le marché
         total retrouvait ~{nb(en_M(dern.ventes_totales), 0)} M. La demande adressable par la
-        sous-traitance ne se contracte pas — elle se déplace de motorisation.
+        sous-traitance ne se contracte pas : elle se déplace de motorisation.
       </div>
       <Chart series={series} hauteur={230} />
       <div className="note">
         Électrique collecté (A3, IEA) ; part collectée (A11) ; total et thermique <strong>dérivés
-        par vue SQL</strong> (total = électrique ÷ part) — aucun modèle n'intervient. Valeurs
+        par vue SQL</strong> (total = électrique ÷ part). Valeurs
         source en millions arrondis : lire des ordres de grandeur, pas des dénombrements.
       </div>
     </div>
@@ -405,7 +401,7 @@ export function Synthetique({ pleine }) {
       <div className="i-code">INDICATEUR SYNTHÉTIQUE · engagement de la ratification</div>
       <div className="i-titre">Part suisse du commerce horloger mondial (SH 91)</div>
       <div>
-        <span className="i-val">{dern ? nb(dern.part_suisse_pct) + " %" : "—"}</span>
+        <span className="i-val">{dern ? nb(dern.part_suisse_pct) + " %" : "n.d."}</span>
         <span className="i-u">du panier de déclarants · {dern ? dern.period : ""}</span>
       </div>
       <table style={{ marginTop: 12 }}>
@@ -417,7 +413,7 @@ export function Synthetique({ pleine }) {
             <React.Fragment key={x.period}>
               <tr>
                 <td><strong>{x.period}</strong></td>
-                <td>{x.part_suisse_pct !== null ? nb(x.part_suisse_pct) + " %" : "—"}</td>
+                <td>{x.part_suisse_pct !== null ? nb(x.part_suisse_pct) + " %" : "n.d."}</td>
                 <td>{nb(x.che_mia_usd)}</td>
                 <td>{nb(x.total_panier_mia_usd)}</td>
                 <td>{x.nb_declarants}/{x.nb_declarants_attendus}</td>
@@ -430,7 +426,7 @@ export function Synthetique({ pleine }) {
         </tbody>
       </table>
       <div className="note">
-        Ratio calculé par requête sur les séries consolidées — aucun modèle n'intervient. Part du
+        Ratio calculé par requête sur les séries consolidées. Part du
         panier de déclarants Comtrade, non du marché mondial entier ; la part n'est calculée que si
         tous les déclarants ont soumis : la fraîcheur d'un panier est celle de son déclarant le plus lent.
       </div>
@@ -512,11 +508,11 @@ function CarteIndicateur({ ind }) {
         <div className="i-code">{ind.indicator_id} · {ind.category === "hard" ? "collecté par code" : "composite · IA + validation"}</div>
         <div className="i-titre">{ind.label}</div>
         {ind.description_metier && <div className="i-quoi">{ind.description_metier}</div>}
-        <div className="i-val neutre">—</div>
+        <div className="i-val neutre">n.d.</div>
         {attente ? (
           <div className="i-seuil">
             Aucun point calculable à ce jour : {nb(attente.n_tries)} items triés sur ce marché
-            en {attente.periode} pour un plancher de {nb(attente.plancher)} — en deçà, un seul
+            en {attente.periode} pour un plancher de {nb(attente.plancher)} : en deçà, un seul
             article déplacerait la part de plus de cinq points. La série s'activera quand le
             corpus franchira le plancher, sans changement de définition.
           </div>
@@ -572,7 +568,7 @@ function CarteIndicateur({ ind }) {
               const dPt = enPoints && vAvant !== null && vAvant !== undefined
                 ? Number(dern.value) - Number(vAvant) : null;
               const affiche = enPoints
-                ? (dPt === null ? "—" : (dPt > 0 ? "+" : "") + nb(dPt, 1) + " pt")
+                ? (dPt === null ? "n.d." : (dPt > 0 ? "+" : "") + nb(dPt, 1) + " pt")
                 : pct(g);
               const signe = enPoints ? dPt : g;
               const cls = sens === 0 || signe === null || signe === 0 ? "e-gris"
@@ -688,17 +684,17 @@ function CarteIndicateur({ ind }) {
             <span className="zn">{nomZone(z.g)}</span>
             <span className="zb"><i style={{ width: Math.max(2, (z.v / maxRef) * 100) + "%" }} /></span>
             <span className="zv">{nb(z.v)}</span>
-            {additif && <span className="zp">{z.part !== null ? nb(z.part, 1) + " %" : "—"}</span>}
+            {additif && <span className="zp">{z.part !== null ? nb(z.part, 1) + " %" : "n.d."}</span>}
             {additif && (
               <span className={"zp " + clsVar(z.dPart)}>
-                {z.dPart !== null ? (z.dPart > 0 ? "+" : "") + nb(z.dPart, 1) + " pt" : "—"}
+                {z.dPart !== null ? (z.dPart > 0 ? "+" : "") + nb(z.dPart, 1) + " pt" : "n.d."}
               </span>
             )}
             {/* Pour une part, la variation par zone se lit en POINTS et sans
                 couleur (sens neutre) — même règle que le badge de la carte. */}
             {compagnon && ind.unit === "pourcentage"
               ? <span className="zp">{z.vp !== null && z.vp !== undefined
-                  ? ((z.v - z.vp > 0 ? "+" : "") + nb(z.v - z.vp, 1) + " pt") : "—"}</span>
+                  ? ((z.v - z.vp > 0 ? "+" : "") + nb(z.v - z.vp, 1) + " pt") : "n.d."}</span>
               : <span className={"zp " + clsVar(z.varAn)}>{pct(z.varAn)}</span>}
           </div>
         );
@@ -788,7 +784,7 @@ function CarteIndicateur({ ind }) {
                 )}
                 {compagnon && (
                   <div className="note" style={{ marginTop: 8 }}>
-                    Une part ne se classe pas par niveau — les records appartiennent aux petits
+                    Une part ne se classe pas par niveau : les records appartiennent aux petits
                     marchés pionniers, sans poids pour la décision. Ici, {compagnon.libelle} :
                     la part est lue là où les volumes sont.
                   </div>
@@ -798,17 +794,17 @@ function CarteIndicateur({ ind }) {
             {pRecente !== pRef && manquants.length > 0 && (
               <div className="note">
                 {pRecente} est encore incomplète ({manquants.slice(0, 6).map(nomZone).join(", ")}{manquants.length > 6 ? "…" : ""} sans soumission) :
-                lecture au titre de {pRef}, la dernière période où tout le panier a déclaré — classer sur
+                lecture au titre de {pRef}, la dernière période où tout le panier a déclaré. Classer sur
                 l'année incomplète donnerait une part nulle aux retardataires.
               </div>
             )}
             {additif && (
               <div className="note">
                 {mondeOk
-                  ? `Parts du marché total tel que publié par la source (ligne monde) — les ${lignesRef.length} zones suivies en couvrent ${nb(sommePanier / total * 100, 1)} %, le reste est agrégé en « Autres ».`
-                  : `Parts du panier suivi (${lignesRef.length} zones) : la source publie par déclarant, sans ligne monde — le total mondial n'existe pas en une série, et le dire vaut mieux que l'estimer.`}
+                  ? `Parts du marché total tel que publié par la source (ligne monde). Les ${lignesRef.length} zones suivies en couvrent ${nb(sommePanier / total * 100, 1)} %, le reste est agrégé en « Autres ».`
+                  : `Parts du panier suivi (${lignesRef.length} zones) : la source publie par déclarant, sans ligne monde. Le total mondial n'existe donc pas en une seule série, et le dire vaut mieux que l'estimer.`}
                 {" "}« pt » = variation de la part en points de pourcentage : le déplacement de la demande
-                entre zones — l'information que QV2 et QV3 demandent.
+                entre zones, l'information que QV2 et QV3 demandent.
               </div>
             )}
           </div>
@@ -923,7 +919,7 @@ export default function Secteur() {
       {reserve > 0 && (
         <div className="note" style={{ marginTop: 22 }}>
           {reserve} indicateur{reserve > 1 ? "s" : ""} qualifié{reserve > 1 ? "s" : ""} en
-          réserve pour ce marché — hors de la grille suivie, consultable{reserve > 1 ? "s" : ""} dans
+          réserve pour ce marché, hors de la grille suivie, consultable{reserve > 1 ? "s" : ""} dans
           Fiabilité · grille. La grille montre ce que le dispositif suit ; la réserve, ce qu'il
           sait suivre.
         </div>
@@ -949,7 +945,7 @@ function Evenements({ code }) {
   return (
     <div className="carte">
       <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 6 }}>
-        Ce qui s'est passé — événements lus dans les flux
+        Ce qui s'est passé : événements lus dans les flux
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
         {/* « autre » est écarté des puces : un type qui ne type pas n'informe pas —
@@ -977,7 +973,7 @@ function Evenements({ code }) {
       ))}
       <div className="note">
         Événements extraits des items de flux jugés pertinents au triage, par un modèle de
-        lecture unique — chaque événement reste rattaché à son article source et porte son
+        lecture unique. Chaque événement reste rattaché à son article source et porte son
         statut de relecture. Un décompte d'événements n'est pas une statistique officielle :
         c'est ce que la presse professionnelle a rapporté.
       </div>

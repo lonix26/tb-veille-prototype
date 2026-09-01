@@ -2309,7 +2309,7 @@ CREATE VIEW public.v_indicateur_synthetique AS
         END AS part_suisse_pct,
         CASE
             WHEN (p.nb_declarants < ( SELECT count(*) AS count
-               FROM attendus)) THEN (((('part non calculable : déclarant(s) sans soumission pour '::text || p.period) || ' — '::text) || COALESCE(m.declarants_manquants, '?'::text)) || '. La fraîcheur d''un panier est celle de son déclarant le plus lent.'::text)
+               FROM attendus)) THEN (((('part non calculable : déclarant(s) sans soumission pour '::text || p.period) || ' : '::text) || COALESCE(m.declarants_manquants, '?'::text)) || '. La fraîcheur d''un panier est celle de son déclarant le plus lent.'::text)
             ELSE ''::text
         END AS completude,
     p.tous_valides

@@ -36,7 +36,7 @@ export default function Accueil() {
     <div className="page">
       <div className="topbar">
         <h1>Vue d'ensemble</h1>
-        <div className="meta">run {run.run_id ?? "—"} ({run.status ?? ""})</div>
+        <div className="meta">run {run.run_id ?? "n.d."} ({run.status ?? ""})</div>
       </div>
 
       {/* ACCUEIL RETOURNÉ VERS LES MARCHÉS (28.08.2026, revue v9). Les
@@ -75,11 +75,10 @@ export default function Accueil() {
         })}
       </div>
       <div className="note" style={{ marginTop: 6 }}>
-        L'extrait de chaque marché provient de son commentaire exécutif le plus récent.
-        Depuis le 31.08.2026, les commentaires <strong>qu'aucun humain n'a relus</strong> sont
-        affichés eux aussi, sous étiquette ambre — le même régime que les valeurs pré-validées
-        par consensus. L'étiquette dit toujours par quel chemin le texte est arrivé. Les
-        compteurs du dispositif (observations, révisions, exécutions) se consultent dans Fiabilité.
+        Chaque marché affiche l'extrait de son commentaire le plus récent. Un commentaire
+        que personne n'a encore relu est affiché quand même, avec une étiquette orange qui le
+        signale. Les compteurs techniques (observations, révisions, exécutions) se trouvent
+        dans la page Fiabilité.
       </div>
 
       <LecturesTransversales D={D} />
@@ -109,7 +108,7 @@ export default function Accueil() {
               <span className="a-pt" style={{ background:
                 { favorable: "var(--vert)", defavorable: "var(--rouge)", neutre: "#98a2b3" }[sensMouvement(D, a)] }} />
               <div>
-                <strong>{a.indicator_id}</strong> {a.indicator_label} — {nomZone(a.geo)}, {a.period} :{" "}
+                <strong>{a.indicator_id}</strong> {a.indicator_label} · {nomZone(a.geo)}, {a.period} :{" "}
                 <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>
                   {pct(a.glissement_annuel_pct ?? a.variation_periode_pct)}
                 </span>{" "}
@@ -139,7 +138,7 @@ function LecturesTransversales({ D }) {
   return (
     <>
       <h2>Lectures transversales <span style={{ fontSize: 12, fontWeight: 400, color: "var(--gris)" }}>
-        des hypothèses, pas des faits — chaque liaison cite les séries qui la portent</span></h2>
+        des pistes de lecture, pas des faits : chaque liaison cite les séries qui la portent</span></h2>
       <div className="grille g2">
         {lectures.map(l => {
           const faits = Object.entries(l.faits_cites || {});
@@ -156,7 +155,7 @@ function LecturesTransversales({ D }) {
                 {String(l.hypothese).replace(/\[?(F\d+)\]?/g, "")}
               </div>
               {l.infirmable_par && (
-                <div className="a-m" style={{ marginTop: 6 }}><strong>Se vérifiera par —</strong> {l.infirmable_par}</div>
+                <div className="a-m" style={{ marginTop: 6 }}><strong>Se vérifiera par :</strong> {l.infirmable_par}</div>
               )}
               <details style={{ marginTop: 6 }}>
                 <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--gris)" }}>
@@ -173,9 +172,9 @@ function LecturesTransversales({ D }) {
         })}
       </div>
       <div className="note" style={{ marginTop: 6 }}>
-        Générées sous contrainte : le modèle ne reçoit que des faits calculés du registre et
-        n'écrit aucun chiffre — les valeurs sont dans les faits cités, dépliables. Une hypothèse
-        non arbitrée n'engage personne ; une hypothèse validée porte le nom de qui l'a jugée.
+        Ces pistes de lecture sont proposées par un modèle à partir des chiffres du registre,
+        visibles sous chaque carte. Une piste non arbitrée n'engage personne ; une piste validée
+        porte le nom de la personne qui l'a jugée.
       </div>
     </>
   );

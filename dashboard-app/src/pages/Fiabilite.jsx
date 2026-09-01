@@ -28,7 +28,7 @@ function reservesDuDispositif(D, S) {
     if (c.avance === 0) r.push({
       gravite: "grave", ou: m.sector_label,
       titre: `${m.sector_label} : aucun signal d'avance`,
-      corps: `Les ${enLettres(m.indicateurs?.length || 0)} séries qui portent ce score décrivent ce qui s'est déjà produit — ${c.coincident} constatent, ${c.retarde} confirment. Un retournement n'y serait visible qu'après coup. S'y ajoute le délai de publication : les séries mensuelles arrivent avec un à trois mois de retard.`
+      corps: `Les ${enLettres(m.indicateurs?.length || 0)} séries qui portent ce score décrivent ce qui s'est déjà produit : ${c.coincident} constatent, ${c.retarde} confirment. Un retournement n'y serait visible qu'après coup. S'y ajoute le délai de publication : les séries mensuelles arrivent avec un à trois mois de retard.`
     });
   }
 
@@ -37,7 +37,7 @@ function reservesDuDispositif(D, S) {
     for (const d of redondances(D, m.indicateurs)) r.push({
       gravite: "moyenne", ou: m.sector_label,
       titre: `${m.sector_label} : deux séries évoluent ensemble`,
-      corps: `« ${d.nomA} » et « ${d.nomB} » corrèlent à ${nb(Math.abs(d.r), 2)} sur ${d.n} points communs. Elles restent deux mesures distinctes — c'est souvent l'écart entre elles qui porte l'information — mais le score en fait une moyenne simple : leur mouvement commun y compte deux fois, et le score paraît plus assuré qu'il ne l'est.`
+      corps: `« ${d.nomA} » et « ${d.nomB} » corrèlent à ${nb(Math.abs(d.r), 2)} sur ${d.n} points communs. Elles restent deux mesures distinctes (c'est souvent l'écart entre elles qui porte l'information), mais le score en fait une moyenne simple : leur mouvement commun y compte deux fois, et le score paraît plus assuré qu'il ne l'est.`
     });
   }
 
@@ -55,7 +55,7 @@ function reservesDuDispositif(D, S) {
   if (muets.length) r.push({
     gravite: "moyenne", ou: "Grille",
     titre: `${enLettres(muets.length)} indicateurs certifiés ne collectent rien`,
-    corps: `${muets.map(i => `${i.indicator_id} (${i.label})`).join(" · ")}. La source est qualifiée — elle existe, elle répond — mais la liaison de collecte manque, ou l'accès n'a pas pu être obtenu.`
+    corps: `${muets.map(i => `${i.indicator_id} (${i.label})`).join(" · ")}. La source est qualifiée (elle existe, elle répond), mais la liaison de collecte manque, ou l'accès n'a pas pu être obtenu.`
   });
 
   // 5. Périodicités mêlées dans un même score.
@@ -82,7 +82,7 @@ function reservesDuDispositif(D, S) {
   if (flt && Number(flt.items_filtres) > 0 && Number(flt.items_audites) === 0) r.push({
     gravite: "grave", ou: "Exploitation",
     titre: "Le filtrage automatique n'a jamais été audité",
-    corps: `${nb(flt.items_filtres)} items — ${nb(flt.part_filtree_pct)} % du collecté triable — ont été écartés sans lecture humaine par la règle de seuil. La règle repose sur une base mince : sur 37 items examinés, aucun de ceux notés 2 ou moins n'avait produit de signal. Quatorze observations ne fondent pas une loi. Tant que l'échantillon mensuel n'a pas été relu, le taux de faux négatifs est inconnu — le dispositif ne peut pas affirmer qu'il n'a rien manqué.`
+    corps: `${nb(flt.items_filtres)} items, soit ${nb(flt.part_filtree_pct)} % du collecté triable, ont été écartés sans lecture humaine par la règle de seuil. La règle repose sur une base mince : sur 37 items examinés, aucun de ceux notés 2 ou moins n'avait produit de signal. Quatorze observations ne fondent pas une loi. Tant que l'échantillon mensuel n'a pas été relu, le taux de faux négatifs est inconnu : le dispositif ne peut pas affirmer qu'il n'a rien manqué.`
   });
   if (flt && Number(flt.faux_negatifs) > 0) r.push({
     gravite: "grave", ou: "Exploitation",
@@ -92,7 +92,7 @@ function reservesDuDispositif(D, S) {
   if (file > 300) r.push({
     gravite: "moyenne", ou: "Exploitation",
     titre: "La file d'examen reste plus longue qu'un traitement hebdomadaire",
-    corps: `${nb(file)} items attendent une lecture humaine, filtrage déduit. C'est la limite structurelle du choix semi-automatisé : elle se traite par un cadrage — les dix mieux notés par semaine — et non par du temps supplémentaire.`
+    corps: `${nb(file)} items attendent une lecture humaine, filtrage déduit. C'est la limite structurelle du choix semi-automatisé : elle se traite par un cadrage (les dix mieux notés par semaine), et non par du temps supplémentaire.`
   });
 
   return r;
@@ -157,7 +157,7 @@ export default function Fiabilite({ vueInitiale }) {
       <h1 className="verdict" style={{ maxWidth: "26ch" }}>Fiabilité</h1>
       <p className="bloc-intro" style={{ marginTop: -14, fontSize: 14 }}>
         Toutes les réserves du dispositif sont réunies ici, et chacune est <strong>recalculée à
-        l'affichage</strong> à partir de la base — aucune n'est écrite à la main. Un tableau de
+        l'affichage</strong> à partir de la base. Un tableau de
         bord qui ne dit pas ce qu'il sait mal laisse croire qu'il sait tout.
       </p>
 
@@ -167,11 +167,11 @@ export default function Fiabilite({ vueInitiale }) {
           <div className="fi-l">réserves actives</div>
         </div>
         <div className="fi-case">
-          <div className="fi-n">{total.en_grille ?? total.total ?? "—"}</div>
+          <div className="fi-n">{total.en_grille ?? total.total ?? "n.d."}</div>
           {/* Depuis le 27.08, la vitrine porte aussi des « à confirmer » (les
               intensités de signalement) : « choisis parmi N certifiés » serait
               devenu faux. Le référentiel est cité pour ses deux populations. */}
-          <div className="fi-l">indicateurs suivis — référentiel : {total.certifies} certifiés, {total.a_confirmer} à confirmer</div>
+          <div className="fi-l">indicateurs suivis · référentiel : {total.certifies} certifiés, {total.a_confirmer} à confirmer</div>
         </div>
         <div className="fi-case">
           <div className="fi-n">{sources.size}</div>
@@ -216,7 +216,7 @@ export default function Fiabilite({ vueInitiale }) {
               ))}
           <p className="note" style={{ marginTop: 14, maxWidth: 760 }}>
             Ces réserves ne sont pas des pannes. Ce sont les endroits où le dispositif produit un
-            résultat <strong>plausible mais moins solide qu'il n'en a l'air</strong> — le seul type
+            résultat <strong>plausible mais moins solide qu'il n'en a l'air</strong>, le seul type
             de défaut qui ne se signale pas tout seul.
           </p>
         </>
@@ -227,10 +227,10 @@ export default function Fiabilite({ vueInitiale }) {
         <div className="carte" style={{ marginBottom: 14 }}>
           <h3 className="sous-titre">Les questions de veille, et qui y répond</h3>
           <p className="reserve-corps" style={{ marginBottom: 10 }}>
-            Chaque indicateur de la grille est rattaché à une question — un déclencheur en base
+            Chaque indicateur de la grille est rattaché à une question ; un déclencheur en base
             l'impose. Après l'élagage, {decouvertes === 0
               ? "toutes les questions restent couvertes."
-              : `${enLettres(decouvertes)} question${decouvertes > 1 ? "s" : ""} ne ${decouvertes > 1 ? "sont" : "est"} plus couverte${decouvertes > 1 ? "s" : ""} — et cela se voit, au lieu d'être recouvert nominalement par une série illisible. C'est la calculabilité de l'absence : un cadre de questions invariant permet de mesurer ce qu'on ne surveille pas.`}
+              : `${enLettres(decouvertes)} question${decouvertes > 1 ? "s" : ""} ne ${decouvertes > 1 ? "sont" : "est"} plus couverte${decouvertes > 1 ? "s" : ""}, et cela se voit, au lieu d'être recouvert nominalement par une série illisible. C'est la calculabilité de l'absence : un cadre de questions invariant permet de mesurer ce qu'on ne surveille pas.`}
           </p>
           <table>
             <thead>
@@ -273,7 +273,7 @@ export default function Fiabilite({ vueInitiale }) {
                     <span className={"etq lat-" + (i.latence || "coincident")}>
                       {i.latence === "avance" ? "annonce"
                         : i.latence === "retarde" ? "confirme"
-                        : i.latence === "coincident" ? "constate" : "—"}
+                        : i.latence === "coincident" ? "constate" : "n.d."}
                     </span>
                   </td>
                   <td>{i.source_organisation}
@@ -303,7 +303,7 @@ export default function Fiabilite({ vueInitiale }) {
           <p className="bloc-intro">
             Chaque collecte <strong>ajoute</strong> ses observations sans écraser les précédentes.
             Une valeur corrigée par sa source ne remplace pas l'ancienne : les deux coexistent,
-            datées. C'est ce qui rend l'écart entre exécutions lisible — et vérifiable.
+            datées. C'est ce qui rend l'écart entre exécutions lisible, et vérifiable.
           </p>
           <table>
             <thead><tr><th>N°</th><th>Exécutée le</th><th>Résultat</th>
@@ -368,15 +368,15 @@ export default function Fiabilite({ vueInitiale }) {
           </p>
           <h3 className="sous-titre">Les cinq critères, appliqués dans cet ordre</h3>
           <ol className="liste-manques">
-            <li><strong>Il collecte</strong> — au moins douze points sur sa zone de référence.</li>
-            <li><strong>Il est frais</strong> — moins de trois mois de retard pour une série
+            <li><strong>Il collecte</strong> : au moins douze points sur sa zone de référence.</li>
+            <li><strong>Il est frais</strong> : moins de trois mois de retard pour une série
               infra-annuelle, moins de dix-huit pour une annuelle.</li>
-            <li><strong>Il n'est pas redondant</strong> — corrélation inférieure à 0,90 avec tout
+            <li><strong>Il n'est pas redondant</strong> : corrélation inférieure à 0,90 avec tout
               autre indicateur retenu.</li>
-            <li><strong>Il parle au métier</strong> — il porte sur l'étage adressable par un
+            <li><strong>Il parle au métier</strong> : il porte sur l'étage adressable par un
               usineur de précision, ou sur le marché de son client direct. Pas deux étages plus
               loin.</li>
-            <li><strong>Il apporte un rôle</strong> — annonce, constat ou confirmation que le
+            <li><strong>Il apporte un rôle</strong> : annonce, constat ou confirmation que le
               secteur n'a pas déjà.</li>
           </ol>
           <h3 className="sous-titre">Ce qui a décidé, quand deux séries se ressemblaient</h3>
@@ -384,14 +384,14 @@ export default function Fiabilite({ vueInitiale }) {
             Entre deux séries corrélées, la grille garde <strong>la plus proche du métier</strong>,
             et non la plus longue. Une série de cent cinquante points sur un marché final vaut
             moins, pour un sous-traitant, qu'une série de dix-neuf points sur les pièces qu'il
-            usine. C'est ainsi que H7 et H9 — la valeur et le volume des exportations horlogères —
+            usine. C'est ainsi que H7 et H9 (la valeur et le volume des exportations horlogères)
             l'emportent sur H1, H8 et H3, et que A6 (équipements, l'étage adressable) l'emporte
             sur A5 (assemblage de véhicules, en aval du sous-traitant).
           </p>
           <h3 className="sous-titre">Ce que l'élagage a coûté</h3>
           <p className="reserve-corps">
             Il faut le dire, parce que c'est le prix du choix. L'automobile ne compte plus que deux
-            indicateurs, dont un — les immatriculations — n'a que sept points : ce marché n'est
+            indicateurs, dont un (les immatriculations) n'a que sept points : ce marché n'est
             plus <em>scorable</em>, et le tableau de bord ne prétend plus le scorer. La couverture
             des questions de veille se resserre également : plusieurs questions n'ont plus qu'un
             indicateur, et deux n'en ont plus du tout. Ces lacunes sont calculables, elles se
@@ -409,7 +409,7 @@ export default function Fiabilite({ vueInitiale }) {
             <p className="bloc-intro">
               Le triage ordonnait la file sans jamais la réduire : <strong>926 items attendaient
               une lecture humaine</strong>, dont trois quarts notés 2 ou moins sur 6. Un dispositif
-              semi-automatisé qui laisse une file inépuisable ne fait pas gagner de temps — il
+              semi-automatisé qui laisse une file inépuisable ne fait pas gagner de temps : il
               déplace le goulot de la collecte vers la validation.
             </p>
             <p className="bloc-intro">
@@ -438,7 +438,7 @@ export default function Fiabilite({ vueInitiale }) {
 
             {regle && (
               <div className="carte" style={{ marginBottom: 16 }}>
-                <h3 className="bloc-titre">La règle — {regle.libelle}</h3>
+                <h3 className="bloc-titre">La règle : {regle.libelle}</h3>
                 <p className="bloc-intro"><strong>Énoncé.</strong> {regle.enonce}</p>
                 <p className="bloc-intro" style={{ marginBottom: 0 }}>
                   <strong>Ce qui la fonde, et ce qui la limite.</strong> {regle.fondement}
@@ -452,11 +452,11 @@ export default function Fiabilite({ vueInitiale }) {
                  style={{ marginBottom: 0 }}>{flt.enonce_audit}</p>
             </div>
 
-            <h2 className="section">L'échantillon du mois — {ech.length} items à relire</h2>
+            <h2 className="section">L'échantillon du mois : {ech.length} items à relire</h2>
             <p className="bloc-intro">
               Tirage <strong>reproductible</strong> : même mois, même échantillon, quel que soit le
               nombre d'interrogations. Le dispositif doit pouvoir rejouer son propre contrôle. Un
-              item reconnu mal écarté revient dans la file d'examen — <strong>par ajout, jamais par
+              item reconnu mal écarté revient dans la file d'examen, <strong>par ajout, jamais par
               effacement</strong> (D-18).
             </p>
             {ech.length === 0
@@ -483,7 +483,7 @@ export default function Fiabilite({ vueInitiale }) {
               )}
             <p className="fi-src">
               Verdicts à inscrire dans <code>flux_filtrage_audit</code>. Bilan recalculé à chaque
-              affichage depuis <code>v_bilan_filtrage</code> — aucun chiffre de cet écran n'est écrit
+              affichage depuis <code>v_bilan_filtrage</code>. Aucun chiffre de cet écran n'est écrit
               à la main.
             </p>
           </>
@@ -494,7 +494,7 @@ export default function Fiabilite({ vueInitiale }) {
         <div className="carte">
           <h3 className="sous-titre">L'état d'un marché</h3>
           <p className="reserve-corps">
-            Pour chaque série, le dispositif retire d'abord la <strong>tendance longue</strong> —
+            Pour chaque série, le dispositif retire d'abord la <strong>tendance longue</strong>,
             sans quoi une série qui croît depuis dix ans s'afficherait « au-dessus » en permanence
             et aucun retournement ne serait signalable. Ce qui reste est l'écart du dernier point à
             sa propre base, exprimé en écarts-types, puis orienté par le sens de lecture déclaré de
@@ -512,21 +512,21 @@ export default function Fiabilite({ vueInitiale }) {
           </ul>
           <h3 className="sous-titre">Pourquoi le score n'ouvre plus la journée</h3>
           <p className="reserve-corps">
-            Le score sectoriel — la moyenne des écarts détendancés des séries d'un marché — a été
+            Le score sectoriel (la moyenne des écarts détendancés des séries d'un marché) a été
             retiré de l'écran de décision le 25 août 2026. Avec deux séries par marché après
             l'élagage, « la moyenne des écarts détendancés » n'est plus une mesure : c'est la
-            moyenne de deux nombres. Le construit était déjà le plus fragile du dispositif —
-            moyenne non pondérée, périodicités mêlées, séries corrélées comptées deux fois — et
+            moyenne de deux nombres. Le construit était déjà le plus fragile du dispositif :
+            moyenne non pondérée, périodicités mêlées, séries corrélées comptées deux fois. Et
             réduire le nombre de séries le rend indéfendable comme chiffre affiché à un dirigeant.
             Il reste calculé, il reste au rapport, et il reste ici : c'est une <strong>
-            expérimentation méthodologique</strong> — comment construire une position cyclique
+            expérimentation méthodologique</strong> : comment construire une position cyclique
             détendancée, et pourquoi elle n'est pas décisionnelle en l'état.
           </p>
           <h3 className="sous-titre">Annonce, constat, confirmation</h3>
           <p className="reserve-corps">
             Chaque indicateur porte son rôle : un <strong>avancé</strong> annonce, un
             <strong> coïncident</strong> constate, un <strong>retardé</strong> confirme. Les
-            mélanger dans une moyenne est une erreur de catégorie — l'avancé y est neutralisé par
+            mélanger dans une moyenne est une erreur de catégorie : l'avancé y est neutralisé par
             le retardé au moment précis où il servirait. Le dispositif le fait, et le dit : c'est
             la première réserve de la liste.
           </p>

@@ -64,7 +64,7 @@ function Fiche({ a }) {
         <div className="fiche-raison">
           <p>{a.justification || "Aucune justification enregistrée."}</p>
           <p className="fiche-modele">
-            Lecture d'adressabilité par <strong>{a.modele || "un modèle"}</strong> — elle ordonne
+            Lecture d'adressabilité par <strong>{a.modele || "un modèle"}</strong> : elle ordonne
             votre lecture, elle ne décide rien. CPV {a.cpv || "non publié"} · publié le {dateCH(a.date_publication)}.
           </p>
         </div>
@@ -125,7 +125,7 @@ export default function AFaire() {
         <p className="bloc-note">
           Le passage à « à votre portée » est une lecture de <strong>{t.modele_lecture || "modèle"}</strong>,
           fondée sur le profil métier déclaré. Chaque fiche porte son raisonnement et le lien vers
-          l'avis officiel — un tri assisté doit pouvoir être contredit.
+          l'avis officiel. Un tri assisté doit pouvoir être contredit.
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export default function AFaire() {
           </div>
           <p className="note" style={{ marginTop: 9, maxWidth: "76ch" }}>
             Les dix mieux notés par le triage. Les examiner chaque semaine suffit à tenir le
-            dispositif : c'est un cadrage, pas un rattrapage — la file ne se videra pas, et ce
+            dispositif : c'est un cadrage, pas un rattrapage. La file ne se videra pas, et ce
             n'est pas son objet. La promotion en signal reste un acte nominatif.
           </p>
         </>
@@ -180,12 +180,12 @@ export default function AFaire() {
                     <td style={{ textAlign: "right" }}>
                       {a.dont_encore_ouverts
                         ? <strong className="hausse">{a.dont_encore_ouverts}</strong>
-                        : <span className="neutre">—</span>}
+                        : <span className="neutre">n.d.</span>}
                     </td>
                     <td className="cell-note">{dateCH(a.premier_avis)}</td>
                     <td>{a.acheteur_courriel
                           ? <a href={"mailto:" + a.acheteur_courriel}>écrire</a>
-                          : <span className="neutre">—</span>}</td>
+                          : <span className="neutre">n.d.</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -199,7 +199,7 @@ export default function AFaire() {
           <p className="note" style={{ marginTop: 9, maxWidth: "76ch" }}>
             Un acheteur qui publie régulièrement sur une même famille de pièces renseigne sur la
             structure d'un marché mieux qu'une série macroéconomique. Le nombre d'avis mesure son
-            activité de publication, pas la taille de son marché — et la demande privée, qui est
+            activité de publication, pas la taille de son marché. La demande privée, qui est
             l'essentiel du carnet d'un sous-traitant, n'apparaît pas ici.
           </p>
         </>

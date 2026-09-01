@@ -94,7 +94,7 @@ export function LienSource({ href, children, titre }) {
 export function MentionTriage() {
   return (
     <span className="mention-triage">
-      score de triage — ordonne la lecture, ne vaut pas validation
+      score de triage : il ordonne la lecture, il ne vaut pas validation
     </span>
   );
 }
@@ -107,14 +107,14 @@ export const useDonnees = () => useContext(Ctx);
 // ---------------------------------------------------------------------
 export const nb = (v, dMax) =>
   v === null || v === undefined || isNaN(v)
-    ? "—"
+    ? "n.d."
     : new Intl.NumberFormat("fr-CH", {
         maximumFractionDigits: dMax ?? (Math.abs(v) >= 100 ? 0 : 2)
       }).format(v);
 
 export const pct = v =>
   v === null || v === undefined || isNaN(v)
-    ? "—"
+    ? "n.d."
     : (v > 0 ? "+" : "") +
       new Intl.NumberFormat("fr-CH", { maximumFractionDigits: 1 }).format(v) + " %";
 

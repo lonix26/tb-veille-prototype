@@ -26,7 +26,7 @@ export default function Referentiel() {
 
       <div className="carte">
         <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 8 }}>
-          Bilan — le décompte vient de la base, il fait référence
+          Bilan. Ces décomptes viennent directement de la base : ce sont eux qui font référence.
         </div>
         <table>
           <thead>
@@ -62,7 +62,7 @@ export default function Referentiel() {
                 <td><strong>{i.indicator_id}</strong></td>
                 <td>{i.sector_label}</td>
                 <td>{i.label}</td>
-                <td>{i.questions || "—"}</td>
+                <td>{i.questions || "n.d."}</td>
                 <td>{i.source_organisation}</td>
                 <td>{i.category === "hard" ? "officielle" : "composite"}</td>
                 <td>

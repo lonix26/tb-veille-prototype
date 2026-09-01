@@ -67,10 +67,10 @@ function Navigation() {
       {lien("/executions", "Exécutions")}
       {lien("/fiabilite", "Fiabilité")}
       <div className="nav-pied">
-        Restitution v9 — structurée par questions de veille le 27.08<br />
+        Tableau de bord organisé par questions de veille<br />
         Scénario B · human-in-the-loop<br />
         Sources ouvertes uniquement<br />
-        Prototype de travail de bachelor — HEG Arc
+        Prototype de travail de bachelor (HEG Arc)
       </div>
     </aside>
   );
@@ -102,7 +102,7 @@ function Erreur({ erreur, recharger }) {
       <div className="vide">
         <strong>La base ne répond pas.</strong><br />
         Cette application ne contient aucune donnée en dur : sans l'interface de lecture,
-        elle n'affiche rien — et le dit.<br />
+        elle n'affiche rien, et le dit.<br />
         <span style={{ fontSize: 12, color: "var(--gris)" }}>{erreur} · {API_URL}</span><br /><br />
         <button className="rafraichir" onClick={recharger}>Réessayer</button>
       </div>
