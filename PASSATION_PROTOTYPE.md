@@ -110,3 +110,40 @@ réimporté dans n8n (il est inactif par nature, appelé en fin de chaîne : auc
 0 validé, 0 rejeté** ; modèle unique `gemini-3.7-flash` ; type « autre » = 273 (40 %), exclu
 de l'écran par `evenements_recents`. La validation humaine est possible par construction et
 n'a jamais été exercée.
+
+## 01.09.2026 (suite 4) — Éligibilité des sources à la lecture événementielle
+
+**Constat** (question de l'étudiant : « quelles sources, quels critères ? »). Il n'existait
+aucun critère d'éligibilité de source propre aux événements : `extraction_evenements_flux`
+lisait tout item pertinent porteur d'un secteur. Décompte des 690 événements par famille :
+TED 287 (42 %, dont 183 « autre » et 103 « investissement » — des appels d'offres relus comme
+des investissements), GDELT 159, presse/communiqués 150, FDA 94 (chaque 510(k) devenue un
+événement alors que M8 les compte déjà). La consigne commence par « Tu lis des titres
+d'articles de presse professionnelle » : écrite pour la presse, appliquée à des
+enregistrements structurés.
+
+**Règle de détection, aux trois conditions** (migration
+`2026-09-01_eligibilite_lecture_evenementielle.sql`, sortie en annexe 5) :
+- déclarée : `flux_sources.lecture_evenementielle` (défaut `false`, COMMENT), vrai pour les
+  13 flux presse/communiqués/actualité, faux pour TED et FDA avec motif ajouté à `note` ;
+- visible : lue par la requête du workflow (`AND s.lecture_evenementielle`), par
+  `v_evenements_mois` et par `evenements_recents` dans l'API ;
+- conservatrice : les 381 événements TED/FDA restent au registre (preuve du constat), ils ne
+  sont plus servis. TED/FDA restent collectés, triés, comptés (M7/M8/S7), en file d'examen.
+
+**Après** : 309 événements éligibles (90 « autre », 36 « investissement ») ; API vérifiée
+(`veille/donnees` : 120 récents, 302 sur 60 jours, aucun TED/FDA) ; captures régénérées ;
+`db/` reconsolidé et vérifié par base neuve (empreintes identiques, 51 indicateurs). Workflows
+réimportés, API republiée, conteneur redémarré.
+
+**Constat annexe, non traité** : les items jugés `est_evenement:false` ne sont pas écrits, donc
+**relus à chaque run** (161 items éligibles en attente au 01.09, dont ceux déjà lus par le run
+193 puis 208). Coût marginal à cette échelle (4 lots), mais c'est une lecture payée deux fois —
+perspective : écrire les non-événements (statut `non_evenement`) pour que le filtre
+`e.evenement_id IS NULL` les exclue.
+
+**Critères de sélection des sources, pour mémoire** (déjà en base et au § 8.9) : grille des
+neuf critères du protocole OSINT ; pour la presse, deux tris (exploitable en réponse réelle,
+puis utile : parle de l'étage adressable, non recouverte), deux fils par marché ; 21 testés,
+8 retenus le 26.08 ; écartés motivés dans `flux_sources.note`. À dire honnêtement au rapport :
+la reconnaissance a porté sur des fils connus et testés, pas sur un recensement exhaustif.

@@ -37,7 +37,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- Seuls les items PERTINENTS au triage (>=1) reçoivent une lecture : le\n-- triage a déjà filtré, on ne paie pas deux fois. Jamais deux lectures du\n-- même item (contrainte UNIQUE, et ce filtre).\nSELECT i.item_id, i.titre, s.sector_code\n  FROM flux_items i\n  JOIN flux_sources s USING (flux_id)\n  JOIN flux_triage_ia t USING (item_id)\n  LEFT JOIN flux_evenements e ON e.item_id = i.item_id\n WHERE t.pertinence >= 1 AND e.evenement_id IS NULL AND s.sector_code IS NOT NULL\n ORDER BY i.item_id;",
+        "query": "-- Seuls les items PERTINENTS au triage (>=1) reçoivent une lecture : le\n-- triage a déjà filtré, on ne paie pas deux fois. Jamais deux lectures du\n-- même item (contrainte UNIQUE, et ce filtre).\n-- ÉLIGIBILITÉ PAR SOURCE (01.09.2026) : seules les sources DÉCLARÉES\n-- éligibles (flux_sources.lecture_evenementielle) sont lues — presse,\n-- communiqués, actualité, celles pour lesquelles la consigne a été écrite.\n-- Les enregistrements structurés (TED, FDA) sont comptés par indicateur,\n-- pas relus : 42 % des événements du 01.09 étaient des avis TED devenus\n-- de faux « investissements ». Constat archivé en annexe 5.\nSELECT i.item_id, i.titre, s.sector_code\n  FROM flux_items i\n  JOIN flux_sources s USING (flux_id)\n  JOIN flux_triage_ia t USING (item_id)\n  LEFT JOIN flux_evenements e ON e.item_id = i.item_id\n WHERE t.pertinence >= 1 AND e.evenement_id IS NULL AND s.sector_code IS NOT NULL\n   AND s.lecture_evenementielle\n ORDER BY i.item_id;",
         "options": {}
       },
       "id": "t3",

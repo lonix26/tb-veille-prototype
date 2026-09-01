@@ -5,7 +5,8 @@
 -- PROVENANCE. Ce fichier est CONSOLIDÉ : il est produit par `pg_dump
 -- --schema-only` de la base en service. Première consolidation le 25.08.2026
 -- après les 78 migrations d'alors ; RECONSOLIDÉ LE 01.09.2026 (gel) après les
--- migrations postérieures — entre les deux, le fichier avait dérivé de la base
+-- migrations postérieures (et de nouveau le soir même, après la migration
+-- d'éligibilité des sources à la lecture événementielle) — entre les deux, le fichier avait dérivé de la base
 -- (41 vues contre 44, colonnes et tables nouvelles absentes) : une base neuve
 -- construite depuis le dépôt n'aurait pas été celle du rapport. Il remplace le
 -- socle écrit à la main du 04.08 (conservé dans `db_origine_2026-08-04/`).
@@ -678,6 +679,7 @@ CREATE TABLE public.flux_sources (
     qualified_by text,
     qualified_at date,
     note text,
+    lecture_evenementielle boolean DEFAULT false NOT NULL,
     CONSTRAINT chk_flux_qualifie_trace CHECK (((statut = 'a_verifier'::text) OR ((qualified_by IS NOT NULL) AND (qualified_at IS NOT NULL)))),
     CONSTRAINT flux_sources_famille_check CHECK ((famille = ANY (ARRAY['marches_publics'::text, 'communications'::text, 'actualite'::text, 'marches_financiers'::text, 'registres'::text, 'trafic'::text, 'brevets_flux'::text, 'emploi'::text, 'reglementaire'::text]))),
     CONSTRAINT flux_sources_statut_check CHECK ((statut = ANY (ARRAY['a_verifier'::text, 'actif'::text, 'ecarte'::text])))
@@ -689,6 +691,13 @@ CREATE TABLE public.flux_sources (
 --
 
 COMMENT ON TABLE public.flux_sources IS 'Descripteurs déclaratifs des flux de l''étage 2 (CONCEPTION_ETAGE2.md). Même principe que source_bindings : ajouter un flux est une déclaration, pas un développement. Un flux écarté avec motif est un résultat (protocole OSINT).';
+
+
+--
+-- Name: COLUMN flux_sources.lecture_evenementielle; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.flux_sources.lecture_evenementielle IS 'Déclaration humaine (01.09.2026) : la source est-elle éligible à la lecture événementielle par IA (extraction_evenements_flux) ? Vrai pour la presse de branche, les communiqués et l''actualité — les sources pour lesquelles la consigne de lecture a été écrite. Faux pour les enregistrements structurés (marchés publics, réglementaire) : ils sont comptés par des indicateurs (M7, M8, S7) et servis dans la file d''examen, une relecture en « événements » les dénaturait (42 % des événements du 01.09 étaient des avis TED). Sans déclaration, une source n''est pas lue.';
 
 
 --
@@ -2375,10 +2384,18 @@ CREATE VIEW public.v_evenements_mois AS
     e.sens_sous_traitance,
     count(*) AS n,
     count(*) FILTER (WHERE (e.statut = 'valide'::text)) AS n_valides
-   FROM (public.flux_evenements e
+   FROM ((public.flux_evenements e
      JOIN public.flux_items i USING (item_id))
-  WHERE (e.statut <> 'rejete'::text)
+     JOIN public.flux_sources s USING (flux_id))
+  WHERE ((e.statut <> 'rejete'::text) AND s.lecture_evenementielle)
   GROUP BY e.sector_code, (to_char((i.date_publication)::timestamp with time zone, 'YYYY-MM'::text)), e.type_evenement, e.sens_sous_traitance;
+
+
+--
+-- Name: VIEW v_evenements_mois; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_evenements_mois IS 'Événements typés par secteur, mois de publication, type et sens — hors rejetés, et restreints aux sources déclarées éligibles à la lecture événementielle (flux_sources.lecture_evenementielle, 01.09.2026).';
 
 
 --

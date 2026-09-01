@@ -46,6 +46,9 @@ ce sont les collecteurs de l'étape 4 qui la remplissent.
 > commentaires ; référentiel identique **par empreinte** (md5 des lignes d'indicateurs, de
 > liaisons, de flux et de questions). Seul écart : 51 indicateurs contre 53, les deux manquants
 > étant T12 et T13, abandonnés le 24.08 (motif dans l'en-tête de `db/02_referentiel.sql`).
+> Reconsolidé une troisième fois le **01.09.2026 (soir)** après la migration d'éligibilité des
+> sources à la lecture événementielle (`flux_sources.lecture_evenementielle`, vue
+> `v_evenements_mois`) : même procédure, mêmes empreintes.
 > **Règle** : à chaque gel, reconsolider — un socle qui ne suit pas la base n'est plus une
 > reproductibilité, c'est une affirmation.
 
