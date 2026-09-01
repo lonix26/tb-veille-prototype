@@ -1,0 +1,285 @@
+{
+  "id": "veille-documentaire-annuelle",
+  "name": "Veille - Détection des éditions annuelles (CP, CCFA : semeur de file composite)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "v1",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual', 'B', 'en_cours', 'Veille documentaire annuelle : détection des nouvelles éditions CP et CCFA') RETURNING run_id;",
+        "options": {}
+      },
+      "id": "v2",
+      "name": "Ouvrir le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Les deux sources documentaires ANNUELLES du dispositif, déclarées ici :\n// la page d'index stable, le motif du nom de fichier, et la règle qui relie\n// le millésime de l'édition à la période de données qu'elle porte.\n//  - Convention patronale (H2, la même extraction sert H11) : l'édition N\n//    recense l'année N — période = millésime.\n//  - CCFA (A1) : l'édition N publie les années N-2 et N-1 — période (l'année\n//    récente, la convention de la file) = millésime - 1.\n// Même doctrine qu'ACEA : détecter n'est pas lire. Le veilleur constate\n// qu'une édition NOUVELLE existe et l'inscrit en file au statut\n// « a_verifier » — la vérification nominative et l'extraction restent\n// humaines et multi-modèles (§ 10.4).\nreturn [\n  { json: {\n    indicator_id: 'H2', geo: 'CH',\n    page: 'https://cpih.ch/statistiques/',\n    motif: 'Recensement[^\"]*\\\\.pdf',\n    base: 'https://cpih.ch/',\n    periode_depuis_millesime: 0,\n    libelle: 'Convention patronale (recensement horloger)'\n  } },\n  { json: {\n    indicator_id: 'A1', geo: 'WORLD',\n    page: 'https://ccfa.fr/analyses-et-statistiques/',\n    motif: 'CCFA[^\"]*FR[^\"]*\\\\.pdf',\n    base: 'https://ccfa.fr/',\n    periode_depuis_millesime: -1,\n    libelle: 'CCFA (annuaire de l\\'industrie automobile)'\n  } },\n];"
+      },
+      "id": "v3",
+      "name": "Cibler les éditions attendues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.page }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "veille-TB-HEG-Arc/1.0 (travail de bachelor, HEG Arc, usage academique et non commercial)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "v4",
+      "name": "Sonder la page d'index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pour chaque source : le document le plus récent de la page est-il une\n// édition que la file ne connaît pas encore ?\nconst sources = $('Cibler les éditions attendues').all().map(x => x.json);\nconst reponses = $input.all();\nconst sorties = [];\nreponses.forEach((rep, i) => {\n  const s = sources[i];\n  const page = String(rep.json.body ?? rep.json.data ?? '');\n  const statutHttp = rep.json.statusCode ?? 0;\n  if (statutHttp >= 400 || !page) {\n    sorties.push({ json: { ...s, verdict: 'page_injoignable', http: statutHttp } });\n    return;\n  }\n  const re = new RegExp('href=\"([^\"]*' + s.motif + ')\"', 'gi');\n  const liens = [...page.matchAll(re)].map(m => m[1]);\n  if (!liens.length) {\n    sorties.push({ json: { ...s, verdict: 'aucun_document', http: statutHttp } });\n    return;\n  }\n  // Le millésime se lit dans le NOM DE FICHIER, jamais dans le chemin :\n  // l'URL CCFA contient le répertoire de téléversement (/2026/06/…), qui a\n  // fait naître une fausse « édition 2026 » au premier run. Constaté, corrigé.\n  const avecMillesime = liens.map(u => {\n    const nomFichier = u.split('/').pop();\n    return { u, an: Math.max(0, ...[...nomFichier.matchAll(/20(\\d{2})/g)].map(m => 2000 + Number(m[1]))) };\n  });\n  avecMillesime.sort((a, b) => b.an - a.an);\n  const { u, an } = avecMillesime[0];\n  let url = u.replace(/&amp;/g, '&');\n  if (url.startsWith('//')) url = 'https:' + url;\n  else if (url.startsWith('/')) url = s.base.replace(/\\/$/, '') + url;\n  else if (!/^https?:/i.test(url)) url = s.base + url;\n  const periode = String(an + s.periode_depuis_millesime);\n  sorties.push({ json: { ...s, verdict: 'document_present', millesime: an, periode, url_document: url, http: statutHttp } });\n});\nreturn sorties;"
+      },
+      "id": "v5",
+      "name": "Décider des inscriptions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "present",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.verdict }}",
+              "rightValue": "document_present"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "v6",
+      "name": "Édition trouvée ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Même doctrine qu'ACEA : un document détecté n'est pas un document lu.\n-- L'inscription est au statut a_verifier ; la vérification nominative et\n-- l'extraction multi-modèles restent en aval. Idempotent : une édition\n-- déjà en file (même période) n'est pas réinscrite.\nINSERT INTO composite_queue (indicator_id, period, geo, source_doc, statut, note)\nSELECT $1, $2, $3, $4, 'a_verifier',\n       'Détecté par la veille documentaire annuelle le ' || CURRENT_DATE ||\n       ' (édition ' || $5 || ', ' || $6 || '). Document joignable au moment de l''inscription. VÉRIFICATION HUMAINE REQUISE avant extraction.'\n WHERE NOT EXISTS (SELECT 1 FROM composite_queue WHERE indicator_id = $1 AND period = $2)\nRETURNING doc_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.indicator_id, $json.periode, $json.geo, $json.page, $json.millesime, $json.libelle] }}"
+        }
+      },
+      "id": "v7",
+      "name": "Insérer si édition nouvelle",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        1200,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Bilan lisible du run : ce qui a été vu, ce qui a été inscrit.\nconst verdicts = $('Décider des inscriptions').all().map(x => x.json);\nconst inscrits = $('Insérer si édition nouvelle').isExecuted\n  ? $('Insérer si édition nouvelle').all().filter(x => x.json.doc_id !== undefined).length\n  : 0;\nconst parties = verdicts.map(v =>\n  v.verdict === 'document_present'\n    ? `${v.indicator_id} : édition ${v.millesime} vue (période ${v.periode})`\n    : `${v.indicator_id} : ${v.verdict}`);\nreturn [{ json: {\n  run_id: $('Ouvrir le run').first().json.run_id,\n  note: 'Veille documentaire annuelle (CP, CCFA) : ' + parties.join(' ; ') + '. ' + inscrits + ' inscription(s) nouvelle(s).'\n} }];"
+      },
+      "id": "v8",
+      "name": "Bilan du run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE runs SET status='ok', closed_at=now(), note=$2 WHERE run_id=$1 RETURNING run_id, status, note;",
+        "options": {
+          "queryReplacement": "={{ [$json.run_id, $json.note] }}"
+        }
+      },
+      "id": "v9",
+      "name": "Clôturer le run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      },
+      "position": [
+        1600,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvrir le run": {
+      "main": [
+        [
+          {
+            "node": "Cibler les éditions attendues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cibler les éditions attendues": {
+      "main": [
+        [
+          {
+            "node": "Sonder la page d'index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sonder la page d'index": {
+      "main": [
+        [
+          {
+            "node": "Décider des inscriptions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Décider des inscriptions": {
+      "main": [
+        [
+          {
+            "node": "Édition trouvée ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Édition trouvée ?": {
+      "main": [
+        [
+          {
+            "node": "Insérer si édition nouvelle",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bilan du run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insérer si édition nouvelle": {
+      "main": [
+        [
+          {
+            "node": "Bilan du run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bilan du run": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
