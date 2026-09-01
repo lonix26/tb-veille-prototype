@@ -89,3 +89,24 @@ M6, T8 et T10, et RI4 est appliquée par la consigne du workflow. La consigne de
 
 **Où le journal reparaît** : onglet « La grille » de l'écran Fiabilité, servi par
 `veille/donnees`. Rien n'est perdu, rien ne s'affiche là où cela gênait.
+
+## 01.09.2026 (suite 3) — Événements : un commentaire affirmait un contrôle non implémenté
+
+En relisant `extraction_evenements_flux` nœud par nœud pour l'expliquer, constat : l'en-tête du
+nœud « Contrôles et mise en forme » affirmait qu'« un resume porteur de chiffres absents du titre
+est signalé (incident) ». **Le code ne le fait pas** — la règle des chiffres n'existe que dans la
+consigne au modèle ; les contrôles déterministes portent sur le JSON, l'admission des `item_id`,
+`est_evenement` et le vocabulaire fermé, rien d'autre. C'est le cas visé par la règle
+« un commentaire qui affirme un contrôle non implémenté est la même faute qu'une phrase
+surdéclarée ».
+
+Correction retenue : **le commentaire dit désormais ce qui est vrai** (règle portée par la
+consigne, aucun contrôle déterministe, date du constat). Le contrôle lui-même — extraction des
+nombres du résumé et du titre, compteur `chiffres_hors_titre` au bilan — est noté en
+perspective, pas implémenté : le gel est fait, le rapport est le chemin critique. Workflow
+réimporté dans n8n (il est inactif par nature, appelé en fin de chaîne : aucun `publish` requis).
+
+État de la table relu à cette occasion, à citer tel quel : **690 événements, 690 `non_relu`,
+0 validé, 0 rejeté** ; modèle unique `gemini-3.7-flash` ; type « autre » = 273 (40 %), exclu
+de l'écran par `evenements_recents`. La validation humaine est possible par construction et
+n'a jamais été exercée.
