@@ -99,8 +99,16 @@ export function Alertes({ code }) {
     if (!parIndicateur.has(a.indicator_id)) parIndicateur.set(a.indicator_id, []);
     parIndicateur.get(a.indicator_id).push(a);
   }
+  // AUDIT DU 01.09.2026 : dans une série multi-zones, la ligne de l'AGRÉGAT
+  // (World…) est le mouvement de la série elle-même — elle se lit en ligne
+  // simple, jamais comme une « zone » du groupe.
   const simples = [], groupes = [];
-  for (const [, rows] of parIndicateur) (rows.length <= 3 ? simples : groupes).push(rows);
+  for (const [, rows] of parIndicateur) {
+    const agregats = rows.filter(a => estAgregat(a.geo));
+    const zones = rows.filter(a => !estAgregat(a.geo));
+    if (agregats.length) simples.push(agregats);
+    if (zones.length) (zones.length <= 3 ? simples : groupes).push(zones);
+  }
 
   const PT = { favorable: "var(--vert)", defavorable: "var(--rouge)", neutre: "#98a2b3" };
   const chipsQV = (id) => {

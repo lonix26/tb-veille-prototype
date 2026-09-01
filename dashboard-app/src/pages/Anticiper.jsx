@@ -105,11 +105,15 @@ export default function Anticiper() {
                 {i > 0 && " · "}<strong>{v.indicator_id}</strong> ({v.label.split("(")[0].trim().toLowerCase()}, {pct(v.ecart_a_la_moyenne_pct)})
               </React.Fragment>
             ))}.
+            {/* AUDIT DU 01.09.2026 : l'énumération était RÉDIGÉE (« le carnet,
+                l'usinage… ») et a menti dès que T8 a changé de camp — elle est
+                désormais calculée depuis la liste elle-même. */}
             {defavMetier.length >= 3 && (
-              <> — <strong>Et c'est la lecture qui compte : les défavorables sont ceux du
-              métier</strong> — le carnet, l'usinage, l'étage adressable. Les marchés finaux vont
-              bien ; la profession, moins. Un écart de ce genre précède les retournements de
-              charge, dans un sens comme dans l'autre.</>
+              <> — <strong>Et c'est la lecture qui compte : {defavMetier.length} des{" "}
+              {diffusion.defav.length} défavorables sont ceux du métier</strong> —{" "}
+              {defavMetier.map(v => v.indicator_id).join(", ")} : l'étage adressable par la
+              sous-traitance. Un écart durable entre cet étage et les marchés finaux précède
+              les retournements de charge, dans un sens comme dans l'autre.</>
             )}
           </p>
         )}

@@ -1483,15 +1483,15 @@ CREATE VIEW public.v_metriques AS
             r.debut_fenetre,
                 CASE
                     WHEN ((r.valeur_periode_precedente IS NULL) OR (r.valeur_periode_precedente = (0)::numeric)) THEN NULL::numeric
-                    ELSE round((((r.value - r.valeur_periode_precedente) / r.valeur_periode_precedente) * (100)::numeric), 2)
+                    ELSE round((((r.value - r.valeur_periode_precedente) / abs(r.valeur_periode_precedente)) * (100)::numeric), 2)
                 END AS variation_periode_pct,
                 CASE
                     WHEN ((r.valeur_annee_precedente IS NULL) OR (r.valeur_annee_precedente = (0)::numeric)) THEN NULL::numeric
-                    ELSE round((((r.value - r.valeur_annee_precedente) / r.valeur_annee_precedente) * (100)::numeric), 2)
+                    ELSE round((((r.value - r.valeur_annee_precedente) / abs(r.valeur_annee_precedente)) * (100)::numeric), 2)
                 END AS glissement_annuel_pct,
                 CASE
                     WHEN ((r.moyenne_mobile_annuelle IS NULL) OR (r.moyenne_mobile_annuelle = (0)::numeric)) THEN NULL::numeric
-                    ELSE round((((r.value - r.moyenne_mobile_annuelle) / r.moyenne_mobile_annuelle) * (100)::numeric), 2)
+                    ELSE round((((r.value - r.moyenne_mobile_annuelle) / abs(r.moyenne_mobile_annuelle)) * (100)::numeric), 2)
                 END AS ecart_a_la_moyenne_pct
            FROM rapproche r
         )

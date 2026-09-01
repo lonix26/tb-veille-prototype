@@ -311,7 +311,11 @@ export function qvDe(D, indicator_id) {
 // comptées — jamais tues. Le tri par poids et non par variation évite le
 // palmarès des petites zones (piège documenté sur A11).
 export function syntheseZones(D, rows) {
-  const pesees = rows.map(a => ({ ...a, poids_pct: poidsAlerte(D, a) }))
+  // AUDIT DU 01.09.2026 : un agrégat (World, Asia Pacific…) n'est PAS une
+  // zone — la synthèse A3 titrait « la plus lourde World » : le mouvement
+  // d'ensemble de la série déguisé en déplacement géographique. Seules les
+  // vraies zones entrent ici ; l'agrégat se lit en ligne de série.
+  const pesees = rows.filter(a => !estAgregat(a.geo)).map(a => ({ ...a, poids_pct: poidsAlerte(D, a) }))
     .sort((x, y) => (y.poids_pct ?? 0) - (x.poids_pct ?? 0));
   const retenues = pesees.filter(a => a.poids_pct === null || a.poids_pct >= SEUIL_POIDS_PCT);
   return { retenues, ecartees: pesees.length - retenues.length, laPlusLourde: retenues[0] || null };
