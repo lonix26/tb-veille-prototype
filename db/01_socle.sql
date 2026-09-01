@@ -3,9 +3,14 @@
 -- TB « Exploration de l'IA pour les entreprises industrielles »
 --
 -- PROVENANCE. Ce fichier est CONSOLIDÉ : il est produit par `pg_dump
--- --schema-only` de la base en service au 25.08.2026, après application des
--- 78 migrations du dossier `migrations/`. Il remplace le socle écrit à la main
--- du 04.08 (conservé tel quel dans `db_origine_2026-08-04/`, et dans git).
+-- --schema-only` de la base en service. Première consolidation le 25.08.2026
+-- après les 78 migrations d'alors ; RECONSOLIDÉ LE 01.09.2026 (gel) après les
+-- migrations postérieures — entre les deux, le fichier avait dérivé de la base
+-- (41 vues contre 44, colonnes et tables nouvelles absentes) : une base neuve
+-- construite depuis le dépôt n'aurait pas été celle du rapport. Il remplace le
+-- socle écrit à la main du 04.08 (conservé dans `db_origine_2026-08-04/`).
+-- Vérifié le 01.09.2026 par construction d'une base neuve et comparaison
+-- (tables, vues, déclencheurs, fonctions, référentiel) avec la base en service.
 --
 -- POURQUOI CONSOLIDER. Le rejeu des 78 migrations sur une base neuve a été
 -- essayé le 25.08 : 69 passent, 9 échouent — dépendances circulaires entre
@@ -19,8 +24,9 @@
 -- CE QUE DEVIENT `migrations/`. Le dossier reste au dépôt comme JOURNAL du
 -- travail — il porte le raisonnement, les corrections et leurs motifs, et
 -- c'est à ce titre qu'il est cité au rapport. Il n'est plus la voie de
--- construction de la base. Toute migration POSTÉRIEURE au 25.08 s'applique
--- normalement par-dessus ce socle.
+-- construction de la base. Toute migration POSTÉRIEURE à la dernière
+-- consolidation s'applique normalement par-dessus ce socle ; à chaque gel, on
+-- reconsolide.
 --
 -- LES COMMENTAIRES MÉTIER SONT PRÉSERVÉS : ils sont portés par des
 -- `COMMENT ON` en base, que le dump restitue. Chaque contrainte continue de
@@ -51,20 +57,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA IF NOT EXISTS public;
-
-
---
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON SCHEMA public IS 'standard public schema';
-
-
---
 -- Name: sandbox; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -76,6 +68,20 @@ CREATE SCHEMA IF NOT EXISTS sandbox;
 --
 
 COMMENT ON SCHEMA sandbox IS 'Espace de l''artefact agentique du scénario C (§ 10.5). DÉLIBÉRÉMENT SANS CONTRAINTES : l''agent publie sans validation, et cette absence de garde-fou est l''objet même de la comparaison. Aucune vue du tableau de bord ne lit ce schéma.';
+
+
+--
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
 
 --
@@ -460,6 +466,53 @@ ALTER SEQUENCE public.discovery_log_log_id_seq OWNED BY public.discovery_log.log
 
 
 --
+-- Name: flux_evenements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.flux_evenements (
+    evenement_id bigint NOT NULL,
+    item_id bigint NOT NULL,
+    run_id bigint NOT NULL,
+    sector_code text,
+    type_evenement text NOT NULL,
+    acteur text,
+    zone text,
+    sens_sous_traitance text NOT NULL,
+    resume text NOT NULL,
+    modele text NOT NULL,
+    statut text DEFAULT 'non_relu'::text NOT NULL,
+    verifie_par text,
+    verifie_le timestamp with time zone,
+    horodatage timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_evenement_verifie CHECK (((statut = 'non_relu'::text) OR ((verifie_par IS NOT NULL) AND (verifie_le IS NOT NULL)))),
+    CONSTRAINT flux_evenements_sens_sous_traitance_check CHECK ((sens_sous_traitance = ANY (ARRAY['opportunite'::text, 'menace'::text, 'neutre'::text]))),
+    CONSTRAINT flux_evenements_statut_check CHECK ((statut = ANY (ARRAY['non_relu'::text, 'valide'::text, 'rejete'::text]))),
+    CONSTRAINT flux_evenements_type_evenement_check CHECK ((type_evenement = ANY (ARRAY['investissement'::text, 'fermeture_reduction'::text, 'rachat_fusion'::text, 'reglementation'::text, 'lancement_produit'::text, 'resultat_financier'::text, 'partenariat'::text, 'autre'::text])))
+);
+
+
+--
+-- Name: TABLE flux_evenements; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.flux_evenements IS 'Événements typés lus par un modèle unique dans les items de flux pertinents. Diffusés sous étiquette « non relu » tant qu''aucun humain n''a tranché — le régime du commentaire exécutif (décision du 31.08.2026).';
+
+
+--
+-- Name: flux_evenements_evenement_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.flux_evenements ALTER COLUMN evenement_id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.flux_evenements_evenement_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: flux_examens; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -808,7 +861,10 @@ CREATE TABLE public.indicators (
     geo_reference text,
     en_vitrine boolean DEFAULT false NOT NULL,
     note_conception text,
+    seuil_consensus numeric,
     periodes_incompletes_source smallint,
+    CONSTRAINT chk_seuil_consensus_borne CHECK (((seuil_consensus IS NULL) OR ((seuil_consensus > (0)::numeric) AND (seuil_consensus <= (1)::numeric)))),
+    CONSTRAINT chk_seuil_consensus_composite CHECK (((category <> 'composite'::text) OR (seuil_consensus IS NOT NULL))),
     CONSTRAINT indicators_category_check CHECK ((category = ANY (ARRAY['hard'::text, 'composite'::text]))),
     CONSTRAINT indicators_frequency_check CHECK ((frequency = ANY (ARRAY['mensuelle'::text, 'trimestrielle'::text, 'semestrielle'::text, 'annuelle'::text, 'bisannuelle'::text]))),
     CONSTRAINT indicators_latence_check CHECK ((latence = ANY (ARRAY['retarde'::text, 'coincident'::text, 'avance'::text, 'flux'::text]))),
@@ -839,12 +895,6 @@ COMMENT ON COLUMN public.indicators.latence IS 'Position temporelle de l''indica
 
 
 --
--- Name: COLUMN indicators.periodes_incompletes_source; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.indicators.periodes_incompletes_source IS 'Nombre de périodes en queue de série que la source publie INCOMPLÈTES par construction (comptages par date de priorité, déclarations en retard). DÉCLARATION HUMAINE, jamais présumée — quatrième application de la doctrine admet_negatifs. NULL = aucune. Effet : v_metriques marque ces périodes « en consolidation », RI4 n''y signale rien ; la valeur reste au registre, seul le signalement est différé. Déclaré le 01.09.2026 pour A7 (OCDE, brevets : effondrement synchrone des six pays sur les deux dernières années).';
-
---
 -- Name: COLUMN indicators.geo_reference; Type: COMMENT; Schema: public; Owner: -
 --
 
@@ -863,6 +913,64 @@ COMMENT ON COLUMN public.indicators.en_vitrine IS 'L''indicateur fait-il partie 
 --
 
 COMMENT ON COLUMN public.indicators.note_conception IS 'Destiné au JURY et à la reprise du dispositif : journal des décisions portant sur cet indicateur (retraits du score, redondances mesurées, changements de source, mises hors vitrine, inapplicabilité de règles). Jamais affiché sur un écran de décision.';
+
+
+--
+-- Name: COLUMN indicators.seuil_consensus; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.indicators.seuil_consensus IS 'Proportion minimale de modèles d''accord pour qu''une valeur composite entre au registre sans arbitrage humain. Obligatoire pour les composites, nul pour les hard. La règle d''écriture est « consensus >= seuil ET contrôles déterministes satisfaits » : le seuil ne dispense JAMAIS des contrôles.';
+
+
+--
+-- Name: COLUMN indicators.periodes_incompletes_source; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.indicators.periodes_incompletes_source IS 'Nombre de périodes en queue de série que la source publie INCOMPLÈTES par construction (comptages par date de priorité, déclarations en retard). DÉCLARATION HUMAINE, jamais présumée — quatrième application de la doctrine admet_negatifs. NULL = aucune. Effet : v_metriques marque ces périodes « en consolidation », RI4 n''y signale rien ; la valeur reste au registre, seul le signalement est différé. Déclaré le 01.09.2026 pour A7 (OCDE, brevets : effondrement synchrone des six pays sur les deux dernières années).';
+
+
+--
+-- Name: lectures_transversales; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.lectures_transversales (
+    lecture_id bigint NOT NULL,
+    run_id bigint NOT NULL,
+    hypothese text NOT NULL,
+    faits_cites jsonb NOT NULL,
+    confiance text NOT NULL,
+    infirmable_par text,
+    incidents jsonb DEFAULT '[]'::jsonb NOT NULL,
+    modele text NOT NULL,
+    statut text DEFAULT 'a_valider'::text NOT NULL,
+    validated_by text,
+    validated_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_lecture_validee CHECK (((statut = 'a_valider'::text) OR ((validated_by IS NOT NULL) AND (validated_at IS NOT NULL)))),
+    CONSTRAINT lectures_transversales_confiance_check CHECK ((confiance = ANY (ARRAY['haute'::text, 'moyenne'::text, 'basse'::text]))),
+    CONSTRAINT lectures_transversales_statut_check CHECK ((statut = ANY (ARRAY['a_valider'::text, 'valide'::text, 'rejete'::text])))
+);
+
+
+--
+-- Name: TABLE lectures_transversales; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.lectures_transversales IS 'Hypothèses de liaison inter-signaux, générées sous contrainte : le modèle ne reçoit que des faits calculés (F1..Fn), n''écrit aucun chiffre, cite ses faits. La validation humaine tranche ; une hypothèse rejetée reste en base — le taux de rejet est une mesure du dispositif, pas un déchet.';
+
+
+--
+-- Name: lectures_transversales_lecture_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.lectures_transversales ALTER COLUMN lecture_id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.lectures_transversales_lecture_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
@@ -1236,6 +1344,58 @@ ALTER SEQUENCE public.ted_lecture_ia_lecture_id_seq OWNED BY public.ted_lecture_
 
 
 --
+-- Name: v_a1_recouvrement_editions; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_a1_recouvrement_editions AS
+ WITH lectures AS (
+         SELECT DISTINCT ON (t.period, t.geo, t.edition) t.period,
+            t.geo,
+            t.edition,
+            t.value
+           FROM ( SELECT indicator_values.period,
+                    indicator_values.geo,
+                    indicator_values.value,
+                        CASE
+                            WHEN (indicator_values.raw_ref ~~ '%CCFA-2023%'::text) THEN 2023
+                            WHEN (indicator_values.raw_ref ~~ '%CCFA-2024%'::text) THEN 2024
+                            ELSE 2025
+                        END AS edition
+                   FROM public.indicator_values
+                  WHERE (indicator_values.indicator_id = 'A1'::text)) t
+          ORDER BY t.period, t.geo, t.edition
+        ), ordonnees AS (
+         SELECT lectures.period,
+            lectures.geo,
+            lectures.edition,
+            lectures.value,
+            row_number() OVER (PARTITION BY lectures.period, lectures.geo ORDER BY lectures.edition) AS rang
+           FROM lectures
+        )
+ SELECT a.period,
+    a.geo,
+    a.edition AS edition_1,
+    a.value AS premiere_publication,
+    b.edition AS edition_2,
+    b.value AS publication_suivante,
+    (b.value - a.value) AS revision,
+        CASE
+            WHEN (a.value = b.value) THEN 'concorde'::text
+            ELSE 'revision_producteur'::text
+        END AS verdict
+   FROM (ordonnees a
+     JOIN ordonnees b ON (((b.period = a.period) AND (b.geo = a.geo) AND (b.rang = (a.rang + 1)))))
+  WHERE ((a.value IS NOT NULL) AND (b.value IS NOT NULL));
+
+
+--
+-- Name: VIEW v_a1_recouvrement_editions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_a1_recouvrement_editions IS 'Contrôle inter-éditions d''A1 : chaque année lue par deux éditions CCFA. concorde = vérité terrain par double publication ; revision_producteur = écart rendu visible (jamais écrasé).';
+
+
+--
 -- Name: v_acheteurs_recurrents; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -1575,7 +1735,7 @@ CREATE VIEW public.v_metriques AS
             ELSE NULL::text
         END,
         CASE
-            WHEN ((periodes_incompletes_source IS NOT NULL) AND (rang_depuis_fin <= periodes_incompletes_source)) THEN ((('periode en consolidation a la source : les '::text || periodes_incompletes_source) || ' derniere(s) periode(s) sont declarees incompletes, aucun signalement (RI4 differe)'::text))
+            WHEN ((periodes_incompletes_source IS NOT NULL) AND (rang_depuis_fin <= periodes_incompletes_source)) THEN (('periode en consolidation a la source : les '::text || periodes_incompletes_source) || ' derniere(s) periode(s) sont declarees incompletes, aucun signalement (RI4 differe)'::text)
             ELSE NULL::text
         END)) AS completude,
     periodes_incompletes_source,
@@ -2205,6 +2365,23 @@ COMMENT ON VIEW public.v_ecart_entre_runs IS 'Un écart non nul signale une rév
 
 
 --
+-- Name: v_evenements_mois; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_evenements_mois AS
+ SELECT e.sector_code,
+    to_char((i.date_publication)::timestamp with time zone, 'YYYY-MM'::text) AS mois,
+    e.type_evenement,
+    e.sens_sous_traitance,
+    count(*) AS n,
+    count(*) FILTER (WHERE (e.statut = 'valide'::text)) AS n_valides
+   FROM (public.flux_evenements e
+     JOIN public.flux_items i USING (item_id))
+  WHERE (e.statut <> 'rejete'::text)
+  GROUP BY e.sector_code, (to_char((i.date_publication)::timestamp with time zone, 'YYYY-MM'::text)), e.type_evenement, e.sens_sous_traitance;
+
+
+--
 -- Name: v_exposition_horlogere; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -2765,6 +2942,62 @@ COMMENT ON VIEW public.v_sante_secteur_brut IS 'Définition ANTÉRIEURE au 24.08
 
 
 --
+-- Name: validation_queue; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.validation_queue (
+    item_id bigint NOT NULL,
+    indicator_id text NOT NULL,
+    run_id bigint NOT NULL,
+    period text NOT NULL,
+    geo text DEFAULT 'WORLD'::text NOT NULL,
+    extractions jsonb NOT NULL,
+    consensus_score numeric NOT NULL,
+    source_doc text NOT NULL,
+    raw_ref text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    decided_value numeric,
+    decision text,
+    decided_by text,
+    decided_at timestamp with time zone,
+    CONSTRAINT chk_decision_complete CHECK (((decision IS NULL) OR ((decided_by IS NOT NULL) AND (decided_at IS NOT NULL)))),
+    CONSTRAINT validation_queue_decision_check CHECK (((decision IS NULL) OR (decision = ANY (ARRAY['accepte'::text, 'corrige'::text, 'rejete'::text]))))
+);
+
+
+--
+-- Name: TABLE validation_queue; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.validation_queue IS 'Sas entre l''extraction par IA et le registre. Tout désaccord entre modèles, toute valeur aberrante y transite. Le taux de correction observé ici est la métrique de preuve qui conditionne le passage en supervision par exception (§ 10.4.2).';
+
+
+--
+-- Name: v_seuils_consensus; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_seuils_consensus AS
+ SELECT i.indicator_id,
+    i.sector_code,
+    i.label,
+    i.seuil_consensus,
+    count(*) FILTER (WHERE (v.validation_status = 'pre_valide_consensus'::text)) AS ecrites_sans_humain,
+    count(*) FILTER (WHERE (v.validation_status = 'valide_humain'::text)) AS ecrites_apres_humain,
+    ( SELECT count(*) AS count
+           FROM public.validation_queue q
+          WHERE ((q.indicator_id = i.indicator_id) AND (q.decision IS NULL))) AS en_attente_humain,
+    ( SELECT count(*) AS count
+           FROM public.validation_queue q
+          WHERE ((q.indicator_id = i.indicator_id) AND (q.decision IS NOT NULL))) AS arbitrees_par_humain,
+    round(((100.0 * (count(*) FILTER (WHERE (v.validation_status = 'pre_valide_consensus'::text)))::numeric) / (NULLIF(count(*), 0))::numeric), 1) AS taux_ecriture_directe_pct
+   FROM (public.indicators i
+     LEFT JOIN public.indicator_values v ON (((v.indicator_id = i.indicator_id) AND (v.obtained_by = 'ia_extraction'::text))))
+  WHERE (i.category = 'composite'::text)
+  GROUP BY i.indicator_id, i.sector_code, i.label, i.seuil_consensus
+  ORDER BY i.indicator_id;
+
+
+--
 -- Name: v_signaux; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -2902,37 +3135,6 @@ CREATE VIEW public.v_signaux_faibles_groupes AS
 --
 
 COMMENT ON VIEW public.v_signaux_faibles_groupes IS 'File des signaux faibles dédoublonnée des reprises syndiquées, une ligne par événement. Représentant = la reprise la plus ancienne (elle porte l''antériorité réelle). n_reprises expose l''écho : un événement repris par quatre organes n''est pas équivalent à un événement isolé.';
-
-
---
--- Name: validation_queue; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.validation_queue (
-    item_id bigint NOT NULL,
-    indicator_id text NOT NULL,
-    run_id bigint NOT NULL,
-    period text NOT NULL,
-    geo text DEFAULT 'WORLD'::text NOT NULL,
-    extractions jsonb NOT NULL,
-    consensus_score numeric NOT NULL,
-    source_doc text NOT NULL,
-    raw_ref text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    decided_value numeric,
-    decision text,
-    decided_by text,
-    decided_at timestamp with time zone,
-    CONSTRAINT chk_decision_complete CHECK (((decision IS NULL) OR ((decided_by IS NOT NULL) AND (decided_at IS NOT NULL)))),
-    CONSTRAINT validation_queue_decision_check CHECK (((decision IS NULL) OR (decision = ANY (ARRAY['accepte'::text, 'corrige'::text, 'rejete'::text]))))
-);
-
-
---
--- Name: TABLE validation_queue; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.validation_queue IS 'Sas entre l''extraction par IA et le registre. Tout désaccord entre modèles, toute valeur aberrante y transite. Le taux de correction observé ici est la métrique de preuve qui conditionne le passage en supervision par exception (§ 10.4.2).';
 
 
 --
@@ -3397,6 +3599,22 @@ ALTER TABLE ONLY public.discovery_log
 
 
 --
+-- Name: flux_evenements flux_evenements_item_id_modele_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_evenements
+    ADD CONSTRAINT flux_evenements_item_id_modele_key UNIQUE (item_id, modele);
+
+
+--
+-- Name: flux_evenements flux_evenements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_evenements
+    ADD CONSTRAINT flux_evenements_pkey PRIMARY KEY (evenement_id);
+
+
+--
 -- Name: flux_examens flux_examens_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3514,6 +3732,14 @@ ALTER TABLE ONLY public.indicator_watch_questions
 
 ALTER TABLE ONLY public.indicators
     ADD CONSTRAINT indicators_pkey PRIMARY KEY (indicator_id);
+
+
+--
+-- Name: lectures_transversales lectures_transversales_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.lectures_transversales
+    ADD CONSTRAINT lectures_transversales_pkey PRIMARY KEY (lecture_id);
 
 
 --
@@ -3764,6 +3990,30 @@ ALTER TABLE ONLY public.composite_queue
 
 
 --
+-- Name: flux_evenements flux_evenements_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_evenements
+    ADD CONSTRAINT flux_evenements_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.flux_items(item_id);
+
+
+--
+-- Name: flux_evenements flux_evenements_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_evenements
+    ADD CONSTRAINT flux_evenements_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(run_id);
+
+
+--
+-- Name: flux_evenements flux_evenements_sector_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flux_evenements
+    ADD CONSTRAINT flux_evenements_sector_code_fkey FOREIGN KEY (sector_code) REFERENCES public.sectors(code);
+
+
+--
 -- Name: flux_examens flux_examens_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3897,6 +4147,14 @@ ALTER TABLE ONLY public.indicators
 
 ALTER TABLE ONLY public.indicators
     ADD CONSTRAINT indicators_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.sources(source_id);
+
+
+--
+-- Name: lectures_transversales lectures_transversales_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.lectures_transversales
+    ADD CONSTRAINT lectures_transversales_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(run_id);
 
 
 --

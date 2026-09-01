@@ -32,18 +32,22 @@ PostgreSQL exécute lui-même les deux fichiers, dans l'ordre de leur nom.
 
 | Fichier | Ce qu'il pose |
 |---|---|
-| `db/01_socle.sql` | 22 tables, 31 vues, les déclencheurs et les contraintes métier |
-| `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 27 sources, 43 indicateurs, 75 liaisons dont 73 actives, 16 flux |
+| `db/01_socle.sql` | 31 tables (dont 4 du schéma `sandbox`), 44 vues, 4 déclencheurs, 44 fonctions, les contraintes métier et leurs commentaires |
+| `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 28 sources, 51 indicateurs, 120 liaisons dont 103 actives, 24 flux avec leur statut, 1 règle de filtrage du triage |
 
 Une base neuve repart donc dans l'**état qualifié** — pas dans un état par défaut qu'il faudrait
 requalifier source par source. Elle est en revanche **vide d'observations**, et c'est voulu :
 ce sont les collecteurs de l'étape 4 qui la remplissent.
 
-> **Vérifié le 25.08.2026, et pas seulement affirmé** : base neuve créée, les deux fichiers
-> appliqués, comparaison faite avec la base en service — mêmes tables, mêmes vues, mêmes
-> déclencheurs, mêmes liaisons actives, mêmes flux. Seul écart : 43 indicateurs contre 45, les
-> deux manquants étant T12 et T13, abandonnés le 24.08 (motif dans l'en-tête de
-> `db/02_referentiel.sql`).
+> **Vérifié, et pas seulement affirmé** — le 25.08.2026, puis à nouveau le **01.09.2026** après
+> reconsolidation des deux fichiers (ils avaient dérivé de la base : 49 indicateurs contre 53,
+> 41 vues contre 44) : base neuve créée, les deux fichiers appliqués, comparaison faite avec la
+> base en service — mêmes tables, vues, déclencheurs, fonctions, contraintes, colonnes et
+> commentaires ; référentiel identique **par empreinte** (md5 des lignes d'indicateurs, de
+> liaisons, de flux et de questions). Seul écart : 51 indicateurs contre 53, les deux manquants
+> étant T12 et T13, abandonnés le 24.08 (motif dans l'en-tête de `db/02_referentiel.sql`).
+> **Règle** : à chaque gel, reconsolider — un socle qui ne suit pas la base n'est plus une
+> reproductibilité, c'est une affirmation.
 
 ### Ce que devient `migrations/`
 
