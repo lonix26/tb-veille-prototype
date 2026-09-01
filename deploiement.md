@@ -1,3 +1,7 @@
+> **DOCUMENT REMPLACÉ le 25.08.2026** par [DEPLOIEMENT.md](DEPLOIEMENT.md), qui décrit la
+> séquence complète actuelle. Celui-ci est conservé comme trace de l'état du 04.08.2026
+> (avant le portage de la collecte vers l'orchestrateur) — ne pas s'en servir pour déployer.
+
 # Prototype — mode d'emploi
 
 ## Contenu

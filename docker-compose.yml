@@ -48,6 +48,14 @@ services:
       # n8n conserve ses propres données (workflows, credentials) en SQLite dans son volume :
       # aucune raison de les mêler à la base métier, et cela garde la base de veille lisible.
       N8N_DIAGNOSTICS_ENABLED: "false"
+      # Élagage des exécutions (01.09.2026) : la base interne n8n atteignait
+      # 1,8 Go — chaque exécution y archive ses données complètes, sans borne.
+      # 60 jours de rétention couvrent largement le dépôt (13.09) ; les traces
+      # DURABLES vivent ailleurs : la table runs (PostgreSQL) et les fichiers
+      # bruts de /data. Le run de référence cité au rapport doit de toute façon
+      # être archivé dans annexes/ au moment de figer (exigence E6, CLAUDE.md).
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "1440"
       N8N_RUNNERS_ENABLED: "true"
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
       # Les nœuds Code doivent pouvoir utiliser les modules internes utilisés par les workflows.
