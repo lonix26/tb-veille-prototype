@@ -33,7 +33,11 @@ function Navigation() {
   const secteurs = [...new Map(r.map(i => [i.sector_code, i.sector_label])).entries()]
     .filter(([c]) => c !== "transversal");
   const retenues = alertesSignificatives(D).retenues;
-  const nbAlertes = c => retenues.filter(a => a.sector_code === c).length;
+  // AUDIT DU 01.09.2026 : la pastille comptait des LIGNES (zones comprises)
+  // quand le bandeau du secteur compte des SÉRIES — deux chiffres différents
+  // pour la même chose, à trois centimètres l'un de l'autre. Même base
+  // désormais : des séries.
+  const nbAlertes = c => new Set(retenues.filter(a => a.sector_code === c).map(a => a.indicator_id)).size;
   const urgentes = (A?.actions || [])
     .filter(a => a.adressable >= 1 && a.jours_restants !== null && a.jours_restants <= 15).length;
 

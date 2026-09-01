@@ -30,7 +30,11 @@ export default function Referentiel() {
         </div>
         <table>
           <thead>
-            <tr><th>Secteur</th><th>Total</th><th>Certifiés</th><th>dont officielles</th><th>dont composites</th><th>À confirmer</th></tr>
+            {/* AUDIT DU 01.09.2026 : « officielles » était FAUX — la colonne compte les
+                hard, dont H7/H8/H9 (Fédération horlogère, une association) et d'autres
+                sources professionnelles. « Hard » = collecté par code, sans jugement
+                sur le statut du producteur — la distinction du § 8.6.4. */}
+            <tr><th>Secteur</th><th>Total</th><th>Certifiés</th><th>dont hard (par code)</th><th>dont composites</th><th>À confirmer</th></tr>
           </thead>
           <tbody>
             {(D.bilan_referentiel || []).map((b, i) => (

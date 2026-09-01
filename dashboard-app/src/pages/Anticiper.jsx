@@ -149,7 +149,11 @@ export default function Anticiper() {
           La part des États-Unis dans les exportations horlogères suisses, et le poids des trois
           premiers débouchés. <strong>Le choc douanier de 2025 — l'événement qui fonde la
           problématique de ce travail — se lit intégralement dans cette série</strong> :
-          constitution de stocks à 34,1 % en avril 2025, effondrement à 10,3 % en octobre,
+          {/* AUDIT DU 01.09.2026 : les chiffres étaient EN DUR (34,1/10,3/27,1) et
+              avaient dérivé de la base (33,7/10,1/26,7 après les runs suivants) —
+              la faute exacte que « la lecture est calculée » interdit. La phrase
+              raconte désormais la forme ; la courbe ci-dessous porte les valeurs. */}
+          constitution de stocks au printemps 2025, effondrement à l'automne,
           remontée à {expo.dernier ? nb(expo.dernier.part_usa_pct) : "—"} % en{" "}
           {expo.dernier ? phrasePeriode(expo.dernier.period) : "—"}. Un dispositif de veille qui
           voit l'événement qui l'a motivé : c'est sa meilleure validation sur pièce.
