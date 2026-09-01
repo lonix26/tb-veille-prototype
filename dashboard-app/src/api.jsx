@@ -149,13 +149,13 @@ const AGREGATS = new Set([
   "World", "Europe", "European Union", "Advanced Economies",
   "Developing Economies excl. China", "Africa", "Asia Pacific",
   "Latin America", "Middle East", "Oceania", "Rest of the world",
-  "Southeast Asia",
+  "Southeast Asia", "Middle East and Caspian",
   "EU27", "EU27_2020", "G20", "CH"
 ]);
 export const estAgregat = g => AGREGATS.has(String(g)) || String(g).startsWith("WB_");
 
 const NOMS_ZONES = {
-  WORLD: "monde", W00: "monde", EU: "Union européenne", EU27: "UE-27", EU27_2020: "UE-27",
+  WORLD: "monde", W00: "monde", World: "monde", "European Union": "Union européenne", EU: "Union européenne", EU27: "UE-27", EU27_2020: "UE-27",
   CH: "Suisse", G20: "G20", CHF_USD: "CHF/USD", CHF_EUR: "CHF/EUR", OWID_WRL: "monde",
   // Les pays qui pèsent effectivement dans les séries collectées. La liste est
   // volontairement courte : un code ISO non traduit s'affiche tel quel, ce qui

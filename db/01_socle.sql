@@ -808,6 +808,7 @@ CREATE TABLE public.indicators (
     geo_reference text,
     en_vitrine boolean DEFAULT false NOT NULL,
     note_conception text,
+    periodes_incompletes_source smallint,
     CONSTRAINT indicators_category_check CHECK ((category = ANY (ARRAY['hard'::text, 'composite'::text]))),
     CONSTRAINT indicators_frequency_check CHECK ((frequency = ANY (ARRAY['mensuelle'::text, 'trimestrielle'::text, 'semestrielle'::text, 'annuelle'::text, 'bisannuelle'::text]))),
     CONSTRAINT indicators_latence_check CHECK ((latence = ANY (ARRAY['retarde'::text, 'coincident'::text, 'avance'::text, 'flux'::text]))),
@@ -836,6 +837,12 @@ COMMENT ON COLUMN public.indicators.sens_favorable IS 'Orientation de lecture : 
 
 COMMENT ON COLUMN public.indicators.latence IS 'Position temporelle de l''indicateur par rapport au cycle réel du marché : retardé, coïncident, avancé, ou flux (étage 2). Sert le critère d''utilité de la grille (CONCEPTION_ETAGE2.md § 5).';
 
+
+--
+-- Name: COLUMN indicators.periodes_incompletes_source; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.indicators.periodes_incompletes_source IS 'Nombre de périodes en queue de série que la source publie INCOMPLÈTES par construction (comptages par date de priorité, déclarations en retard). DÉCLARATION HUMAINE, jamais présumée — quatrième application de la doctrine admet_negatifs. NULL = aucune. Effet : v_metriques marque ces périodes « en consolidation », RI4 n''y signale rien ; la valeur reste au registre, seul le signalement est différé. Déclaré le 01.09.2026 pour A7 (OCDE, brevets : effondrement synchrone des six pays sur les deux dernières années).';
 
 --
 -- Name: COLUMN indicators.geo_reference; Type: COMMENT; Schema: public; Owner: -
@@ -1368,7 +1375,9 @@ CREATE VIEW public.v_metriques AS
             c_1.run_id,
             c_1.executed_at,
             i.frequency,
-            i.alert_threshold_pct
+            i.alert_threshold_pct,
+            i.periodes_incompletes_source,
+            dense_rank() OVER (PARTITION BY c_1.indicator_id ORDER BY c_1.period DESC) AS rang_depuis_fin
            FROM (public.v_current c_1
              JOIN public.indicators i ON ((i.indicator_id = c_1.indicator_id)))
         ), fenetres AS (
@@ -1389,6 +1398,8 @@ CREATE VIEW public.v_metriques AS
             b.executed_at,
             b.frequency,
             b.alert_threshold_pct,
+            b.periodes_incompletes_source,
+            b.rang_depuis_fin,
             lag(b.value) OVER w AS valeur_periode_precedente,
             lag(b.period) OVER w AS periode_precedente,
             avg(b.value) OVER (PARTITION BY b.indicator_id, b.geo ORDER BY b.period ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) AS mm_12,
@@ -1417,6 +1428,8 @@ CREATE VIEW public.v_metriques AS
             f.executed_at,
             f.frequency,
             f.alert_threshold_pct,
+            f.periodes_incompletes_source,
+            f.rang_depuis_fin,
             f.valeur_periode_precedente,
             f.periode_precedente,
             f.mm_12,
@@ -1467,6 +1480,8 @@ CREATE VIEW public.v_metriques AS
             r.executed_at,
             r.frequency,
             r.alert_threshold_pct,
+            r.periodes_incompletes_source,
+            r.rang_depuis_fin,
             r.valeur_periode_precedente,
             r.periode_precedente,
             r.mm_12,
@@ -1517,6 +1532,7 @@ CREATE VIEW public.v_metriques AS
     ecart_a_la_moyenne_pct,
     alert_threshold_pct AS seuil_materialite_pct,
         CASE
+            WHEN ((periodes_incompletes_source IS NOT NULL) AND (rang_depuis_fin <= periodes_incompletes_source)) THEN 'non signale : periode en consolidation a la source'::text
             WHEN (alert_threshold_pct IS NULL) THEN 'seuil non configure'::text
             WHEN (glissement_annuel_pct IS NOT NULL) THEN
             CASE
@@ -1557,7 +1573,13 @@ CREATE VIEW public.v_metriques AS
         CASE
             WHEN (alert_threshold_pct IS NULL) THEN 'seuil de materialite non configure (RI4 inapplicable)'::text
             ELSE NULL::text
-        END)) AS completude
+        END,
+        CASE
+            WHEN ((periodes_incompletes_source IS NOT NULL) AND (rang_depuis_fin <= periodes_incompletes_source)) THEN ((('periode en consolidation a la source : les '::text || periodes_incompletes_source) || ' derniere(s) periode(s) sont declarees incompletes, aucun signalement (RI4 differe)'::text))
+            ELSE NULL::text
+        END)) AS completude,
+    periodes_incompletes_source,
+    ((periodes_incompletes_source IS NOT NULL) AND (rang_depuis_fin <= periodes_incompletes_source)) AS periode_en_consolidation
    FROM calcule c;
 
 

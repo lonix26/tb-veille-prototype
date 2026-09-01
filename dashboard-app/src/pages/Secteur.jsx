@@ -85,6 +85,23 @@ function Commentaire({ code }) {
 //     ligne pondérée, la zone la plus lourde citée, les < 1 % écartés et
 //     COMPTÉS, le détail renvoyé à la dynamique géographique (QV3) où il
 //     se lit en points de part. Repli du 27.08 conservé pour l'audit.
+// REGROUPEMENT DU 01.09.2026 (décision de l'étudiant : « neuf des treize
+// lignes sont le même signal »). Sur l'automobile, A3 2025 montait dans
+// toutes ses zones et chaque zone faisait une ligne ; une dixième ligne
+// résumait les mêmes zones. Règle de RESTITUTION, pas de détection : les
+// mouvements restent tous détectés et dépliables, ils sont ÉNONCÉS par
+// indicateur. Trois garde-fous, posés avant d'écrire le code :
+//  a. la divergence reste visible : « généralisée » seulement si toutes
+//     les zones vont dans le même sens ; sinon les zones à contre-courant
+//     qui pèsent sont nommées, les marginales comptées ;
+//  b. un agrégat (monde, UE…) n'est pas une zone : il ne compte pas dans
+//     « n zones sur n », mais il n'est jamais retiré de l'écran ;
+//  c. la pastille compte les SIGNAUX après regroupement et dit à côté le
+//     nombre de mouvements détectés — les deux nombres, pas un seul.
+const SEUIL_DOMINANTE = 0.8;   // part des zones dans le même sens pour dire « dominante »
+
+const signe = a => Math.sign(Number(a.glissement_annuel_pct ?? a.variation_periode_pct ?? 0));
+
 export function Alertes({ code }) {
   const { D } = useDonnees();
   const navigate = useNavigate();
@@ -98,16 +115,6 @@ export function Alertes({ code }) {
     if (!parIndicateur.has(a.indicator_id)) parIndicateur.set(a.indicator_id, []);
     parIndicateur.get(a.indicator_id).push(a);
   }
-  // AUDIT DU 01.09.2026 : dans une série multi-zones, la ligne de l'AGRÉGAT
-  // (World…) est le mouvement de la série elle-même — elle se lit en ligne
-  // simple, jamais comme une « zone » du groupe.
-  const simples = [], groupes = [];
-  for (const [, rows] of parIndicateur) {
-    const agregats = rows.filter(a => estAgregat(a.geo));
-    const zones = rows.filter(a => !estAgregat(a.geo));
-    if (agregats.length) simples.push(agregats);
-    if (zones.length) (zones.length <= 3 ? simples : groupes).push(zones);
-  }
 
   const PT = { favorable: "var(--vert)", defavorable: "var(--rouge)", neutre: "#98a2b3" };
   const chipsQV = (id) => {
@@ -118,6 +125,7 @@ export function Alertes({ code }) {
     const [cls, lbl] = SENS_ETQ[sensMouvement(D, a)];
     return <span className={"etq " + cls}>{lbl}</span>;
   };
+  const varDe = a => pct(a.glissement_annuel_pct ?? a.variation_periode_pct);
 
   const ligne = (a, i) => (
     <div className="alerte" key={i}>
@@ -125,9 +133,7 @@ export function Alertes({ code }) {
       <div>
         <div>
           <strong>{a.indicator_id}</strong> · {a.indicator_label} · {nomZone(a.geo)}, {a.period} :{" "}
-          <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>
-            {pct(a.glissement_annuel_pct ?? a.variation_periode_pct)}
-          </span>{" "}
+          <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>{varDe(a)}</span>{" "}
           {chipSens(a)} {chipsQV(a.indicator_id)}
         </div>
         <div className="a-m">variation rare pour cette série (moins d'une fois sur dix)</div>
@@ -136,52 +142,116 @@ export function Alertes({ code }) {
     </div>
   );
 
-  const nMouvements = simples.length + groupes.length
-    ? simples.flat().length + groupes.length
-    : 0;
-  const nDefav = [
-    ...simples.flat(),
-    ...groupes.map(rows => syntheseZones(D, rows).laPlusLourde).filter(Boolean)
-  ].filter(a => a.diffusable && sensMouvement(D, a) === "defavorable").length;
+  // Un signal par indicateur. Jusqu'à trois mouvements, ils se lisent tels
+  // quels ; au-delà, une seule ligne d'ensemble, calculée.
+  const simples = [], ensembles = [];
+  for (const [, rows] of parIndicateur) {
+    if (rows.length <= 3) { simples.push(...rows); continue; }
+    // Période courante : celle du plus grand nombre de mouvements. Les
+    // autres sont des zones dont la dernière observation est plus ancienne
+    // (petites destinations qui n'exportent plus) : comptées à part.
+    const freq = new Map();
+    for (const a of rows) freq.set(a.period, (freq.get(a.period) || 0) + 1);
+    const periode = [...freq.entries()].sort((x, y) => y[1] - x[1] || (y[0] > x[0] ? 1 : -1))[0][0];
+    const cur = rows.filter(a => a.period === periode);
+    const anciens = rows.filter(a => a.period !== periode);
+    const agregats = cur.filter(a => estAgregat(a.geo));
+    const zones = cur.filter(a => !estAgregat(a.geo));
+    const { retenues, ecartees } = syntheseZones(D, zones);
+    const hausses = zones.filter(a => signe(a) > 0).length;
+    const baisses = zones.filter(a => signe(a) < 0).length;
+    const nZ = hausses + baisses;
+    const sensMajoritaire = hausses >= baisses ? 1 : -1;
+    const mot = sensMajoritaire > 0 ? "hausse" : "baisse";
+    let qualificatif;
+    if (!nZ) qualificatif = "mouvement d'ensemble";
+    else if (hausses === 0 || baisses === 0) qualificatif = `${mot} généralisée`;
+    else if (Math.max(hausses, baisses) / nZ >= SEUIL_DOMINANTE) qualificatif = `${mot} dominante`;
+    else qualificatif = "mouvements contrastés";
+    const contreCourant = retenues.filter(a => signe(a) === -sensMajoritaire);
+    const contreMarginales = zones.filter(a => signe(a) === -sensMajoritaire).length - contreCourant.length;
+    // Le repère : la zone de référence déclarée si elle bouge, sinon le
+    // premier agrégat, sinon la zone la plus lourde.
+    const ref = (D.referentiel || []).find(r => r.indicator_id === rows[0].indicator_id);
+    const repere = agregats.find(a => a.geo === ref?.geo_reference) || agregats[0] || retenues[0] || cur[0];
+    // Le sens du signal est celui du mouvement majoritaire des zones
+    // (ou du repère quand il n'y a pas de zones), signé par sens_favorable.
+    const porteur = nZ ? { ...cur[0], glissement_annuel_pct: sensMajoritaire, variation_periode_pct: sensMajoritaire } : repere;
+    // L'étendue se lit sur les zones qui PÈSENT : sur les marginales, elle
+    // n'est qu'un palmarès de petits nombres (Laos +989 %, Algérie +23 200 %).
+    const ampleur = a => Number(a.glissement_annuel_pct ?? a.variation_periode_pct ?? 0);
+    const bornes = [...(retenues.length >= 2 ? retenues : zones)].sort((x, y) => ampleur(x) - ampleur(y));
+    ensembles.push({ rows, periode, cur, anciens, agregats, zones, retenues, ecartees, hausses, baisses,
+      qualificatif, contreCourant, contreMarginales, repere, porteur, min: bornes[0], max: bornes[bornes.length - 1] });
+  }
+
+  const nSignaux = simples.length + ensembles.length;
+  const nDefav = [...simples, ...ensembles.map(e => e.porteur)]
+    .filter(a => a && a.diffusable !== false && sensMouvement(D, a) === "defavorable").length;
 
   return (
     <div className="carte">
       <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 4 }}>
         Mouvements inhabituels{" "}
         <span className="etq e-gris">
-          {nMouvements} mouvement{nMouvements > 1 ? "s" : ""}{nDefav ? ` · ${nDefav} défavorable${nDefav > 1 ? "s" : ""}` : ""}
+          {nSignaux} signa{nSignaux > 1 ? "ux" : "l"}{nDefav ? ` · ${nDefav} défavorable${nDefav > 1 ? "s" : ""}` : ""}
+          {liste.length > nSignaux ? ` · ${liste.length} mouvements détectés` : ""}
         </span>
       </div>
-      {simples.flat().map(ligne)}
-      {groupes.map((rows, gi) => {
-        const { retenues, ecartees, laPlusLourde } = syntheseZones(D, rows);
-        const l = laPlusLourde;
-        const lis = l ? valeurLisible(l.value, l.unit) : null;
+      {simples.map(ligne)}
+      {ensembles.map((e, gi) => {
+        const r = e.repere;
+        const lis = r ? valeurLisible(r.value, r.unit) : null;
+        const sens = sensMouvement(D, e.porteur);
         return (
-          <div className="alerte" key={"g" + gi}>
-            <span className="a-pt" style={{ background: l && l.diffusable ? PT[sensMouvement(D, l)] : "#98a2b3" }} />
+          <div className="alerte" key={"e" + gi}>
+            <span className="a-pt" style={{ background: PT[sens] }} />
             <div>
               <div>
-                <strong>{rows[0].indicator_id}</strong> · {rows[0].indicator_label} : géographie en
-                mouvement : <strong>{retenues.length}</strong> zone{retenues.length > 1 ? "s" : ""} pesant
-                ≥ {SEUIL_POIDS_PCT} % du flux à amplitude inhabituelle
-                {l && <>, la plus lourde {nomZone(l.geo)} ({pct(l.glissement_annuel_pct ?? l.variation_periode_pct)},
-                  {" "}{lis.val} {lis.unit})</>}{" "}
-                {chipsQV(rows[0].indicator_id)}
+                <strong>{e.rows[0].indicator_id}</strong> · {e.rows[0].indicator_label} · {e.periode} :{" "}
+                <strong>{e.qualificatif}</strong>
+                {r && estAgregat(r.geo) && <>, {nomZone(r.geo)}{" "}
+                  <span className={clsVar(r.glissement_annuel_pct ?? r.variation_periode_pct)}>{varDe(r)}</span>
+                  {lis && lis.val ? <> ({lis.val} {lis.unit})</> : null}</>}{" "}
+                <span className={"etq " + SENS_ETQ[sens][0]}>{SENS_ETQ[sens][1]}</span> {chipsQV(e.rows[0].indicator_id)}
               </div>
               <div className="a-m">
-                {ecartees > 0 && <>{ecartees} zone{ecartees > 1 ? "s" : ""} marginale{ecartees > 1 ? "s" : ""} (&lt; {SEUIL_POIDS_PCT} % du
-                flux chacune) écartée{ecartees > 1 ? "s" : ""} : trop petites pour peser, elles ne font pas un signal.{" "}</>}
-                Le déplacement se lit en points de part dans la{" "}
-                <span className="src-inline" onClick={() => navigate("/qv/" + rows[0].sector_code)}>
-                  dynamique géographique (QV3) ↗
-                </span>
+                {e.zones.length > 0 && <>
+                  {e.hausses > 0 && `${e.hausses} zone${e.hausses > 1 ? "s" : ""} en hausse`}
+                  {e.hausses > 0 && e.baisses > 0 && ", "}
+                  {e.baisses > 0 && `${e.baisses} en baisse`}
+                  {e.retenues.length > 0 && <> · {e.retenues.length} zone{e.retenues.length > 1 ? "s" : ""} pesant ≥ {SEUIL_POIDS_PCT} % du flux
+                    {e.retenues[0] && <>, la plus lourde {nomZone(e.retenues[0].geo)} ({varDe(e.retenues[0])})</>}
+                    {e.retenues.length > 1 && e.min && e.max && <>, de {varDe(e.min)} ({nomZone(e.min.geo)}) à {varDe(e.max)} ({nomZone(e.max.geo)})</>}</>}
+                  {e.ecartees > 0 && <> · {e.ecartees} zone{e.ecartees > 1 ? "s" : ""} marginale{e.ecartees > 1 ? "s" : ""} (&lt; {SEUIL_POIDS_PCT} %) écartée{e.ecartees > 1 ? "s" : ""}, trop petite{e.ecartees > 1 ? "s" : ""} pour peser</>}
+                  .
+                </>}
+                {e.agregats.length > 1 && <> {e.agregats.length} agrégats en mouvement (hors décompte des zones).</>}
+                {e.anciens.length > 0 && <> {e.anciens.length} zone{e.anciens.length > 1 ? "s" : ""} dont la dernière observation est antérieure à {e.periode}, non comptée{e.anciens.length > 1 ? "s" : ""}.</>}
               </div>
+              {(e.contreCourant.length > 0 || e.contreMarginales > 0) && (
+                <div className="a-m" style={{ color: "var(--ambre)" }}>
+                  À contre-courant :{" "}
+                  {e.contreCourant.length > 0 && <>{e.contreCourant.map(a => `${nomZone(a.geo)} (${varDe(a)})`).join(", ")}, qui pèse{e.contreCourant.length > 1 ? "nt" : ""}</>}
+                  {e.contreCourant.length > 0 && e.contreMarginales > 0 && " ; "}
+                  {e.contreMarginales > 0 && <>{e.contreMarginales} zone{e.contreMarginales > 1 ? "s" : ""} marginale{e.contreMarginales > 1 ? "s" : ""} (&lt; {SEUIL_POIDS_PCT} %)</>}.
+                </div>
+              )}
+              {e.zones.length > 0 && (
+                <div className="a-m">
+                  Le déplacement se lit en points de part dans la{" "}
+                  <span className="src-inline" onClick={() => navigate("/qv/" + e.rows[0].sector_code)}>
+                    dynamique géographique (QV3) ↗
+                  </span>
+                </div>
+              )}
               <details style={{ marginTop: 4 }}>
                 <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--gris)" }}>
-                  les {retenues.length} zones pesantes, par poids décroissant
+                  les {e.rows.length} mouvements détectés : agrégats, puis zones par poids décroissant
                 </summary>
-                <div style={{ marginTop: 6 }}>{retenues.map(ligne)}</div>
+                <div style={{ marginTop: 6 }}>
+                  {[...e.agregats, ...e.retenues, ...e.zones.filter(a => !e.retenues.includes(a)), ...e.anciens].map(ligne)}
+                </div>
               </details>
             </div>
           </div>
@@ -189,9 +259,10 @@ export function Alertes({ code }) {
       })}
       <div className="note">
         Un mouvement est dit « inhabituel » quand il dépasse le seuil calibré sur l'historique
-        de sa propre série. Vert : le mouvement est favorable ; rouge : défavorable. Un mouvement
-        « retenu » n'est pas caché, son motif est affiché. Les zones trop petites pour peser sont
-        écartées et comptées.
+        de sa propre série. Vert : le mouvement est favorable ; rouge : défavorable. Au-delà de
+        trois mouvements sur un même indicateur, ils sont énoncés en un signal, dépliable ; les
+        zones à contre-courant sont nommées. Un mouvement « retenu » n'est pas caché, son motif
+        est affiché. Les zones trop petites pour peser sont écartées et comptées.
       </div>
     </div>
   );
