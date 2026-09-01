@@ -147,3 +147,14 @@ neuf critères du protocole OSINT ; pour la presse, deux tris (exploitable en r�
 puis utile : parle de l'étage adressable, non recouverte), deux fils par marché ; 21 testés,
 8 retenus le 26.08 ; écartés motivés dans `flux_sources.note`. À dire honnêtement au rapport :
 la reconnaissance a porté sur des fils connus et testés, pas sur un recensement exhaustif.
+
+## 01.09.2026 (suite 5) — Le lien vers l'article, absent de l'écran des événements
+
+Question de l'étudiant sur capture : « je n'ai aucun moyen de remonter à la source pour lire
+l'article ». Exact : l'API servait déjà `titre` et `url` de l'item (`evenements_recents`),
+le composant `Evenements` de `Secteur.jsx` ne les affichait pas — et sa note disait « chaque
+événement reste rattaché à son article source ». Vrai en base, faux à l'écran : même famille
+de défaut que le commentaire du nœud de contrôles (suite 3). Corrigé : titre de l'article en
+lien (nouvel onglet), domaine de la source ; note réécrite (« lecture sur le titre seul ; le
+résumé est celui du modèle, l'article lié est la source et fait foi »). 309/309 événements
+éligibles ont une URL. Reconstruit, captures régénérées.

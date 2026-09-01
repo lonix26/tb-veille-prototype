@@ -1006,6 +1006,8 @@ export default function Secteur() {
 // badgé « non relu » tant qu'aucun humain n'a tranché — jamais servi
 // comme fait établi. Route réelle : cette page (Secteur), pas Marche —
 // leçon du 31.08 : Marche.jsx n'est plus routée depuis la v9.
+const domaine = u => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return null; } };
+
 function Evenements({ code }) {
   const { D } = useDonnees();
   const types = (D?.evenements_types || []).filter(v => v.sector_code === code);
@@ -1039,13 +1041,23 @@ function Evenements({ code }) {
               <strong>{e.acteur || "acteur non précisé"}</strong>{e.zone ? <> · {e.zone}</> : null} · {dateCH(e.date_publication)}
             </div>
             <div className="a-m">{e.resume} <BadgeEvenement e={e} /></div>
+            {/* Le lien vers l'article est ce qui permet de juger sur pièce : le résumé
+                est celui d'un modèle non relu, l'article est la source. Sans ce lien,
+                « rattaché à son article » n'était vrai qu'en base (constat du 01.09). */}
+            {e.url && (
+              <div className="a-m" style={{ marginTop: 2 }}>
+                <a href={e.url} target="_blank" rel="noopener noreferrer">{e.titre || "ouvrir l'article"} ↗</a>
+                {domaine(e.url) && <span style={{ color: "var(--gris)" }}> · {domaine(e.url)}</span>}
+              </div>
+            )}
           </div>
         </div>
       ))}
       <div className="note">
         Événements extraits des items de flux jugés pertinents au triage, par un modèle de
-        lecture unique. Chaque événement reste rattaché à son article source et porte son
-        statut de relecture. Un décompte d'événements n'est pas une statistique officielle :
+        lecture unique, sur le titre seul. Le résumé est celui du modèle ; l'article lié
+        est la source, et c'est lui qui fait foi. Chaque événement porte son statut de
+        relecture. Un décompte d'événements n'est pas une statistique officielle :
         c'est ce que la presse professionnelle a rapporté.
       </div>
     </div>
