@@ -187,3 +187,44 @@ pas « non exercée », elle était impossible.
   explicite (« aucun humain ne l'a relue ») ; onglet Méthode réécrit ; note du tamis complétée.
 - `CLAUDE.md` : phrase « seuls les validés sont servis » remplacée par le régime du 31.08.
 - Reste au rapport (§ 5.C.1 de l'évaluation) : C4 l. 94 et § 12.5, inventaire § 7.2.2.
+
+## 02.09.2026 (suite) — A2 : le déploiement décrit doit être celui qui marche
+
+**A2 — `DEPLOIEMENT.md` omettait ce qu'un clone neuf ne peut pas deviner, et cinq fichiers de
+workflows ne portaient pas l'identifiant de l'instance (B-2, B-3 du tour « jury »).**
+
+- **Pièce d'audit avant réimport.** La version d'`extraction_composite_A2` en service
+  (`updatedAt 2026-08-17T13:45:15`, celle qui a produit les runs 51-58) ne correspondait à
+  **aucun commit** : sept nœuds diffèrent même de `8f69aa0`. Les correctifs du 17.08 n'avaient
+  jamais été importés, et le fichier corrigé n'a produit aucun run. Elle est exportée telle quelle
+  dans `n8n_workflows/archive/extraction_composite_A2_en_service_2026-08-17.json` (README à côté ;
+  dossier hors boucle d'import par construction, la boucle prenant `n8n_workflows/*.json`).
+- **Identifiants alignés sur l'instance**, pas l'inverse — la CLI n8n ne supprime pas de
+  workflow et l'historique d'exécution est attaché à l'identifiant : `extraction_composite_A2`
+  → `0ay3mDuTGTSporSW`, `extraction_composite_A1_ccfa` → `QSCRx2ogbAts5eVZ`,
+  `extraction_composite_CP` → `PNd16YrFSehKUDIR`, `extraction_signal_qualitatif` →
+  `VoDfbXcbAS4JoNxf`, `collecte_a5_eurostat_pilote` → `wI6EHIFdDk4lMpKl`. Les cinq réimportés :
+  toujours 21 workflows dans l'instance (aucun doublon) ; A2 comparée nœud par nœud entre le
+  fichier et l'instance après import : 0 différence.
+- **`DEPLOIEMENT.md` réécrit** aux endroits faux ou muets : § 1 en trois sous-sections (`.env`
+  du compose avec `cp .env.example .env` et `mkdir -p data/staging` ; fichier de clés avec les
+  **neuf** variables lues par les workflows et ce que chacune conditionne ; les **deux
+  *credentials*** n8n par identifiant, `QdVRYX9pjTj9C8G3` Postgres dans 23 fichiers et
+  `comtradeKeyCred1` pour A4/H1/H3/M1/S6 — voie testée : création à l'interface puis `sed` ;
+  voie `import:credentials` signalée **non testée**, faute d'instance vierge). § 2 : 8 fonctions
+  propres, pas 44 (36 sont celles de `pgcrypto`). § 3 : `npm ci` justifié par le verrou, sept
+  écrans (onze rendus) et non huit, Node non épinglé (v24.19.0 sur le poste). § 4 : import par le
+  volume `/workflows` en lecture seule, `publish:workflow` à la place d'`update:workflow
+  --active` (procédure réellement employée), et l'écart 26 fichiers / 21 importés nommé —
+  renvoyé à A9. § 5 : « 30 indicateurs » remplacé par un renvoi à `v_bindings_actifs`. § 6
+  recalculé par requête : certifiés sans liaison = **cinq** (A1, A2, **H2** requalifié composite
+  le 30.08, H4, S1) ; fenêtre figée = **31 lignes par construction** (A3 ×15, A11 ×16, un
+  millésime IEA chacune) une fois exclus les faux positifs `"filter": "top"` de M4 (142) et H12
+  (144) ; fraîcheur = A2, T12, T13 ; `en_grille` = en vitrine (38), non « certifiés + à confirmer »
+  (51). Acte humain 2 mis au régime du 31.08.
+- `.env.example` : ne prétend plus que les clés vivent « dans n8n » ni que la collecte hard data
+  « n'en requiert aucune » (Comtrade en exige une) ; documente `CLES_API_FICHIER` et le contenu
+  attendu du fichier de clés. `README.md` : « Docker et rien d'autre » corrigé.
+- **Non fait, et dit** : aucune reconstruction sur poste vierge n'a été rejouée pour valider la
+  séquence de bout en bout ; ce que le document affirme comme vérifié l'est sur l'instance en
+  service (import, publication, requêtes), pas sur un clone neuf.

@@ -1,5 +1,5 @@
 {
-  "id": "collecteA5PiloteV0",
+  "id": "wI6EHIFdDk4lMpKl",
   "name": "Veille - Collecte A5 (Eurostat, pilote de la tranche verticale)",
   "meta": {
     "description": "Tranche verticale sur un indicateur : A5, production industrielle automobile UE (Eurostat, NACE C29, mensuelle). Chaîne complète et sans intervention humaine — ouverture de run, appel d'API, dépôt brut, normalisation JSON-stat, contrôles déterministes, écriture en base avec statut et référence d'audit, clôture de run. Pipeline ETL : aucun modèle de langage n'intervient, conformément à l'usage différencié du § 13.1."

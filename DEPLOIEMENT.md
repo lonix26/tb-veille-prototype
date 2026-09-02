@@ -1,6 +1,8 @@
 # Déploiement du dispositif — séquence complète
 
-*Écrit le 25.08.2026, après le portage intégral de la collecte vers l'orchestrateur.*
+*Écrit le 25.08.2026, après le portage intégral de la collecte vers l'orchestrateur. Révisé le
+02.09.2026 (correction A2 du tour « jury ») : prérequis complétés, identifiants alignés sur
+l'instance, valeurs attendues du § 6 recalculées par requête.*
 
 **Ce document répond à une seule question : que faut-il faire pour que, dans trois mois, tous les
 indicateurs se mettent à jour ?** Réponse courte — déployer le compose, rejouer les migrations,
@@ -10,18 +12,65 @@ importer les workflows, les lancer dans l'ordre. Aucun script n'intervient dans 
 
 ## 1. Prérequis
 
-```bash
-# Les clés vivent HORS du dossier du travail : il part chaque jour vers le Drive.
-cat ~/.config/veille_tb/cles.env     # permissions 600
-```
+Ce qu'il faut sur le poste : **Docker** avec le greffon compose, et **Node.js** (v24.19.0 sur le
+poste de développement ; la version n'est pas épinglée par `package.json`) pour construire
+l'interface (§ 3). Rien d'autre n'est installé hors conteneur.
 
-Le fichier doit porter au minimum `GOOGLE_API_KEY` et `MODELE_GOOGLE` (triage et lecture
-décisionnelle), `ANTHROPIC_API_KEY` et `MODELE_ANTHROPIC` (commentaire exécutif), et le
-mot de passe de la base. Le `docker-compose.yml` le lit ; **aucune clé n'est dans le dépôt**.
+### 1.1 Le `.env` du compose — dans `prototype/`, jamais versionné
 
 ```bash
 cd prototype
-docker compose up -d          # base, orchestrateur, service statique de restitution
+cp .env.example .env         # puis renseigner POSTGRES_PASSWORD et CLES_API_FICHIER
+mkdir -p data/staging        # zone de dépôt brut montée sur /data (exclue du dépôt)
+```
+
+`.env` ne porte que **deux choses** : le mot de passe de la base (`POSTGRES_PASSWORD`, exigé par le
+compose, sans valeur par défaut) et le **chemin** du fichier de clés (`CLES_API_FICHIER`). Le mot
+de passe n'est pas dans le fichier de clés : il est lu par le service `db`, et ressaisi une fois
+dans la *credential* Postgres de n8n (§ 1.3).
+
+### 1.2 Le fichier de clés — HORS du dossier du travail
+
+```bash
+cat ~/.config/veille_tb/cles.env     # permissions 600 ; le dossier du TB part chaque jour vers le Drive
+```
+
+Le compose le monte en `env_file` du service n8n. Les workflows lisent **neuf** variables
+d'environnement, toutes optionnelles au sens strict — un workflow dont la clé manque échoue à
+l'appel, il ne se dégrade pas en silence :
+
+| Variable | Lue par | Nécessaire pour |
+|---|---|---|
+| `GOOGLE_API_KEY`, `MODELE_GOOGLE` | triage, lecture décisionnelle, extraction composite, couche 0 | la chaîne quotidienne (§ 5, étapes 6-7) |
+| `ANTHROPIC_API_KEY`, `MODELE_ANTHROPIC` | commentaire exécutif, lecture transversale, extraction composite, couche 0 | la chaîne quotidienne (étape 9) |
+| `OPENAI_API_KEY`, `MODELE_OPENAI` | extraction composite (A1, A2, CP), signal qualitatif, couche 0 | le consensus multi-modèles seulement |
+| `PERPLEXITY_API_KEY`, `MODELE_PERPLEXITY` | couche 0 (`decouverte_sources_multi_ia`) | la découverte de sources seulement |
+| `TRIAGE_DOCTRINE` | triage (`triage_ia_flux`) | facultative : `evenement` ou, par défaut, `signal` |
+
+Valeurs de modèle en service à la date de révision : préfixe `gemini` pour Google ; les autres
+sont dans le fichier, pas ici. **Aucune clé n'est dans le dépôt** ; `.gitignore` exclut `.env`,
+`data/` et les sauvegardes n8n (`*.tar.gz`, qui contiennent la clé de chiffrement des
+*credentials*).
+
+### 1.3 Les deux *credentials* n8n — à créer une fois, avec leur identifiant
+
+Les fichiers de workflows référencent deux *credentials* **par identifiant**. Sans elles, l'import
+passe mais chaque nœud Postgres ou Comtrade échoue à l'exécution :
+
+| Identifiant dans les fichiers | Nom | Type | Fichiers | Contenu |
+|---|---|---|---|---|
+| `QdVRYX9pjTj9C8G3` | `postgres veille` | Postgres | 23 workflows | hôte `db`, port 5432, base/utilisateur/mot de passe du `.env` |
+| `comtradeKeyCred1` | `comtrade subscription` | *Header Auth* | `collecte_generique` (A4, H1, H3, M1, S6) | en-tête `Ocp-Apim-Subscription-Key`, clé gratuite du portail UN Comtrade |
+
+Deux voies. **Voie testée sur l'instance en service** : créer les deux *credentials* dans
+l'interface n8n (`http://127.0.0.1:5678`), relever leurs identifiants dans l'URL, puis les
+substituer dans les fichiers avant l'import (`sed -i 's/QdVRYX9pjTj9C8G3/<id>/' n8n_workflows/*.json`).
+**Voie non testée sur instance neuve** : `n8n import:credentials --input=<fichier>` accepte un
+JSON portant `id`, `name`, `type` et `data` en clair, qu'il chiffre à l'import — elle
+préserverait les identifiants tels quels ; elle n'a pas été rejouée ici, faute d'instance vierge.
+
+```bash
+docker compose up -d          # base, orchestrateur, service statique de restitution, adminer
 ```
 
 ## 2. Schéma et référentiel — rien à lancer
@@ -32,7 +81,7 @@ PostgreSQL exécute lui-même les deux fichiers, dans l'ordre de leur nom.
 
 | Fichier | Ce qu'il pose |
 |---|---|
-| `db/01_socle.sql` | 31 tables (dont 4 du schéma `sandbox`), 44 vues, 4 déclencheurs, 44 fonctions, les contraintes métier et leurs commentaires |
+| `db/01_socle.sql` | 31 tables (27 en `public`, 4 en `sandbox`), 44 vues, 4 déclencheurs, 8 fonctions propres (les 36 autres du schéma sont celles de l'extension `pgcrypto`), les contraintes métier et leurs commentaires |
 | `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 28 sources, 51 indicateurs, 120 liaisons dont 103 actives, 24 flux avec leur statut, 1 règle de filtrage du triage |
 
 Une base neuve repart donc dans l'**état qualifié** — pas dans un état par défaut qu'il faudrait
@@ -76,36 +125,49 @@ un dossier **exclu du dépôt** (c'est un produit de compilation, pas une source
 
 ```bash
 cd dashboard-app
-npm ci            # ou npm install au premier jet
+npm ci            # installe exactement package-lock.json ; npm install seulement si le verrou est absent
 npm run build     # produit dashboard-app/dist, servi tel quel par nginx
 cd ..
 ```
 
-Puis, une fois l'API de restitution active (étape suivante), vérifier que les huit écrans se
-rendent réellement — un écran qui plante ne se voit qu'en l'ouvrant, et on n'ouvre que celui
-qu'on vient d'écrire :
+Puis, une fois l'API de restitution active (étape suivante), vérifier que les **sept écrans**
+(vue d'ensemble, actions, anticiper, secteur — instancié pour les quatre secteurs et le socle
+transversal —, référentiel, exécutions, fiabilité) se rendent réellement — un écran qui plante ne
+se voit qu'en l'ouvrant, et on n'ouvre que celui qu'on vient d'écrire :
 
 ```bash
 bash dashboard-app/verification/executer.sh
 ```
 
-Il rend chaque écran hors navigateur avec les données réelles de l'API et sort en erreur si
-l'un d'eux lève une exception.
+Il rend chaque écran hors navigateur avec les données réelles de l'API (onze rendus, l'écran
+secteur comptant cinq fois) et sort en erreur si l'un d'eux lève une exception.
 
 ## 4. Importer les workflows
 
 ```bash
-for f in n8n_workflows/*.json; do
-  docker cp "$f" veille_n8n:/tmp/w.json
-  docker exec veille_n8n n8n import:workflow --input=/tmp/w.json
-done
-docker exec veille_n8n n8n update:workflow --id=apiRestitutionV4 --active=true
+for f in n8n_workflows/*.json; do            # la racine seulement : archive/ est exclu par construction
+  docker exec veille_n8n n8n import:workflow --input="/workflows/$(basename "$f")"
+done                                          # ./n8n_workflows est monté en lecture seule sur /workflows
+docker exec veille_n8n n8n publish:workflow --id=apiRestitutionV4
 docker compose restart n8n        # INDISPENSABLE : sans redémarrage, les webhooks
                                   # ne sont pas enregistrés et l'API répond 404
 ```
 
 Chaque fichier porte son **identifiant épinglé** : l'import met à jour en place et ne crée pas de
-copie. Sans cela, l'instance accumule des doublons et rien ne dit lequel s'exécute.
+copie. Sans cela, l'instance accumule des doublons et rien ne dit lequel s'exécute. Cette
+promesse n'était tenue qu'en partie jusqu'au 02.09.2026 : cinq fichiers (`extraction_composite_A2`,
+`extraction_composite_A1_ccfa`, `extraction_composite_CP`, `extraction_signal_qualitatif`,
+`collecte_a5_eurostat_pilote`) portaient un identifiant différent de celui de l'instance, si
+bien qu'un réimport aurait créé un doublon — ou, pour A2, ne l'a jamais été : la version qui a
+produit les runs 51-58 ne correspondait à aucun commit. Elle est archivée telle quelle dans
+`n8n_workflows/archive/` (pièce d'audit, hors boucle d'import) ; les cinq identifiants sont
+alignés sur l'instance depuis le 02.09 et le réimport a été vérifié (21 workflows, aucun doublon,
+A2 identique nœud pour nœud entre le fichier et l'instance).
+
+Les 26 fichiers de la racine s'importent ; 21 sont présents dans l'instance en service. Les cinq
+autres (`collecte_a5_multi_geo`, `collecte_hard_data`, `collecte_m2_eurostat`,
+`extraction_composite_multi_ia`, `scenario_c_agent_autonome`) sont des états antérieurs ou des
+artefacts de laboratoire, à archiver (correction A9 du tour « jury »).
 
 ## 5. Lancer la chaîne, dans cet ordre
 
@@ -114,7 +176,7 @@ enrichis, le commentaire a besoin des indicateurs.
 
 | # | Workflow | Ce qu'il alimente |
 |---|---|---|
-| 1 | `collecteGeneriqueV2` | 30 indicateurs — API et fichiers plats |
+| 1 | `collecteGeneriqueV2` | les indicateurs à liaison active — API et fichiers plats (le décompte fait foi par `v_bindings_actifs`, pas ici) |
 | 2 | `collecteXlsxIndexeV1` | S4, T3 — classeurs derrière une page d'index |
 | 3 | `collecteFhV1` | H7, H8, H9 — document tabulaire de la Fédération horlogère |
 | 4 | `collecteFluxV1` | `flux_items` — quatre familles de flux |
@@ -145,9 +207,11 @@ SELECT run_id, status, left(note, 90) FROM runs ORDER BY run_id DESC LIMIT 12;
 SELECT * FROM v_bilan_referentiel;
 
 -- Indicateurs certifiés sans aucune liaison active : ils ne collecteront jamais.
--- Au 25.08.2026, quatre sont attendus dans ce résultat, et aucun autre :
---   A2  composite ACEA — alimenté par `composite_queue`, pas par une liaison (doctrine)
+-- Au 02.09.2026 (recalculé par cette requête), CINQ sont attendus, et aucun autre :
 --   A1  production mondiale de véhicules — source non encore liée
+--   A2  composite ACEA — alimenté par `composite_queue`, pas par une liaison (doctrine)
+--   H2  exportations horlogères — requalifié composite le 30.08 (lecture du document FH),
+--       ses liaisons STATENT (runs 43-161) sont closes
 --   H4  brevets horlogers CIB G04 — en attente d'un accès OEB (portail OPS hors service)
 --   S1  commandes et livraisons d'avions — requalification en composite à trancher
 -- Tout autre indicateur qui apparaît ici est une régression.
@@ -156,13 +220,20 @@ WHERE i.status = 'certifie'
   AND NOT EXISTS (SELECT 1 FROM v_bindings_actifs b WHERE b.indicator_id = i.indicator_id);
 
 -- Liaisons actives à fenêtre FIGÉE : elles rapporteront toujours la même période.
--- Au 25.08.2026, DEUX sont attendues et aucune autre : les liaisons A3 24 et 27
--- (éditions IEA 2023 et 2024), qui portent des années closes et ne bougeront plus.
+-- Au 02.09.2026 (recalculé), 31 lignes sont attendues, toutes par construction :
+--   A3   15 liaisons (24 à 123) — une par millésime de l'IEA Global EV Data Explorer
+--   A11  16 liaisons (124 à 139) — idem, part électrique des ventes, 2010 à 2025
+-- Ces éditions portent des années closes et ne bougeront plus ; c'est le millésime
+-- suivant qu'il faut AJOUTER, pas ces lignes qu'il faut corriger.
+-- Le filtre sur "top" écarte deux faux positifs : M4 (142) et H12 (144) portent
+-- `"filter": "top"` (paramètre OFS PX-Web), pas une année figée.
 -- Toute autre ligne est une liaison qui a cessé d'avancer sans le dire — c'est
 -- exactement le défaut trouvé le 25.08 sur H1, A3, H2 et M4.
 SELECT binding_id, indicator_id, left(params::text, 70)
 FROM source_bindings
-WHERE statut = 'actif' AND params::text !~ '\{\{' AND params::text ~ '"(year|Jahr)"';
+WHERE statut = 'actif' AND params::text !~ '\{\{' AND params::text ~ '"(year|Jahr)"'
+  AND params::text !~ '"filter": *"top"'
+ORDER BY indicator_id, binding_id;
 
 -- LE CONTRÔLE QUI COMPTE VRAIMENT : la chaîne produit-elle tout ce que la base
 -- contient déjà ? Un indicateur dont la chaîne rend une période plus ancienne que
@@ -176,11 +247,13 @@ SELECT t.indicator_id, t.p AS jamais_atteint, coalesce(c.p, '—') AS par_la_cha
 FROM tout t LEFT JOIN chaine c USING (indicator_id)
 WHERE c.indicator_id IS NULL OR c.p < t.p
 ORDER BY 1;
--- Attendu : A2 (composite, alimenté par composite_queue) et les indicateurs
--- écartés de la grille. Toute autre ligne est une régression à traiter.
+-- Attendu au 02.09.2026 (campagne depuis le run 150) : A2 (composite, alimenté par
+-- composite_queue) et T12, T13 (statut `restreint`, abandonnés le 24.08, observations
+-- conservées). Toute autre ligne est une régression à traiter.
 
--- Et le décompte de la grille, qui fait foi. `en_grille` = certifiés + à confirmer ;
--- `ecartes` = indicateurs restés au référentiel mais retirés de la grille.
+-- Et le décompte de la grille, qui fait foi. `en_grille` = indicateurs en vitrine
+-- (suivis et affichés, 38 au 02.09), ce qui n'est PAS certifiés + à confirmer (41 + 10) ;
+-- `ecartes` = indicateurs restés au référentiel mais hors vitrine (15).
 SELECT * FROM v_bilan_referentiel;
 ```
 
@@ -204,8 +277,10 @@ ce n'est pas une lacune du dispositif mais sa doctrine (§ 10.4).
    paramètres aient été vus en réponse réelle. La contrainte `chk_binding_verifie` l'impose en
    base, et les collecteurs lisent désormais ce statut — un flux non qualifié n'est pas collecté,
    et le workflow dit lequel et pourquoi.
-2. **La validation des commentaires.** Ils sortent au statut `a_valider` ; seuls les validés sont
-   servis par l'interface. Le rejet est un événement de l'historique, pas un effacement.
+2. **La validation des commentaires.** Ils sortent au statut `a_valider` ; depuis le 31.08.2026
+   l'interface les sert **avec leur statut** et badge en ambre ce qu'aucun humain n'a relu — la
+   règle antérieure « seuls les validés sont servis » n'est plus ce que l'API fait. Le rejet est
+   un événement de l'historique, pas un effacement.
 3. **L'examen des items de flux.** Le triage assisté par IA ordonne ; il ne décide pas. La
    promotion en signal est un acte nominatif et daté.
 4. **La validation des extractions composites.** La file `composite_queue` est alimentée par la

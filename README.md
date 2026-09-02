@@ -1,6 +1,6 @@
 # Prototype : système de veille économique semi-automatisée
 
-Sous-projet technique du Travail de Bachelor. Autonome : un clone propre démarre avec Docker et rien d'autre.
+Sous-projet technique du Travail de Bachelor. Autonome : un clone propre démarre avec Docker, Node.js pour construire l'interface, un fichier de clés d'API hors dossier et deux *credentials* n8n — la séquence complète est dans `DEPLOIEMENT.md`.
 
 ## Ce que c'est
 

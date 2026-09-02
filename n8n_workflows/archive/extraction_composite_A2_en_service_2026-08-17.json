@@ -1,6 +1,11 @@
 {
+  "updatedAt": "2026-08-17T13:45:15.238Z",
+  "createdAt": "2026-08-17T13:45:08.989Z",
   "id": "0ay3mDuTGTSporSW",
   "name": "Veille - Extraction composite A2 (multi-IA, human-in-the-loop)",
+  "description": null,
+  "active": false,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {},
@@ -8,9 +13,10 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        0,
-        400
-      ]
+        -1072,
+        -112
+      ],
+      "id": "1ac6fcb8-7d7a-4605-ad3a-1753af7a0a4d"
     },
     {
       "parameters": {
@@ -22,9 +28,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        200,
-        400
+        -864,
+        -112
       ],
+      "id": "f7d7164a-6032-4c0d-b96d-4e9c4074156c",
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -36,16 +43,16 @@
       "parameters": {
         "operation": "executeQuery",
         "query": "SELECT doc_id, indicator_id, period, geo, source_doc FROM composite_queue WHERE statut = 'a_traiter' ORDER BY period LIMIT 1;",
-        "options": {},
-        "additionalFields": {}
+        "options": {}
       },
       "name": "Prendre le prochain document",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        320,
-        550
+        -752,
+        48
       ],
+      "id": "3126b2fe-f328-44b0-b744-edd89798ba38",
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -62,29 +69,31 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        400
-      ]
+        -672,
+        -112
+      ],
+      "id": "4c372942-e923-42bb-939c-e2451608268f"
     },
     {
       "parameters": {
         "url": "={{ $json.source_doc }}",
         "options": {
-          "timeout": 60000,
           "response": {
             "response": {
               "responseFormat": "file"
             }
-          }
+          },
+          "timeout": 60000
         }
       },
       "name": "Télécharger le PDF ACEA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        600,
-        400
+        -464,
+        -112
       ],
+      "id": "b39aa1fc-eab7-4453-8699-a214c5eca845",
       "notes": "Document non structuré (communiqué ACEA en PDF). Récupéré tel quel, en binaire."
     },
     {
@@ -97,9 +106,10 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
-        800,
-        400
+        -272,
+        -112
       ],
+      "id": "023338a3-5664-4181-b749-d8b482584b5d",
       "notes": "Exigence E6 : le document source est conservé tel que reçu AVANT toute extraction."
     },
     {
@@ -111,22 +121,24 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        1000,
-        400
+        -64,
+        -112
       ],
+      "id": "163eb855-09b4-4ff5-907e-ff9e7ba2a1b5",
       "notes": "Extraction texte native n8n (pas de dépendance externe). Le même texte est soumis aux trois modèles : le consensus porte sur une entrée identique."
     },
     {
       "parameters": {
-        "jsCode": "// Construit le prompt d'extraction et le texte du document en une seule charge,\n// soumise à l'identique aux trois modèles (sauf consigne dégradée du modèle C en\n// mode désaccord). Chaque champ attendu est { valeur, extrait_source } : le\n// modèle doit recopier le fragment EXACT du document d'où provient la valeur, ce\n// qui rend la validation humaine une comparaison de secondes plutôt qu'une\n// relecture (§ 10.4.1, rang 2).\nconst t = $('Préparer tâche d\\'extraction').first().json;\nconst doc = $input.first().json.text || '';\n\nconst schema = {\n  periode:                 { valeur: '', extrait_source: '' },\n  immatriculations_ue_mois:{ valeur: '', extrait_source: '' },\n  part_bev_pct:            { valeur: '', extrait_source: '' }\n};\n\nconst consigne = `Tu es un extracteur de données. À partir du DOCUMENT ci-dessous (communiqué de presse ACEA sur les immatriculations de voitures neuves), renvoie STRICTEMENT un objet JSON valide conforme au SCHÉMA, sans aucun texte autour, sans balises de code.\nPour CHAQUE champ, renvoie un objet {\"valeur\": ..., \"extrait_source\": ...} où extrait_source est le fragment EXACT du document d'où provient la valeur, recopié à l'identique. Si une valeur est absente, écris \"ABSENT\" dans les deux champs. N'utilise AUCUNE source autre que le document.\nPrécisions de lecture :\n- periode : le mois de référence du communiqué, au format AAAA-MM.\n- immatriculations_ue_mois : le total des immatriculations de l'Union européenne pour le MOIS de référence — la ligne « EUROPEAN UNION » du tableau mensuel, colonne du total. Attention : cette ligne énumère d'abord des décomptes par motorisation (BEV, HEV, PHEV…) ; le total mensuel est la valeur suivie du total du même mois de l'année précédente puis d'une variation en pourcentage. Ce n'est PAS le premier nombre de la ligne (c'est le décompte BEV), et PAS le cumul annuel (year-to-date).\n- part_bev_pct : la part de marché des voitures 100% électriques à batterie, en pourcentage.\nSCHÉMA : ` + JSON.stringify(schema);\n\n// Variante dégradée pour le modèle C : on l'oriente vers le cumul annuel.\nconst consigne_C = t.mode_desaccord\n  ? consigne.replace('PAS le cumul annuel (year-to-date).', 'utilise le CUMUL ANNUEL (year-to-date) cumulé sur l\\'année.')\n  : consigne;\n\nconst enveloppe = (c) => c + '\\n\\nDOCUMENT :\\n' + doc;\n\nreturn [{ json: {\n  ...t,\n  prompt_A: enveloppe(consigne),\n  prompt_B: enveloppe(consigne),\n  prompt_C: enveloppe(consigne_C)\n} }];"
+        "jsCode": "// Construit le prompt d'extraction et le texte du document en une seule charge,\n// soumise à l'identique aux trois modèles (sauf consigne dégradée du modèle C en\n// mode désaccord). Chaque champ attendu est { valeur, extrait_source } : le\n// modèle doit recopier le fragment EXACT du document d'où provient la valeur, ce\n// qui rend la validation humaine une comparaison de secondes plutôt qu'une\n// relecture (§ 10.4.1, rang 2).\nconst t = $('Préparer tâche d\\'extraction').first().json;\nconst doc = $input.first().json.text || '';\n\nconst schema = {\n  periode:                 { valeur: '', extrait_source: '' },\n  immatriculations_ue_mois:{ valeur: '', extrait_source: '' },\n  part_bev_pct:            { valeur: '', extrait_source: '' }\n};\n\nconst consigne = `Tu es un extracteur de données. À partir du DOCUMENT ci-dessous (communiqué de presse ACEA sur les immatriculations de voitures neuves), renvoie STRICTEMENT un objet JSON valide conforme au SCHÉMA, sans aucun texte autour, sans balises de code.\nPour CHAQUE champ, renvoie un objet {\"valeur\": ..., \"extrait_source\": ...} où extrait_source est le fragment EXACT du document d'où provient la valeur, recopié à l'identique. Si une valeur est absente, écris \"ABSENT\" dans les deux champs. N'utilise AUCUNE source autre que le document.\nPrécisions de lecture :\n- periode : le mois de référence du communiqué, au format AAAA-MM.\n- immatriculations_ue_mois : le total des immatriculations de l'Union européenne pour le MOIS de référence — la ligne « EUROPEAN UNION » du tableau mensuel, colonne du total. PAS le cumul annuel (year-to-date).\n- part_bev_pct : la part de marché des voitures 100% électriques à batterie, en pourcentage.\nSCHÉMA : ` + JSON.stringify(schema);\n\n// Variante dégradée pour le modèle C : on l'oriente vers le cumul annuel.\nconst consigne_C = t.mode_desaccord\n  ? consigne.replace('PAS le cumul annuel (year-to-date).', 'utilise le CUMUL ANNUEL (year-to-date) cumulé sur l\\'année.')\n  : consigne;\n\nconst enveloppe = (c) => c + '\\n\\nDOCUMENT :\\n' + doc;\n\nreturn [{ json: {\n  ...t,\n  prompt_A: enveloppe(consigne),\n  prompt_B: enveloppe(consigne),\n  prompt_C: enveloppe(consigne_C)\n} }];"
       },
       "name": "Consolider le contexte",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1200,
-        400
-      ]
+        144,
+        -112
+      ],
+      "id": "5b5d8e38-f6f5-4744-825a-662d17f0c108"
     },
     {
       "parameters": {
@@ -149,16 +161,17 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt_A }] }) }}",
         "options": {
-          "timeout": 180000
+          "timeout": 90000
         }
       },
       "name": "Modèle A (OpenAI)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1400,
-        200
+        336,
+        -304
       ],
+      "id": "e0291c65-bf71-4578-b968-d63390105445",
       "onError": "continueRegularOutput"
     },
     {
@@ -186,16 +199,17 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'claude-opus-4-8', max_tokens: 1024, messages: [{ role: 'user', content: $('Consolider le contexte').first().json.prompt_B }] }) }}",
         "options": {
-          "timeout": 180000
+          "timeout": 90000
         }
       },
       "name": "Modèle B (Anthropic)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1400,
-        400
+        336,
+        -112
       ],
+      "id": "12c025ab-7c9a-4ce9-9f6d-144f60bd4190",
       "onError": "continueRegularOutput"
     },
     {
@@ -215,16 +229,17 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $('Consolider le contexte').first().json.prompt_C }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) }}",
         "options": {
-          "timeout": 180000
+          "timeout": 90000
         }
       },
       "name": "Modèle C (Google)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1400,
-        600
+        336,
+        96
       ],
+      "id": "66420f99-a944-4260-8a0c-0b69cc64ff25",
       "onError": "continueRegularOutput"
     },
     {
@@ -235,21 +250,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1600,
-        400
-      ]
+        544,
+        -112
+      ],
+      "id": "4a7e4028-a95b-4271-8b06-e96aa6280bb7"
     },
     {
       "parameters": {
-        "jsCode": "// Consensus champ par champ sur la VALEUR. Une valeur unanime mais sans extrait\n// vérifiable ne compte pas comme consensus : l'accord sur une affirmation\n// invérifiable n'est pas une preuve (§ 6.3). Le consensus est une heuristique de\n// priorisation, jamais une vérité — la hiérarchie reste vérité terrain, puis\n// consensus, puis validation humaine.\nconst j = $input.first().json;\nconst parsed = j.extractions.map(e => e.extraction || {});\nconst champs = ['periode', 'immatriculations_ue_mois', 'part_bev_pct'];\n\n// Le % est neutralisé : « 20 » et « 20% » sont la même valeur — le désaccord\n// constaté au run 57 entre ces deux formes était un artefact du contrôle,\n// pas un désaccord des modèles (corrigé le 17.08.2026).\nconst norm = (v) => String(v ?? '').trim().replace(/\\s|,|%/g, '').toLowerCase();\nlet accord = 0;\nconst detail = {};\nfor (const f of champs) {\n  const vals = parsed.map(p => norm(p[f]?.valeur ?? p[f]));\n  const extraits = parsed.map(p => String(p[f]?.extrait_source ?? '').trim());\n  const unanime = vals.every(v => v === vals[0] && v !== '' && v !== 'absent');\n  const tous_sources = extraits.every(e => e !== '' && e.toLowerCase() !== 'absent') || vals[0] === 'absent';\n  detail[f] = { valeurs: parsed.map(p => p[f]?.valeur ?? p[f] ?? null), extraits_source: extraits, unanime, tous_sources };\n  if (unanime && tous_sources) accord++;\n}\nconst consensus_score = champs.length ? accord / champs.length : 0;\nlet unanimous = consensus_score === 1;\n\n// Garde de concordance de période (17.08.2026) : la période extraite du\n// DOCUMENT doit être celle que la file ANNONCE. Un communiqué mal apparié\n// (décalage de nommage ACEA, cumul lu à la place du mensuel) écrirait une\n// valeur juste sous un mois faux — indétectable ensuite. En cas d'écart,\n// validation humaine forcée, jamais d'écriture directe.\nconst periodeExtraite = norm(parsed[0]?.periode?.valeur ?? parsed[0]?.periode);\nif (unanimous && periodeExtraite && periodeExtraite !== norm(j.period)) {\n  unanimous = false;\n  j.incidents = (j.incidents ?? []).concat('période extraite (' + periodeExtraite + ') != période attendue (' + j.period + ') — validation humaine forcée');\n}\n\n// Valeur pivot proposée : immatriculations mensuelles UE (numérique), si unanime.\nlet valeur_pivot = null;\nif (detail.immatriculations_ue_mois.unanime) {\n  const brut = String(parsed[0].immatriculations_ue_mois?.valeur ?? '').replace(/[^0-9]/g, '');\n  if (brut) valeur_pivot = Number(brut);\n}\n\nreturn [{ json: { ...j, consensus_score, unanimous, valeur_pivot, detail } }];"
+        "jsCode": "// Consensus champ par champ sur la VALEUR. Une valeur unanime mais sans extrait\n// vérifiable ne compte pas comme consensus : l'accord sur une affirmation\n// invérifiable n'est pas une preuve (§ 6.3). Le consensus est une heuristique de\n// priorisation, jamais une vérité — la hiérarchie reste vérité terrain, puis\n// consensus, puis validation humaine.\nconst j = $input.first().json;\nconst parsed = j.extractions.map(e => e.extraction || {});\nconst champs = ['periode', 'immatriculations_ue_mois', 'part_bev_pct'];\n\nconst norm = (v) => String(v ?? '').trim().replace(/\\s|,/g, '').toLowerCase();\nlet accord = 0;\nconst detail = {};\nfor (const f of champs) {\n  const vals = parsed.map(p => norm(p[f]?.valeur ?? p[f]));\n  const extraits = parsed.map(p => String(p[f]?.extrait_source ?? '').trim());\n  const unanime = vals.every(v => v === vals[0] && v !== '' && v !== 'absent');\n  const tous_sources = extraits.every(e => e !== '' && e.toLowerCase() !== 'absent') || vals[0] === 'absent';\n  detail[f] = { valeurs: parsed.map(p => p[f]?.valeur ?? p[f] ?? null), extraits_source: extraits, unanime, tous_sources };\n  if (unanime && tous_sources) accord++;\n}\nconst consensus_score = champs.length ? accord / champs.length : 0;\nlet unanimous = consensus_score === 1;\n\n// Garde de concordance de période (17.08.2026) : la période extraite du\n// DOCUMENT doit être celle que la file ANNONCE. Un communiqué mal apparié\n// (décalage de nommage ACEA, cumul lu à la place du mensuel) écrirait une\n// valeur juste sous un mois faux — indétectable ensuite. En cas d'écart,\n// validation humaine forcée, jamais d'écriture directe.\nconst periodeExtraite = norm(parsed[0]?.periode?.valeur ?? parsed[0]?.periode);\nif (unanimous && periodeExtraite && periodeExtraite !== norm(j.period)) {\n  unanimous = false;\n  j.incidents = (j.incidents ?? []).concat('période extraite (' + periodeExtraite + ') != période attendue (' + j.period + ') — validation humaine forcée');\n}\n\n// Valeur pivot proposée : immatriculations mensuelles UE (numérique), si unanime.\nlet valeur_pivot = null;\nif (detail.immatriculations_ue_mois.unanime) {\n  const brut = String(parsed[0].immatriculations_ue_mois?.valeur ?? '').replace(/[^0-9]/g, '');\n  if (brut) valeur_pivot = Number(brut);\n}\n\nreturn [{ json: { ...j, consensus_score, unanimous, valeur_pivot, detail } }];"
       },
       "name": "Contrôle de consistance",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1800,
-        400
-      ]
+        736,
+        -112
+      ],
+      "id": "99543504-426f-4bf8-a4e9-bb66da81bb6f"
     },
     {
       "parameters": {
@@ -266,9 +283,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        2000,
-        400
-      ]
+        944,
+        -112
+      ],
+      "id": "b936d694-6472-411e-9563-e08bf9b20cbf"
     },
     {
       "parameters": {
@@ -276,16 +294,16 @@
         "query": "INSERT INTO indicator_values (indicator_id, run_id, period, geo, value, obtained_by, validation_status, consensus_score, raw_ref)\nVALUES ($1, $2, $3, $4, $5, 'ia_extraction', 'pre_valide_consensus', $6, $7)\nON CONFLICT (indicator_id, run_id, period, geo) DO NOTHING\nRETURNING value_id;",
         "options": {
           "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, $json.valeur_pivot, $json.consensus_score, $json.raw_ref] }}"
-        },
-        "additionalFields": {}
+        }
       },
       "name": "Écrire pré-validé (consensus)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2250,
-        250
+        1200,
+        -256
       ],
+      "id": "d3dcb6d4-e1a4-4f3b-bb82-662b3abcb663",
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -299,16 +317,16 @@
         "query": "INSERT INTO validation_queue (indicator_id, run_id, period, geo, extractions, consensus_score, source_doc, raw_ref)\nVALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)\nRETURNING item_id;",
         "options": {
           "queryReplacement": "={{ [$json.indicator_id, $json.run_id, $json.period, $json.geo, JSON.stringify({detail: $json.detail, extractions: $json.extractions, incidents: $json.incidents}), $json.consensus_score, $json.source_doc, $json.raw_ref] }}"
-        },
-        "additionalFields": {}
+        }
       },
       "name": "File de validation humaine",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2250,
-        550
+        1200,
+        48
       ],
+      "id": "b8ad71a1-8a5b-4caa-81dd-c5f42b44bcfd",
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -322,16 +340,16 @@
         "query": "UPDATE runs SET status = CASE WHEN $2::numeric = 1 THEN 'ok' ELSE 'partiel' END,\n    closed_at = now(),\n    note = 'Extraction composite A2 — consensus ' || round($2::numeric*100) || '%, ' ||\n           CASE WHEN $2::numeric = 1 THEN 'pré-validé (indicator_values)' ELSE 'routé en file de validation humaine' END\nWHERE run_id = $1;",
         "options": {
           "queryReplacement": "={{ [$('Contrôle de consistance').first().json.run_id, $('Contrôle de consistance').first().json.consensus_score] }}"
-        },
-        "additionalFields": {}
+        }
       },
       "name": "Clôturer le run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2500,
-        400
+        1440,
+        -112
       ],
+      "id": "b5ef25c8-f8cb-4f40-8d55-656968a9d2ee",
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -345,16 +363,16 @@
         "query": "UPDATE composite_queue SET statut = 'traite', run_id = $1, traite_le = now() WHERE doc_id = $2 RETURNING doc_id, period, statut;",
         "options": {
           "queryReplacement": "={{ [$(\"Préparer tâche d'extraction\").first().json.run_id, $(\"Préparer tâche d'extraction\").first().json.doc_id] }}"
-        },
-        "additionalFields": {}
+        }
       },
       "name": "Marquer le document traité",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2750,
-        400
+        1696,
+        -112
       ],
+      "id": "9397671f-8dbf-4d8a-8899-f74d99eaefde",
       "credentials": {
         "postgres": {
           "id": "QdVRYX9pjTj9C8G3",
@@ -561,6 +579,38 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "2a03d588-8862-4948-a047-a5a9672c8cd3",
+  "activeVersionId": null,
+  "versionCounter": 2,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-17T13:45:08.991Z",
+      "createdAt": "2026-08-17T13:45:08.991Z",
+      "role": "workflow:owner",
+      "workflowId": "0ay3mDuTGTSporSW",
+      "projectId": "Uv5vueC8X7aNYS6e",
+      "project": {
+        "updatedAt": "2026-08-09T22:18:59.275Z",
+        "createdAt": "2026-08-06T09:02:48.442Z",
+        "id": "Uv5vueC8X7aNYS6e",
+        "name": "Nilo Castillo <nilo.castillo@he-arc.ch>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "c70dc9a8-8535-4c2d-bb99-5ff61046e548"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
   }
 }
