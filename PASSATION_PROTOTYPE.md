@@ -5675,3 +5675,41 @@ sur proposition motivée ; `validated_by = 'N. Castillo'`.
   pas face à la base d'aujourd'hui — les dénombrements d'événements cités le 31.08 (F39 = 29)
   ne sont plus ceux de la vue (9), les événements ayant bougé depuis. Taux mesurés une fois :
   commentaires 1 rejet / 5, lectures 6 / 13.
+
+## 02.09.2026 (suite 12) — Liste B, acte 3 : trente événements relus au hasard
+
+Troisième « jamais » : aucun des 690 événements extraits par le modèle n'avait été relu par un
+humain (`flux_evenements.statut = 'non_relu'` partout). Plutôt que les 69 servis, un
+**échantillon aléatoire reproductible** (`setseed(0.42)`, `ORDER BY random() LIMIT 30`, les
+30 identifiants figés dans la migration `2026-09-02_b3_evenements_echantillon.sql`, sortie en
+annexe 5) — pour obtenir un taux d'erreur mesuré, pas une relecture de convenance. Décisions de
+l'étudiant sur proposition motivée ; `verifie_par = 'N. Castillo'` ; colonne `motif` ajoutée.
+
+- **Critère** : fidélité de l'extraction (type, sens, acteur, zone, résumé) au **titre, seule
+  charge transmise au modèle** (vérifié dans `extraction_evenements_flux.json` : `item_id |
+  [secteur] titre`, ni description ni nom d'acheteur). La pertinence de l'item n'est pas jugée
+  ici, c'est l'objet de l'audit du filtrage (B4).
+- **Population** : 690 = 309 presse + 287 avis TED + 94 FDA. Les TED/FDA sont du régime
+  antérieur au 01.09 (depuis, seules les sources `lecture_evenementielle` sont lues et servies) ;
+  ils restent au registre, l'échantillon en a tiré 17 sur 30.
+- **Résultat : 24 validés, 6 rejetés — taux mesuré 20 %.** Trois défauts typés :
+  1. `acteur = « TED »` (42, 46, 57, 65) : la plateforme de publication prise pour l'acheteur,
+     alors que l'attendu était « non précisé » (ce que le modèle a fait ailleurs : 244, 207,
+     286). Le nom réel figurait dans la charge collectée (`payload->'buyer-name'` : Fraport AG,
+     hôpital de Prievidza…) mais **n'était pas transmis au modèle**. 27 autres `non_relu`
+     portent ce même acteur — défaut corrigeable (transmettre `buyer-name`, ou consigne
+     « acteur absent ⇒ non précisé ») mais sur un régime que le workflow n'exécute plus.
+  2. Type forcé (364) : `lancement_produit` pour une démonstration technologique.
+  3. Acteur mal identifié (529) : une personne (ministre) au lieu de l'organisation ; objet de
+     défense classé automobile par le flux.
+- **Observation pour C.8, pas une erreur individuelle** : typage instable des avis TED — même
+  genre d'avis tantôt `autre` (244, 57) tantôt `investissement` (207) ; tantôt `neutre` (262,
+  65) tantôt `opportunite` (93, 308). Limite de reproductibilité de la typologie, à écrire.
+- **Commentaire 82** (horlogerie, run 197), servi depuis le rejet du 87 : contrôlé cohérent
+  avec sa charge en B2, `valide` confirmé ici. L'horlogerie est servie sans badge.
+- **Effet vérifié sur `/veille/donnees`** : 364 et 529 ne sont plus servis (`statut <> 'rejete'`),
+  les événements validés apparaissent avec leur statut ; les 4 TED rejetés n'étaient de toute
+  façon plus servis. État : `flux_evenements` 660 non_relu / 24 valide / 6 rejete ;
+  `commentaries` 19 a_valider / 30 valide / 39 rejete.
+- **Limite à écrire** : 30 sur 690 tirés une fois ; l'intervalle de confiance d'un taux de 20 %
+  sur n = 30 est large (≈ 8–39 % à 95 %), à présenter comme un ordre de grandeur.
