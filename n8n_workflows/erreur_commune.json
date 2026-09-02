@@ -1,0 +1,60 @@
+{
+  "id": "erreurCommuneV1",
+  "name": "Veille - Erreur commune (clôture des runs en échec)",
+  "meta": {
+    "description": "Workflow d'erreur COMMUN (02.09.2026, constat WF-4 du tour « jury »). Déclaré comme settings.errorWorkflow de chaque workflow du dispositif : quand une exécution échoue après l'ouverture de son run, le run est clos en 'echec' avec le message d'erreur, le nom du workflow, le nœud fautif et l'identifiant d'exécution n8n — au lieu de rester 'en_cours' sans clôture, ce qui obligeait à solder à la main (59 runs, 25.08 et 01.09). Hypothèse dite : une seule exécution à la fois (déclencheurs manuels, poste unique) — le run clos est celui, ou ceux, encore 'en_cours' sans closed_at. Un échec AVANT l'ouverture du run (gardes « rien à traiter ») ne touche aucune ligne : ce n'est pas un run, c'est voulu. Ne modifie rien d'autre."
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Déclencheur d'erreur",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Reçoit { execution: { id, error: { message }, lastNodeExecuted, mode }, workflow: { id, name } } de n8n quand un workflow qui déclare ce workflow d'erreur échoue."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Clôt en 'echec' le ou les runs encore ouverts ; 0 ligne si l'échec précède l'ouverture.\nUPDATE runs\n   SET status = 'echec',\n       closed_at = now(),\n       note = coalesce(note, '') || ' — ÉCHEC (clôture automatique) : ' || $1\n WHERE status = 'en_cours' AND closed_at IS NULL\nRETURNING run_id, status, closed_at, note;",
+        "options": {
+          "queryReplacement": "={{ (() => { const e = $json.execution ?? {}; const w = $json.workflow ?? {}; const msg = (e.error && e.error.message) ? String(e.error.message) : 'erreur sans message'; return [ 'workflow « ' + (w.name ?? w.id ?? '?') + ' », nœud « ' + (e.lastNodeExecuted ?? '?') + ' », exécution n8n ' + (e.id ?? '?') + ' : ' + msg.slice(0, 600) ]; })() }}"
+        }
+      },
+      "name": "Clôturer le run en échec",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        0
+      ],
+      "executeOnce": true,
+      "notes": "Ajoute le message à la note existante (jamais d'écrasement : la note d'ouverture dit ce que le run tentait). Message tronqué à 600 caractères.",
+      "credentials": {
+        "postgres": {
+          "id": "QdVRYX9pjTj9C8G3",
+          "name": "postgres veille"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Déclencheur d'erreur": {
+      "main": [
+        [
+          {
+            "node": "Clôturer le run en échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

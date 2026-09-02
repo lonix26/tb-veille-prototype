@@ -599,5 +599,8 @@
   },
   "meta": {
     "description": " — 23.08.2026 : trois points de lecture ajoutés pour la restitution v4 (/veille/sante, /veille/signaux, /veille/opportunites). Lecture seule, mêmes principes que le point existant : aucune écriture, aucun statut modifié, le non-validé se compte et ne s'affiche pas."
+  },
+  "settings": {
+    "errorWorkflow": "erreurCommuneV1"
   }
 }

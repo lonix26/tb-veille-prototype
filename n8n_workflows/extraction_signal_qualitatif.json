@@ -426,7 +426,8 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "errorWorkflow": "erreurCommuneV1"
   },
   "meta": {
     "description": " — PORTAGE DU 23.08.2026, mêmes corrections que la couche 0 : identifiants de modèles périmés (gpt-4o, claude-opus-4-8, gemini-pro-latest — ce dernier renvoie 404) remplacés par les variables d'environnement MODELE_*, avec repli sur les identifiants vérifiés le 22.08 ; max_tokens Anthropic porté de 1024 à 16000 (le raisonnement adaptatif s'impute dessus) ; clé Google déplacée de la chaîne de requête vers l'en-tête x-goog-api-key (une clé dans l'URL se retrouve dans les journaux) ; paramètre temperature retiré des trois appels — il est refusé hors valeur par défaut sur les modèles courants."

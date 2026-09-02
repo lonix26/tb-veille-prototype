@@ -1,7 +1,9 @@
 {
   "id": "PNd16YrFSehKUDIR",
   "name": "Extraction composite — recensement Convention patronale (H2, H11)",
-  "settings": {},
+  "settings": {
+    "errorWorkflow": "erreurCommuneV1"
+  },
   "nodes": [
     {
       "id": "declencheur-manuel",

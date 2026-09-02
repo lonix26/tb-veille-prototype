@@ -5843,3 +5843,48 @@ vert) ; `npm run build` (bundle `index-*.js`, servi par nginx, vérifié par `cu
 était le symptôme de l'écran blanc, écrasé). Non couvert : le bandeau de rechargement (n° 6) n'a
 pas été vu à l'écran — il faudrait couper n8n pendant un rechargement ; le code est relu, pas
 démontré.
+
+## 02.09.2026 (suite 15) — Workflow d'erreur commun : les runs en échec se ferment seuls
+
+**Constat de départ** (WF-4/DOC-16 de la revue, et faiblesse n° 4 du bloc « limites
+d'architecture ») : quand un workflow plante après avoir ouvert son run, la ligne `runs` restait
+en `en_cours`, sans `closed_at` — l'écran des exécutions montrait un run « en cours » pour toujours
+et la statistique ok/échec/partiel se biaisait. Aucun des 21 workflows ne déclarait
+`settings.errorWorkflow`.
+
+**Ce qui est fait.**
+
+- `n8n_workflows/erreur_commune.json` (id `erreurCommuneV1`, « Veille - Erreur commune (clôture
+  des runs en échec) ») : déclencheur d'erreur natif → un `UPDATE runs SET status='echec',
+  closed_at=now(), note = note || ' — ÉCHEC (clôture automatique) : …' WHERE status='en_cours'
+  AND closed_at IS NULL`. La note reçoit le nom du workflow fautif, le nœud, l'identifiant
+  d'exécution n8n et le message (600 caractères au plus). **Hypothèse dite dans le fichier** : une
+  seule exécution à la fois — le `UPDATE` clôt *tous* les runs ouverts, pas celui de l'exécution
+  fautive (la table `runs` n'a pas de colonne reliant un run à une exécution n8n). Un échec
+  survenu avant l'ouverture du run ne touche aucune ligne.
+- Les 21 autres fichiers reçoivent `settings.errorWorkflow: "erreurCommuneV1"` (diff limité au
+  réglage, formatage conservé). Tous réimportés, `apiRestitutionV4` et `erreurCommuneV1`
+  publiés, n8n redémarré : 7 points d'API en 200, sonde navigateur verte sur les onze écrans.
+
+**Ce qui a coincé, et pourquoi.** Premier essai par `n8n execute --id` (CLI) : exécution 2654 en
+`error`, run 215 resté `en_cours`. Deux causes, établies dans le code de n8n 2.20.7
+(`workflows/workflow-execution.service.js`, l. 252) : **le workflow d'erreur doit être publié**
+(« is not active and cannot be executed »), ce que `import:workflow` ne fait pas ; et le
+déclenchement est asynchrone, le processus CLI sort avant. Second essai dans le serveur, par un
+banc d'essai à webhook (`bancEssaiErreur01` : ouvre un run, puis un nœud Code lève une erreur) :
+exécution 2656 en `error`, **run 216 clos en `echec` avec la note complète** (workflow, nœud
+« Échouer », exécution 2656, message). Le run 215 a été clos par la même exécution — c'est
+l'hypothèse « tous les runs ouverts » à l'œuvre ; sa note porte une précision manuelle qui le dit.
+Après coup : `runs` ne compte plus aucun `en_cours` ; restent les runs 79 et 80, anciens, à
+`closed_at` nul avec un statut final — laissés tels quels, ce sont des faits d'époque.
+
+**Règle de procédure, ajoutée à celle du 02.09** : après tout réimport, publier *deux* workflows —
+`apiRestitutionV4` et `erreurCommuneV1` — avant le redémarrage ; un workflow d'erreur importé
+mais non publié ne tourne pas, silencieusement.
+
+**Reste à faire dans l'interface n8n** (pas de commande CLI de suppression) : supprimer
+`bancEssaiErreur01` — désactivé par CLI (webhook en 404), mais encore présent en base n8n. Il
+n'est pas dans `n8n_workflows/`.
+
+**Non démontré** : le mécanisme sur un vrai workflow de collecte (seul le banc l'a exercé) ; le
+comportement si deux exécutions se chevauchent (hypothèse énoncée, pas testée).

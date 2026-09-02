@@ -291,5 +291,7 @@
       ]
     }
   },
-  "settings": {}
+  "settings": {
+    "errorWorkflow": "erreurCommuneV1"
+  }
 }
