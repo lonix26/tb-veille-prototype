@@ -5606,3 +5606,40 @@ fichiers `db/` doivent redire la même chose). Tout ce qui suit est vérifié su
   n8n et statuts d'échec (DOC-16) non traités ; `.git` de 115 Mo ; annexes et D2 sont hors dépôt
   (copie Drive). **La liste A est close** ; les listes B (actes humains) et C (rapport) restent à
   l'étudiant.
+
+## 02.09.2026 (suite 10) — Liste B, acte 1 : la couche 0 décidée
+
+Premier des quatre « jamais » relevés par le tour jury (IA-20) : la file de la couche 0
+(`source_qualification_queue`, 19 candidats du run du 22.08, QV5 automobile) avait été
+alimentée et jamais décidée. Décidée ce jour, migration
+`2026-09-02_b1_couche0_decisions.sql` (sortie en annexe 5).
+
+- **Résultat : 1 inscrite · 5 différées · 13 écartées**, chaque décision avec son motif —
+  la colonne `motif` n'existait pas sur cette file (A3 l'avait ajoutée aux autres) ; ajoutée.
+  `decided_by = 'N. Castillo'`, décision d'étudiant sur proposition motivée de la session.
+- **Raisonnement appliqué dans l'ordre** : (1) jeu de données ou simple page (avis MIIT, page
+  ICCT, programme FHWA, boîte à outils DOT → écartés : matière à flux, pas au référentiel) ;
+  (2) réponse à la question posée (EPA → QV4, CAAM → QV2 : différés avec réorientation) ;
+  (3) les quatre critères d'admissibilité du cadrage (Tax Foundation, AEE non identifiable :
+  écartés) ; (4) redondance (ACEA proposée sous trois éditions, AFDC sous quatre entrées,
+  EAFO sous deux : une entrée gardée par série).
+- **Le consensus a priorisé, il n'a pas décidé** : le seul candidat à 3 modèles sur 4 est le
+  seul inscrit ; deux candidats à un seul modèle (EAFO, State aid scoreboard) sont différés
+  sur le fond.
+- **L'inscription est réelle** : ligne `acea_incitations` dans `sources` (ACEA, « Electric
+  cars: tax benefits and incentives », annuelle, PDF tabulaire par pays, libre),
+  `a_confirmer` — accès vérifié (200 les 22.08 et 02.09), granularité d'extraction non
+  validée, **aucune liaison ni indicateur rattaché**. « Inscrite » sans cette ligne aurait été
+  une surdéclaration. Sources : 23 certifiées + 6 à confirmer = 29, dont 28 à URL externe.
+- **Effets** : D2 régénéré (28 URL testées le 02.09 — la 28e ajoutée au fichier
+  `annexes/verif_urls_2026-09-02.txt` ; 6 sources à confirmer). `v_bilan_referentiel` inchangé
+  (compte les indicateurs, pas les sources). Ni l'API ni les écrans ne servent la file : l'acte
+  est visible par requête (`SELECT decision, count(*) FROM source_qualification_queue GROUP BY 1`).
+- **Limites à dire dans le rapport** (session Cowork) : la couche 0 a été exécutée sur **une
+  seule question de veille** (QV5 automobile) — son comportement sur d'autres questions n'est
+  pas établi ; l'appréciation des candidats s'est fondée sur les fiches des modèles, le titre
+  réel des pages relevé le 02.09 et la connaissance des producteurs, sans ouverture détaillée
+  de chaque jeu, d'où une seule inscription en `a_confirmer`. Deux pages ont répondu « Access
+  Denied » le 02.09 (FHWA, DOT) alors que la file les avait vues en 200 le 22.08.
+- **Socle** : la colonne `motif` et la ligne `acea_incitations` seront reprises dans `db/` à la
+  prochaine régénération (règle « à chaque gel »), pas fichier par fichier.
