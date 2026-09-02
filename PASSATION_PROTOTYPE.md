@@ -5713,3 +5713,44 @@ l'étudiant sur proposition motivée ; `verifie_par = 'N. Castillo'` ; colonne `
   `commentaries` 19 a_valider / 30 valide / 39 rejete.
 - **Limite à écrire** : 30 sur 690 tirés une fois ; l'intervalle de confiance d'un taux de 20 %
   sur n = 30 est large (≈ 8–39 % à 95 %), à présenter comme un ordre de grandeur.
+
+## 02.09.2026 (suite 13) — Liste B, acte 4 : le filtrage audité, la liste B close
+
+Quatrième et dernier « jamais » : la règle `seuil_v1` avait écarté 964 items depuis le 26.08
+sans qu'un seul ait été audité — l'écran disait « taux de faux négatifs inconnu ». Le dispositif
+d'audit existait (vue `v_filtrage_echantillon` à tirage déterministe, table
+`flux_filtrage_audit`, restitution par ajout) ; il n'avait jamais servi. Migration
+`2026-09-02_b4_audit_filtrage.sql`, sortie en annexe 5. Décisions de l'étudiant sur proposition
+motivée ; `audite_par = 'N. Castillo'`, échantillon `2026-09`.
+
+- **Échantillon** : les 40 premiers rangs de la vue pour septembre (les 10 de l'écran inclus),
+  identifiants figés dans la migration — la vue exclut ensuite les items audités du mois, son
+  résultat a donc changé (924 restants).
+- **Critère** : l'écart était-il fondé ? Faux négatif si un décideur de PME de mécanique de
+  précision devait voir l'item dans sa file de signaux.
+- **Résultat : 39 `confirme`, 1 `faux_negatif` — taux mesuré 2,5 %.** Les 39 se répartissent en
+  cinq familles (avis TED hors champ 14 ; avis TED médicaux courants comptés par M7 12 ;
+  actualité sans contenu industriel 7 ; FDA logiciel ou rappel déjà compté 3 ; communiqués
+  produit/infrastructure 3). Le faux négatif, item 23 (« Consumo de vehículos chinos en México
+  crece y producción se estanca », note 2/6, antériorité 0), est une dynamique géographique
+  QV3 que la règle sous-pondère face à l'antériorité : **angle mort typé** — la doctrine
+  « signal » privilégie l'anticipation, une observation de marché établie mais portante passe
+  sous le seuil. L'item est **revenu dans la file humaine** (415 items, était 414), sans
+  effacement.
+- **Énoncé du bilan reformulé** (`v_bilan_filtrage`, décision d'étudiant) : l'ancien texte
+  exigeait une révision de règle dès le premier faux négatif — écrit en attendant zéro. Nouveau :
+  taux mesuré, item restitué, règle maintenue sous une **tolérance de 5 % fixée a posteriori, après
+  le premier audit** ; au-delà, « la règle doit être révisée ». Le caractère a posteriori du seuil
+  est dit dans la vue elle-même et ici. Vérifié servi par `/veille/sante`.
+- **Constat pour le rapport** : 352 items écartés de la file « signal » ont néanmoins une lecture
+  événementielle (ex. item 175 = événement 93 validé en B3). C'est le fonctionnement voulu des
+  deux doctrines (le filtrage porte sur la file humaine de signaux, l'extraction lit tout item de
+  pertinence ≥ 1) — à écrire pour prévenir le reproche d'incohérence. Le flux ferroviaire
+  (CPV 34630000) n'a pas de secteur rattaché : 5 de ses avis dans l'échantillon, tous hors champ.
+- **`db/` à régénérer** au prochain gel : `v_bilan_filtrage` reformulée, colonnes `motif`
+  (B1, B2, B3), ligne `acea_incitations`.
+
+**Liste B close.** Quatre taux mesurés une fois, jamais auparavant : commentaires 1 rejet / 5
+(puis 82 validé) ; lectures 6 / 13 ; événements 6 / 30 (20 %) ; filtrage 1 / 40 (2,5 %). Aucun
+de ces chiffres ne se cite depuis un texte : `commentaries.status`,
+`lectures_transversales.statut`, `flux_evenements.statut`, `v_bilan_filtrage`.
