@@ -156,8 +156,9 @@ export default function Fiabilite({ vueInitiale }) {
       </header>
       <h1 className="verdict" style={{ maxWidth: "26ch" }}>Fiabilité</h1>
       <p className="bloc-intro" style={{ marginTop: -14, fontSize: 14 }}>
-        Toutes les réserves du dispositif sont réunies ici, et chacune est <strong>recalculée à
-        l'affichage</strong> à partir de la base. Un tableau de
+        Toutes les réserves du dispositif sont réunies ici. Les décomptes des réserves sont
+        calculés à l'affichage depuis la base ; les onglets « L'élagage » et « Le filtrage »
+        contiennent aussi des <strong>récits datés</strong>, signalés comme tels. Un tableau de
         bord qui ne dit pas ce qu'il sait mal laisse croire qu'il sait tout.
       </p>
 
@@ -358,7 +359,13 @@ export default function Fiabilite({ vueInitiale }) {
 
       {vue === "elagage" && (
         <div className="carte">
-          <h3 className="sous-titre">De quarante-quatre indicateurs à treize</h3>
+          <h3 className="sous-titre">De quarante-quatre indicateurs à treize — récit de l'élagage du 25 août 2026</h3>
+          <p className="reserve-corps" style={{ fontStyle: "italic" }}>
+            Ce qui suit est un récit daté, écrit le 25 août 2026 ; il n'est pas recalculé. L'état
+            courant, lui, est calculé : <strong>{total.en_grille ?? "n.d."} indicateurs en vitrine
+            sur {total.total ?? "n.d."} au référentiel</strong> (onglet « La grille »). La grille a
+            été révisée depuis l'élagage (30 août 2026, réintégrations par question de veille).
+          </p>
           <p className="reserve-corps">
             La grille comptait quarante-quatre indicateurs. Un décideur n'en lit pas
             quarante-quatre, et le volume masquait ce que la grille avait à dire. L'élagage du
@@ -390,7 +397,7 @@ export default function Fiabilite({ vueInitiale }) {
           </p>
           <h3 className="sous-titre">Ce que l'élagage a coûté</h3>
           <p className="reserve-corps">
-            Il faut le dire, parce que c'est le prix du choix. L'automobile ne compte plus que deux
+            Il faut le dire, parce que c'est le prix du choix. Au 25 août 2026, l'automobile ne comptait plus que deux
             indicateurs, dont un (les immatriculations) n'a que sept points : ce marché n'est
             plus <em>scorable</em>, et le tableau de bord ne prétend plus le scorer. La couverture
             des questions de veille se resserre également : plusieurs questions n'ont plus qu'un
@@ -407,8 +414,8 @@ export default function Fiabilite({ vueInitiale }) {
         return (
           <>
             <p className="bloc-intro">
-              Le triage ordonnait la file sans jamais la réduire : <strong>926 items attendaient
-              une lecture humaine</strong>, dont trois quarts notés 2 ou moins sur 6. Un dispositif
+              Au 24 août 2026, le triage ordonnait la file sans jamais la réduire : <strong>926 items
+              attendaient une lecture humaine</strong>, dont trois quarts notés 2 ou moins sur 6. Un dispositif
               semi-automatisé qui laisse une file inépuisable ne fait pas gagner de temps : il
               déplace le goulot de la collecte vers la validation.
             </p>
@@ -417,8 +424,9 @@ export default function Fiabilite({ vueInitiale }) {
               disparaît pas : il change d'objet.</strong> Il ne porte plus sur chaque item mais sur
               l'énoncé de la règle, vérifié chaque mois sur un échantillon tiré au sort. Ce
               déplacement a une propriété que l'examen exhaustif n'avait pas : <strong>il produit
-              une mesure</strong>. « Zéro faux négatif sur dix items audités » est un résultat ;
-              « 926 items non examinés » est un aveu.
+              une mesure</strong>. « Zéro faux négatif sur dix items audités » serait un résultat ;
+              « 926 items non examinés » est un aveu. Tant que l'échantillon n'a pas été relu, le
+              taux de faux négatifs reste inconnu — c'est ce que le bilan ci-dessous affiche.
             </p>
 
             <div className="tuiles" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", marginBottom: 18 }}>
@@ -473,7 +481,7 @@ export default function Fiabilite({ vueInitiale }) {
                           <td>{e.rang}</td>
                           <td>{e.note_ia}/6</td>
                           <td>{e.famille}</td>
-                          <td><LienSource url={e.url} libelle={e.titre} /></td>
+                          <td><LienSource href={e.url} titre={e.titre}>{e.titre || "voir la source"}</LienSource></td>
                           <td>{dateCH(e.date_publication)}</td>
                         </tr>
                       ))}
@@ -482,9 +490,9 @@ export default function Fiabilite({ vueInitiale }) {
                 </div>
               )}
             <p className="fi-src">
-              Verdicts à inscrire dans <code>flux_filtrage_audit</code>. Bilan recalculé à chaque
-              affichage depuis <code>v_bilan_filtrage</code>. Aucun chiffre de cet écran n'est écrit
-              à la main.
+              Verdicts à inscrire dans <code>flux_filtrage_audit</code>. Le bilan et l'échantillon
+              ci-dessus sont recalculés à chaque affichage depuis <code>v_bilan_filtrage</code> ; les
+              deux paragraphes d'introduction sont un récit daté du 24 août 2026.
             </p>
           </>
         );

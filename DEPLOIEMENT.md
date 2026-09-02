@@ -139,8 +139,9 @@ se voit qu'en l'ouvrant, et on n'ouvre que celui qu'on vient d'écrire :
 bash dashboard-app/verification/executer.sh
 ```
 
-Il rend chaque écran hors navigateur avec les données réelles de l'API (onze rendus, l'écran
-secteur comptant cinq fois) et sort en erreur si l'un d'eux lève une exception.
+Il rend chaque écran hors navigateur avec les données réelles de l'API (dix-sept rendus :
+l'écran secteur compte cinq fois, l'écran fiabilité une fois par onglet) et sort en erreur si
+l'un d'eux lève une exception.
 
 ## 4. Importer les workflows
 

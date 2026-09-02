@@ -64,7 +64,7 @@ export default function Referentiel() {
                 <td>{i.label}</td>
                 <td>{i.questions || "n.d."}</td>
                 <td>{i.source_organisation}</td>
-                <td>{i.category === "hard" ? "officielle" : "composite"}</td>
+                <td>{i.category === "hard" ? "hard (par code)" : i.category === "composite" ? "composite" : (i.category || "n.d.")}</td>
                 <td>
                   {i.observations > 0
                     ? `${i.observations} obs. · ${i.p_min} → ${i.p_max}`

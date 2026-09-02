@@ -213,7 +213,7 @@ workflows ne portaient pas l'identifiant de l'instance (B-2, B-3 du tour « jury
   `comtradeKeyCred1` pour A4/H1/H3/M1/S6 — voie testée : création à l'interface puis `sed` ;
   voie `import:credentials` signalée **non testée**, faute d'instance vierge). § 2 : 8 fonctions
   propres, pas 44 (36 sont celles de `pgcrypto`). § 3 : `npm ci` justifié par le verrou, sept
-  écrans (onze rendus) et non huit, Node non épinglé (v24.19.0 sur le poste). § 4 : import par le
+  écrans (dix-sept rendus par onglet et par secteur) et non huit, Node non épinglé (v24.19.0 sur le poste). § 4 : import par le
   volume `/workflows` en lecture seule, `publish:workflow` à la place d'`update:workflow
   --active` (procédure réellement employée), et l'écart 26 fichiers / 21 importés nommé —
   renvoyé à A9. § 5 : « 30 indicateurs » remplacé par un renvoi à `v_bindings_actifs`. § 6
@@ -300,3 +300,28 @@ sur 1 407 lignes (§ 3.1 de l'évaluation).**
   (§ 12.5, liste C). Non traité ici : dépôt d'un fichier brut pour les flux et les avis TED
   (`raw_ref = 'run N · flux'`), A1 et CP qui citent une URL distante, la couche 0 sans run —
   E6 reste **tenue pour les hard data, A2 et le signal ; non tenue ailleurs**.
+
+## 02.09.2026 (suite 5) — A6 : six corrections d'interface (UI-1, 2, 4, 5, 6, 9)
+
+- **UI-1** `Secteur.jsx`, bandeau de lecture : « Sur un an : n en progression » était calculé
+  sur la *première* métrique servie par indicateur (Aruba pour H1, Afghanistan pour M3).
+  Désormais sur `geo_reference` du référentiel ; un indicateur sans métrique sur cette zone est
+  compté à part (« 1 sans glissement annuel sur cette zone »). Horlogerie : 6 / 1 / 1.
+- **UI-2** « variation rare pour cette série (moins d'une fois sur dix) » → « dépasse le seuil de
+  l'indicateur, calibré sur l'ensemble de ses zones (p90 de l'historique) » ; note de bas de
+  section corrigée dans le même sens (le seuil n'est pas calibré zone par zone).
+- **UI-4** `Anticiper.jsx` : `sens ?? 1 || 1` comptait les sens nuls comme favorables. Les cinq
+  indicateurs sans sens déclaré (S9, A10, A9, H10, H9) sont exclus et nommés ; verdict passé de
+  « 19 des 26 » à **« Seize des 21 »**, avec les non-comptés énoncés.
+- **UI-5** `Fiabilite.jsx`, échantillon d'audit : `<LienSource url= libelle=>` appelait une
+  signature `{href, children, titre}` — dix « source non enregistrée ». Corrigé : 9 liens, 1
+  item réellement sans URL.
+- **UI-6** bannière « chacune est recalculée à l'affichage » et « aucun chiffre de cet écran
+  n'est écrit à la main » retirées ; les récits de l'élagage (25.08) et du filtrage (24.08)
+  sont **datés comme récits**, et l'onglet Élagage affiche l'état courant calculé
+  (`en_grille` / `total` du bilan). « Zéro faux négatif sur dix items audités » est passé au
+  conditionnel : l'audit n'a pas eu lieu.
+- **UI-9** `Referentiel.jsx` : « officielle » (41 occurrences, faux pour H7/H8/H9, S1) → « hard
+  (par code) » / « composite », comme l'en-tête « Catégorie » le disait déjà.
+- Build refait ; `verification/executer.sh` : 17 rendus sans exception. Captures pour les
+  figures du rapport **non régénérées** (à faire une fois la liste A close).

@@ -40,11 +40,18 @@ export default function Anticiper() {
   // ---------- 1. Diffusion : compté à l'affichage depuis la vitrine ----------
   const diffusion = useMemo(() => {
     const ref = D?.referentiel || [];
-    const sens = id => Number(ref.find(r => r.indicator_id === id)?.sens_favorable ?? 1) || 1;
-    const rows = (S?.vitrine || []).filter(v => v.ecart_a_la_moyenne_pct !== null);
+    // CORRECTION DU 02.09.2026 (UI-4) : un sens NUL n'est pas un sens favorable.
+    // `?? 1 || 1` comptait A9, A10, H9 (sens 0, « à interpréter » sur les pages
+    // Secteur) comme favorables. Les indicateurs sans sens déclaré sont exclus
+    // du décompte et comptés à part.
+    const sens = id => Number(ref.find(r => r.indicator_id === id)?.sens_favorable ?? 0) || 0;
+    const tous = (S?.vitrine || []).filter(v => v.ecart_a_la_moyenne_pct !== null);
+    const neutres = tous.filter(v => sens(v.indicator_id) === 0);
+    const rows = tous.filter(v => sens(v.indicator_id) !== 0);
     const fav = rows.filter(v => Number(v.ecart_a_la_moyenne_pct) * sens(v.indicator_id) > 0);
     const defav = rows.filter(v => Number(v.ecart_a_la_moyenne_pct) * sens(v.indicator_id) < 0);
-    return { n: rows.length, fav, defav };
+    const nuls = rows.length - fav.length - defav.length;
+    return { n: rows.length, fav, defav, neutres, nuls };
   }, [S, D]);
 
   // ---------- 2. Tension : séries par marché ----------
@@ -96,6 +103,12 @@ export default function Anticiper() {
           On compte des <strong>directions</strong>, jamais des grandeurs : combien d'indicateurs
           suivis sont au-dessus de leur propre moyenne, dans leur sens favorable. Aucune unité
           mélangée, aucune pondération.
+          {(diffusion.neutres.length > 0 || diffusion.nuls > 0) && (
+            <> Non comptés : {diffusion.neutres.length > 0 && <>{diffusion.neutres.length} indicateur{diffusion.neutres.length > 1 ? "s" : ""} sans
+            sens déclaré ({diffusion.neutres.map(v => v.indicator_id).join(", ")}), à interpréter</>}
+            {diffusion.neutres.length > 0 && diffusion.nuls > 0 && " ; "}
+            {diffusion.nuls > 0 && <>{diffusion.nuls} à écart nul</>}.</>
+          )}
         </p>
         {diffusion.defav.length > 0 && (
           <p className="bloc-intro" style={{ marginBottom: 0 }}>

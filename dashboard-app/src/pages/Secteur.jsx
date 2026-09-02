@@ -13,7 +13,15 @@ import { phrasePeriode } from "../phrases.jsx";
 function Lecture({ code, inds }) {
   const { D } = useDonnees();
   const collectes = inds.filter(i => i.observations > 0);
-  const ms = collectes.map(i => metrDe(D, i.indicator_id)).filter(Boolean);
+  // CORRECTION DU 02.09.2026 (UI-1) : la phrase « sur un an : n en progression »
+  // était établie sur la PREMIÈRE métrique servie par indicateur — Aruba pour H1,
+  // l'Afghanistan pour M3. Elle l'est désormais sur la zone de référence déclarée
+  // au référentiel ; un indicateur sans métrique sur cette zone n'est pas compté.
+  const refDe = id => (D?.referentiel || []).find(r => r.indicator_id === id);
+  const ms = collectes.map(i => {
+    const g = refDe(i.indicator_id)?.geo_reference;
+    return g ? metrDe(D, i.indicator_id, g) : null;
+  }).filter(Boolean);
   const varsOk = ms.filter(m => m.glissement_annuel_pct !== null);
   const hausses = varsOk.filter(m => m.glissement_annuel_pct > 0).length;
   const baisses = varsOk.filter(m => m.glissement_annuel_pct < 0).length;
@@ -23,7 +31,7 @@ function Lecture({ code, inds }) {
     <div className="lecture">
       <div className="l-t">
         <strong>{collectes.length} indicateur{collectes.length > 1 ? "s" : ""} suivi{collectes.length > 1 ? "s" : ""} sur {inds.length}.</strong>{" "}
-        {varsOk.length > 0 && <>Sur un an : {hausses} en progression, {baisses} en recul.{" "}</>}
+        {varsOk.length > 0 && <>Sur un an, sur la zone de référence de chaque indicateur : {hausses} en progression, {baisses} en recul{varsOk.length < collectes.length ? ` (${collectes.length - varsOk.length} sans glissement annuel sur cette zone)` : ""}.{" "}</>}
         {/* Compter des SÉRIES, pas des lignes de zones (27.08) : « 127 à
             examiner » quand 123 sont les destinations d'une seule série
             surdéclarait l'urgence. */}
@@ -136,7 +144,7 @@ export function Alertes({ code }) {
           <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>{varDe(a)}</span>{" "}
           {chipSens(a)} {chipsQV(a.indicator_id)}
         </div>
-        <div className="a-m">variation rare pour cette série (moins d'une fois sur dix)</div>
+        <div className="a-m">dépasse le seuil de l'indicateur, calibré sur l'ensemble de ses zones (p90 de l'historique)</div>
         {!a.diffusable && <div className="a-m">{a.motif_de_retenue}</div>}
       </div>
     </div>
@@ -258,8 +266,9 @@ export function Alertes({ code }) {
         );
       })}
       <div className="note">
-        Un mouvement est dit « inhabituel » quand il dépasse le seuil calibré sur l'historique
-        de sa propre série. Vert : le mouvement est favorable ; rouge : défavorable. Au-delà de
+        Un mouvement est dit « inhabituel » quand il dépasse le seuil de son indicateur, calibré
+        sur l'historique de toutes ses zones confondues — non zone par zone : pour une petite
+        destination, « rare » ne vaut donc pas « moins d'une fois sur dix ». Vert : le mouvement est favorable ; rouge : défavorable. Au-delà de
         trois mouvements sur un même indicateur, ils sont énoncés en un signal, dépliable ; les
         zones à contre-courant sont nommées. Un mouvement « retenu » n'est pas caché, son motif
         est affiché. Les zones trop petites pour peser sont écartées et comptées.
