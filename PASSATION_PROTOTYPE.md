@@ -279,3 +279,24 @@ validation rejouée) étaient servies sans marque (DATA-5, DATA-10).** Migration
   17.08** (note de la liaison 25, `SpatialDim`) : rien à faire.
 - Non traité, et dit : les 1 077 valeurs « écartées par contrôles qualité » du run 209 (BD-5)
   n'ont jamais été écrites ; leur persistance ligne à ligne reste une perspective (liste D).
+
+## 02.09.2026 (suite 4) — A5 : un fichier brut par liaison, et le run sur chaque item de flux
+
+**A5 — le brut du collecteur générique était nommé `{indicateur}_run{run}.raw` : pour un
+indicateur à plusieurs liaisons, chaque appel écrasait le précédent (H1 run 209 : 5 839
+observations citaient un fichier qui ne contenait que 2024) ; et `flux_items.run_id` était NULL
+sur 1 407 lignes (§ 3.1 de l'évaluation).**
+
+- `collecte_generique` (« Préparer les appels ») et `collecte_xlsx_indexe` (« Résoudre le lien
+  du classeur ») : suffixe `_b{binding_id}` — `H1_run212_b20.raw`. `collecte_flux` (« Normaliser
+  les items », « Écrire les items ») : `run_id` porté par chaque item et inséré.
+- Réimportés (21 workflows, aucun doublon) et **exécutés** : run 211 (`collecte_flux`, 8 items
+  nouveaux, tous avec `run_id = 211`) ; run 212 (`collecte_generique`, `ok`, 9 583
+  observations sur 31 indicateurs, 1 077 écartées) — 98 fichiers `*_run212_b*.raw` déposés ;
+  H1 cite désormais quatre fichiers distincts (b20 : 1 652 obs, b21 : 1 608, b22 : 1 610,
+  b23 : 969), A3 douze, A11 treize (trois liaisons sans observation ce jour).
+- Les fichiers antérieurs gardent leur nom : pour un run < 212, un `raw_ref` d'indicateur
+  multi-liaisons ne désigne que la dernière réponse écrite — ce que le rapport doit dire
+  (§ 12.5, liste C). Non traité ici : dépôt d'un fichier brut pour les flux et les avis TED
+  (`raw_ref = 'run N · flux'`), A1 et CP qui citent une URL distante, la couche 0 sans run —
+  E6 reste **tenue pour les hard data, A2 et le signal ; non tenue ailleurs**.
