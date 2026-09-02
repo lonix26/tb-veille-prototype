@@ -39,6 +39,9 @@ function Fiche({ a }) {
         <span className="fiche-delai">{phraseEcheance(a.jours_restants)}</span>
         {a.adressable === 2 && <span className="etq e-violet">cœur de métier</span>}
         {a.acheteur_recurrent && <span className="etq e-gris">acheteur habitué</span>}
+        {a.adressable != null && a.lecture_statut !== "valide" && (
+          <span className="etq e-ambre">lecture par un modèle, non relue</span>
+        )}
         <span className="fiche-ech">clôture le {dateCH(a.date_limite)}</span>
       </div>
       <h3 className="fiche-titre">{a.piece_concernee || a.titre}</h3>
@@ -65,7 +68,11 @@ function Fiche({ a }) {
           <p>{a.justification || "Aucune justification enregistrée."}</p>
           <p className="fiche-modele">
             Lecture d'adressabilité par <strong>{a.modele || "un modèle"}</strong> : elle ordonne
-            votre lecture, elle ne décide rien. CPV {a.cpv || "non publié"} · publié le {dateCH(a.date_publication)}.
+            votre lecture, elle ne décide rien.
+            {a.lecture_statut === "valide"
+              ? ` Relue et validée par ${a.lecture_valide_par}.`
+              : " Aucun humain ne l'a relue : le classement « à votre portée » est celui du modèle seul."}
+            {" "}CPV {a.cpv || "non publié"} · publié le {dateCH(a.date_publication)}.
           </p>
         </div>
       )}
@@ -124,8 +131,9 @@ export default function AFaire() {
         ]} />
         <p className="bloc-note">
           Le passage à « à votre portée » est une lecture de <strong>{t.modele_lecture || "modèle"}</strong>,
-          fondée sur le profil métier déclaré. Chaque fiche porte son raisonnement et le lien vers
-          l'avis officiel. Un tri assisté doit pouvoir être contredit.
+          fondée sur le profil métier déclaré, et aucune de ces lectures n'a encore été relue par
+          un humain : chaque fiche le dit. Chaque fiche porte aussi son raisonnement et le lien
+          vers l'avis officiel. Un tri assisté doit pouvoir être contredit.
         </p>
       </div>
 

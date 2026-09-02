@@ -507,8 +507,11 @@ export default function Fiabilite({ vueInitiale }) {
               à son propre passé ; les échelles ne sont pas communes.</li>
             <li><strong>Prédire.</strong> Le dispositif décrit une position et une direction. Aucun
               chiffre affiché n'est une prévision, et c'est un choix.</li>
-            <li><strong>Se passer de vous.</strong> Les lectures produites par modèle sortent au
-              statut « à valider » et n'atteignent l'écran qu'après relecture humaine.</li>
+            <li><strong>Se passer de vous.</strong> Les lectures produites par modèle (commentaires,
+              événements, lectures transversales, adressabilité des appels d'offres) sortent au
+              statut « à valider » ou « non relu » et sont affichées <em>avec ce statut</em>, sous
+              une étiquette ambre, tant qu'un humain ne les a pas relues. Rien n'est validé par
+              le dispositif lui-même ; ce qui n'est pas relu se voit.</li>
           </ul>
           <h3 className="sous-titre">Pourquoi le score n'ouvre plus la journée</h3>
           <p className="reserve-corps">

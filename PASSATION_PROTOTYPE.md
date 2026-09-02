@@ -158,3 +158,32 @@ de défaut que le commentaire du nœud de contrôles (suite 3). Corrigé : titre
 lien (nouvel onglet), domaine de la source ; note réécrite (« lecture sur le titre seul ; le
 résumé est celui du modèle, l'article lié est la source et fait foi »). 309/309 événements
 éligibles ont une URL. Reconstruit, captures régénérées.
+
+---
+
+## 02.09.2026 — Tour complet « jury » et plan de correction A1
+
+Six examens indépendants (base, workflows, application, documentation, chaîne IA, données) : 3
+bloquants, 55 majeurs, 56 mineurs, 18 remarques — synthèse et rapports dans
+`../evaluation_critique_prototype_2026-09-02.md` (racine, hors dépôt). Le plan de correction y
+figure au § 5 ; les corrections du prototype (liste A) sont exécutées dans l'ordre, une entrée
+ici par item.
+
+**A1 — la doctrine de diffusion écrite est celle d'avant le 31.08 (B-1).** Deux notes de
+`api_restitution.json` (« la doctrine v4 interdit d'afficher du non validé », « rien de non
+validé à l'écran ») et l'onglet Méthode de l'application (« n'atteignent l'écran qu'après
+relecture humaine ») contredisaient le nœud d'à côté, qui sert `a_valider`. Pire : les 82
+actions TED viennent de `ted_lecture_ia`, table sans colonne de statut — la validation n'y était
+pas « non exercée », elle était impossible.
+
+- Migration `2026-09-02_a1_statut_lecture_ted.sql` (sortie en annexe 5) : `statut` (défaut
+  `non_relu`, jamais modifié par un workflow), `valide_par`, `valide_le`, contrainte de
+  traçabilité ; `v_actions` recréée (DROP/CREATE, aucune dépendance) avec `lecture_statut` et
+  `lecture_valide_par`. État : 324 lectures `non_relu`, 78 servies.
+- API : les trois notes réécrites au régime réel (« servi avec son statut, badgé ») ; le filtre
+  `valide` est **maintenu** sur les signaux (régime propre à la table) et sur l'attribution
+  ancrée (variante expérimentale) — mais présenté comme tel, pas comme règle générale.
+- Application : fiche d'action badgée « lecture par un modèle, non relue » et raisonnement
+  explicite (« aucun humain ne l'a relue ») ; onglet Méthode réécrit ; note du tamis complétée.
+- `CLAUDE.md` : phrase « seuls les validés sont servis » remplacée par le régime du 31.08.
+- Reste au rapport (§ 5.C.1 de l'évaluation) : C4 l. 94 et § 12.5, inventaire § 7.2.2.
