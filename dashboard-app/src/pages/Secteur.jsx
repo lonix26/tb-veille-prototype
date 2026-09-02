@@ -479,10 +479,14 @@ export function Synthetique({ pleine }) {
   return (
     <div className={"carte ind" + (pleine ? " pleine" : "")}>
       <div className="i-code">INDICATEUR SYNTHÉTIQUE · engagement de la ratification</div>
-      <div className="i-titre">Part suisse du commerce horloger mondial (SH 91)</div>
+      {/* 02.09.2026 (A8) : le dénominateur est la somme des sept déclarants
+          de H3, pas le monde — l'ancien titre « commerce horloger mondial »
+          surdéclarait de treize points (48,65 % du monde en 2023, vérifié
+          sur Comtrade tous déclarants ; 61,35 % du panier). */}
+      <div className="i-titre">Part suisse des exportations d'horlogerie (SH 91) d'un panier de {dern ? dern.nb_declarants_attendus : "sept"} exportateurs</div>
       <div>
         <span className="i-val">{dern ? nb(dern.part_suisse_pct) + " %" : "n.d."}</span>
-        <span className="i-u">du panier de déclarants · {dern ? dern.period : ""}</span>
+        <span className="i-u">du panier de {dern ? dern.nb_declarants_attendus : ""} déclarants, non du monde · {dern ? dern.period : ""}</span>
       </div>
       <table style={{ marginTop: 12 }}>
         <thead>
@@ -506,9 +510,11 @@ export function Synthetique({ pleine }) {
         </tbody>
       </table>
       <div className="note">
-        Ratio calculé par requête sur les séries consolidées. Part du
-        panier de déclarants Comtrade, non du marché mondial entier ; la part n'est calculée que si
-        tous les déclarants ont soumis : la fraîcheur d'un panier est celle de son déclarant le plus lent.
+        Ratio calculé par requête sur les séries consolidées de H3. Part d'un
+        panier de déclarants Comtrade (les sept collectés, près de quatre cinquièmes des exportations
+        mondiales du chapitre en 2023), <strong>non du marché mondial entier</strong> — la part mondiale est plus
+        basse. La part n'est calculée que si tous les déclarants ont soumis : la fraîcheur d'un panier
+        est celle de son déclarant le plus lent.
       </div>
     </div>
   );

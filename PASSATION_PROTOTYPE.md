@@ -302,6 +302,62 @@ sur 1 407 lignes (§ 3.1 de l'évaluation).**
   (`raw_ref = 'run N · flux'`), A1 et CP qui citent une URL distante, la couche 0 sans run —
   E6 reste **tenue pour les hard data, A2 et le signal ; non tenue ailleurs**.
 
+## 02.09.2026 (suite 7) — A8 : les libellés disent ce que la série mesure ; filtres M3 et T4
+
+Migration `migrations/2026-09-02_a8_libelles_et_filtres.sql` (corps + trois compléments datés,
+exécutés dans l'ordre), sortie dans `annexe_5/2026-09-02_a8_libelles_et_filtres.txt`. Runs
+**213** (07:24, 11 436 obs) et **214** (11 438 obs), collecteur générique complet — il n'a pas
+de filtre par liaison. Chaque chiffre ci-dessous a été revérifié sur pièce avant d'être écrit.
+
+- **Indicateur synthétique** : le titre « part suisse du commerce horloger mondial » était
+  faux. Le dénominateur est le **panier des sept déclarants de H3**, pas le monde. Vérifié le
+  02.09 sur Comtrade, tous déclarants, SH 91, 2023 : monde 61,17 Mrd USD → part suisse
+  **48,65 %** ; panier 48,51 Mrd (79,3 % du monde) → 61,35 %. Treize points d'écart.
+  `COMMENT ON VIEW v_indicateur_synthetique` réécrit ; bloc `Synthetique` de `Secteur.jsx`
+  retitré « Part suisse des exportations d'horlogerie (SH 91) d'un panier de n exportateurs »,
+  unité « du panier de n déclarants, non du monde », note explicite. Rendu contrôlé sur
+  « Vue d'ensemble » et « Socle transversal ». **Reste faux ailleurs** : `SecteurQV.jsx` l. 395
+  (non routé, UI-30 → A9) et le rapport C4 l. 16 (liste C, Cowork).
+- **Libellés** : H7 « Exportations suisses de montres-bracelets, valeur (FH) » — le tableau FH lu
+  est celui des montres-bracelets, non du chapitre entier ; H1 (Comtrade, chapitre) converti en
+  francs par T2 (CHF par USD, donc H1 × T2) lui est supérieur de 3,9 à 5,3 %, moyenne 4,7 % sur
+  19 mois. M4 « Emplois medtech et mécanique de précision en Suisse (NOGA 26.6, 32.5 — y c.
+  mécaniciens-dentistes et lunetterie) » — 15,9 % du total 2024 (5 254/33 104, brut
+  `M4_run212_b142.raw`) ; le périmètre de la liaison n'est **pas** changé, cela se décide en
+  supervision. M2 « … instruments et fournitures médicales et dentaires UE (NACE C32.5) ».
+  A2 « Immatriculations de voitures particulières neuves, UE27 (ACEA) » (PDF `A2_run58.pdf`).
+- **M3** (liaison 25, OMS GHED) : `$filter` « TimeDim ge 2014 » et `periode_min` 2014 au lieu
+  d'un seul millésime. Run 213 : CHE **10 points** 2014-2023 (10,68 → 11,69 % du PIB), 2 051 obs
+  sur 205 zones.
+- **T4** (liaison 13, FMI WEO) : `periode_min` 2014, `frequency` « annuelle » (la source publie
+  des points annuels, deux fois l'an). Run 213 : 10 points, **sans 2020 ni 2021** — le brut
+  (`T4_run213_b13.raw`) les contient ; −2,7 écarté par le contrôle « valeur négative », 6,7 par
+  ricochet (+348 % contre −2,7, seuil de variation 200 %). Un taux de croissance est une
+  grandeur signée : `admet_negatifs` déclaré sur la liaison (doctrine T5/T8), run 214 →
+  **12 points** 2014-2025 avec 2020 : −2,7 et 2021 : 6,7. Aucune trace en base des observations
+  écartées, seul le compteur de `runs.note` (1 079 → 1 077) — limite connue.
+- **Retour en vitrine de M3 et T4** (complément 2) : écartés le 26.08 pour série courte (1 et
+  3 points) ; c'était le filtre, pas la source. Seuil en vigueur huit points (§ 8.8.7), même
+  forme que le retour H2/M4 du 28.08. Effet sur le score : médical −0,44 → **−0,55**
+  ({M1,M2,M3,M4,M7,M8}), transversal 0,51 → **0,47** (onze indicateurs, profondeur 12).
+  `v_bilan_referentiel` total : en_grille 38 → **40**, écartés 15 → **13** (certifiés 41
+  inchangés). **Décision d'étudiant, à ratifier.**
+- **Seuil M3** (complément 3) : le 3 % semé a priori le 06.08 sur registre vide produisait, une
+  fois M3 en vitrine, **132 mouvements** sur 205 zones en 2023. Recalibré par la méthode du
+  10.08 (p90 de |glissement| toutes zones, n = 1 845, p90 19,9 %) → **19 %** ; 24 zones
+  franchissent en 2023 (écran médical : 132 → 26 mouvements). Hors 2020-2022 le p90 vaut
+  15,1 % ; la méthode ne trie pas les années, elle est appliquée telle quelle — dit dans la
+  note. **T4 reste « seuil non configuré »** : le glissement relatif d'un taux de croissance
+  n'a pas de sens (2021 : +348 %) ; un seuil en points demanderait une règle que RI4 n'a pas.
+- **À savoir** : le commentaire exécutif validé servi sur le socle dit encore « série
+  semestrielle » pour T4 — c'est le texte validé humainement avant le changement, il n'est pas
+  modifié à la main ; la prochaine fournée portera « annuelle ». M3 CHE 2020 (+4,9 %) et 2022
+  (−3,0 %) sont « sous le seuil » à 19 % (ils étaient « franchi » à 3 %).
+- Build refait, `dashboard-app/verification/executer.sh` : 17 rendus sans exception (le script
+  se lance depuis `dashboard-app/`, pas depuis `prototype/`). API non republiée (rien de
+  structurel : elle lit les vues). `db/02_referentiel.sql` (libellés, seuils, liaisons, vitrine)
+  n'est pas régénéré → A10.
+
 ## 02.09.2026 (suite 6) — A7 : les textes portés par la base alignés sur la base
 
 Migration `migrations/2026-09-02_a7_notes_et_commentaires.sql`, sortie dans
