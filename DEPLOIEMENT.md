@@ -146,6 +146,19 @@ Il rend chaque écran hors navigateur avec les données réelles de l'API (dix-s
 l'écran secteur compte cinq fois, l'écran fiabilité une fois par onglet) et sort en erreur si
 l'un d'eux lève une exception.
 
+Côté base (02.09.2026), un second harnais relit ce que le rapport affirme :
+
+```bash
+bash verification/base.sh
+```
+
+Treize invariants structurels (indicateur certifié sans question de veille, observation
+orpheline ou en doublon, run resté ouvert, vue illisible…) qui doivent valoir zéro, puis six
+faits cités par le rapport (bilan `v_bilan_referentiel`, nombre de questions de veille, objets
+de la base, bilan du filtrage) comparés au relevé figé `verification/base_attendu.txt`. Un écart
+sort en erreur ; `--figer` régénère le relevé, à ne faire qu'après avoir compris l'écart et
+l'avoir daté en passation.
+
 ### 3.1 Où l'application va chercher l'API — poste local par conception
 
 L'application interroge l'API de restitution **depuis le navigateur**, à l'adresse compilée

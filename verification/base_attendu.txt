@@ -1,0 +1,7 @@
+# Relevé figé par requête le 02.09.2026 — verification/base.sh --figer
+referentiel_total=53/41/38/3/10/40/13
+referentiel_par_secteur=aerospatial:6/9 automobile:8/11 horlogerie:9/12 medical:7/8 transversal:11/13
+questions_de_veille=6
+instanciations_sectorielles=21
+objets=tables:27 vues:44 fonctions:44
+filtrage_flux=1415/964/415/40/1

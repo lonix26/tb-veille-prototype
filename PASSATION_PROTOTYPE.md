@@ -5888,3 +5888,40 @@ n'est pas dans `n8n_workflows/`.
 
 **Non démontré** : le mécanisme sur un vrai workflow de collecte (seul le banc l'a exercé) ; le
 comportement si deux exécutions se chevauchent (hypothèse énoncée, pas testée).
+
+## 02.09.2026 (suite 16) — Harnais de la base : treize invariants et six faits figés
+
+**Pourquoi.** Le harnais de l'application relit les écrans ; rien ne relisait la base, alors que
+c'est elle que le rapport cite — et le décompte d'indicateurs a dérivé trois fois dans le texte
+(règle CLAUDE.md : citer depuis `v_bilan_referentiel`). `verification/base.sh` (lecture seule,
+`docker compose exec db`) rend ce contrôle exécutable.
+
+**Ce qu'il contrôle.**
+
+1. *Invariants structurels, attendu zéro* : indicateur certifié sans question de veille, sans
+   source, dont la `geo_reference` n'a aucune métrique dans `v_metriques`, ou hard en vitrine
+   sans liaison active ; liaison ou instanciation vers un code de question inconnu ; observation
+   sans indicateur, sans run, à valeur nulle, ou en doublon (indicateur, run, période, zone) ;
+   run `en_cours` depuis plus d'une heure (ce que le workflow d'erreur commun de la suite 15
+   doit empêcher) ; run clos sans `closed_at` hors 79 et 80 (faits d'époque, exclus par
+   commentaire daté) ; chaque vue du schéma se laisse lire (`SELECT … LIMIT 1` sur les 44).
+2. *Faits cités par le rapport*, comparés à `verification/base_attendu.txt`, relevé **figé par
+   requête** le 02.09.2026 : `v_bilan_referentiel` total `53/41/38/3/10/40/13` et par secteur ;
+   6 questions de veille ; 21 instanciations sectorielles ; 27 tables / 44 vues / 44 fonctions ;
+   filtrage `1415/964/415/40/1`. `--figer` régénère le relevé (à dater ici).
+3. *Pour information, non contrôlé* : runs par statut, observations, statuts de validation.
+
+**Ce qui n'est pas un invariant, et que j'ai écarté après l'avoir testé** : 8 indicateurs
+certifiés sans seuil d'alerte (M8, T5, T8, A11, M7, S7, T10, T4) ; 6 certifiés hors vitrine et
+5 en vitrine à confirmer ; `items_collectes ≠ items_filtres + file_humaine` dans
+`v_bilan_filtrage` (36 items ni filtrés ni en file) ; 45 runs `ok` sans observation (flux et
+textes). Ce sont des états, pas des règles — à relire au moment de figer, pas à asserter.
+
+**Résultat ce soir** : 13 invariants à zéro, 6 faits conformes, code de sortie 0 ; un écart
+provoqué (relevé altéré à la main) sort bien en `KO … attendu 7, relevé 6`, code 1. Défaut
+attrapé en route : `docker compose exec` lit l'entrée standard et vidait le fichier lu par la
+boucle `read` — relevé calculé une fois, hors boucle, commentaire dans le script.
+
+**Tension signalée** : CLAUDE.md (état au 22.08) dit encore « 30 indicateurs, 26 certifiés » ; la
+base et la passation disent 53 / 41 depuis la famille d'intensité et le socle transversal (suite
+9). Le relevé figé fait foi ; CLAUDE.md est à mettre à jour côté Cowork.
