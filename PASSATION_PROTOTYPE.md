@@ -228,3 +228,30 @@ workflows ne portaient pas l'identifiant de l'instance (B-2, B-3 du tour « jury
 - **Non fait, et dit** : aucune reconstruction sur poste vierge n'a été rejouée pour valider la
   séquence de bout en bout ; ce que le document affirme comme vérifié l'est sur l'instance en
   service (import, publication, requêtes), pas sur un clone neuf.
+
+## 02.09.2026 (suite 2) — A3 : le motif d'une décision humaine est une colonne
+
+**A3 — aucune table de décision n'avait de colonne `motif`, et un rejet pouvait rester anonyme
+(B-2).** Migration `2026-09-02_a3_motif_des_decisions.sql`, sortie en annexe 5.
+
+- `motif text` sur `validation_queue`, `composite_queue`, `commentaries`. Contraintes : un rejet
+  de la file exige un motif (`chk_vq_rejet_motive`, l'auteur étant déjà exigé) ; un document
+  écarté exige motif, auteur et date (`chk_cq_ecart_motive`) ; un commentaire rejeté exige
+  auteur, date et motif (`chk_commentaire_rejet_trace`) — celle-ci posée **`NOT VALID`** : elle
+  s'applique à toute ligne écrite ou modifiée désormais, pas aux cinq rejets du run 101, qui
+  n'ont ni migration, ni auteur, ni date, et que la migration n'invente pas (motif « AUCUNE
+  TRACE »). Les rejets restent sans auteur : 30 lignes, dont 25 `a_valider` (normal) et ces 5.
+- Motifs rapatriés **sur pièces seulement** : fournée 1 (run 69) — chaque motif vérifié dans le
+  texte du commentaire (`5 points` → calcul dérivé ; `non document` → affirmation contredite ;
+  `114,57` → arrondi) ; run 70 — fournée intermédiaire obsolète (C4 § 11.6) ; runs 95 et 108 —
+  motif et auteur pris dans les en-têtes des migrations du 24.08, date à la précision du jour ;
+  24 lignes dont l'auteur portait le motif entre parenthèses (« archive de modele erronee »,
+  « donnees superseded ») — motif déplacé, auteur ramené à `N. Castillo` ; file de validation —
+  items 1-3 (A2 2025-11, consensus 0, trois valeurs nulles) et 24-25 (H2/H11 run 168, mêmes
+  valeurs que 16-17 acceptés) ; `composite_queue` doc 1 — auteur et date pris dans sa `note`.
+- État : 38/38 rejets de commentaires motivés (33 avec auteur), 5/5 rejets de file motivés,
+  1/1 écart motivé.
+- **Reste, hors A3** : `composite_queue` 9-11 portent encore « (délégation du 31.08.2026) »
+  dans `verifie_par` — même défaut, statut `traite`, à nettoyer avec A4 ou A10 ; le motif n'est
+  pas encore exposé par l'API ni par l'écran ; `signals` et `flux_evenements` n'ont pas été
+  traités (hors périmètre du plan).
