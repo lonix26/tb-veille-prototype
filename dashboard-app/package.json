@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "Application de restitution du prototype de veille économique (TB HEG Arc). Lit l'API n8n en lecture seule.",
   "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

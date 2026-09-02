@@ -12,9 +12,12 @@ importer les workflows, les lancer dans l'ordre. Aucun script n'intervient dans 
 
 ## 1. Prérequis
 
-Ce qu'il faut sur le poste : **Docker** avec le greffon compose, et **Node.js** (v24.19.0 sur le
-poste de développement ; la version n'est pas épinglée par `package.json`) pour construire
-l'interface (§ 3). Rien d'autre n'est installé hors conteneur.
+Ce qu'il faut sur le poste : **Docker** avec le greffon compose, et **Node.js 24** (v24.19.0 sur le
+poste de développement ; `dashboard-app/.nvmrc` et le champ `engines` de `package.json` le disent
+depuis le 02.09.2026) pour construire l'interface (§ 3). Les quatre images du compose sont
+épinglées par empreinte dans `docker-compose.yml` (PostgreSQL 16.14, n8n 2.20.7-exp.0 sur
+Node 24.14.1, nginx 1.27.5, Adminer 6.0.1) : un `docker compose pull` redonne exactement ce
+qui a tourné. Rien d'autre n'est installé hors conteneur.
 
 ### 1.1 Le `.env` du compose — dans `prototype/`, jamais versionné
 
@@ -165,10 +168,11 @@ produit les runs 51-58 ne correspondait à aucun commit. Elle est archivée tell
 alignés sur l'instance depuis le 02.09 et le réimport a été vérifié (21 workflows, aucun doublon,
 A2 identique nœud pour nœud entre le fichier et l'instance).
 
-Les 26 fichiers de la racine s'importent ; 21 sont présents dans l'instance en service. Les cinq
-autres (`collecte_a5_multi_geo`, `collecte_hard_data`, `collecte_m2_eurostat`,
-`extraction_composite_multi_ia`, `scenario_c_agent_autonome`) sont des états antérieurs ou des
-artefacts de laboratoire, à archiver (correction A9 du tour « jury »).
+Les 21 fichiers de la racine s'importent et sont exactement les 21 workflows de l'instance en
+service. Cinq états antérieurs jamais importés (`collecte_a5_multi_geo`, `collecte_hard_data`,
+`collecte_m2_eurostat`, `extraction_composite_multi_ia`, `scenario_c_agent_autonome`) ont été
+déplacés le 02.09.2026 dans `n8n_workflows/archive/squelettes_2026-08-04/` (correction A9 du tour
+« jury ») ; le `README` de l'archive dit ce que chacun était et ce qui l'a remplacé.
 
 ## 5. Lancer la chaîne, dans cet ordre
 

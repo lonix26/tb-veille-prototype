@@ -30,8 +30,12 @@ sed -i 's/^CREATE SCHEMA public;$/CREATE SCHEMA IF NOT EXISTS public;/; s/^CREAT
 # --- 2. Référentiel, table par table, DANS L'ORDRE DES DÉPENDANCES ----
 # pg_dump ordonne alphabétiquement, ce qui violerait les clés étrangères.
 : > "$TMP/ref.sql"
+# `flux_filtrage_regles` ajoutée le 02.09.2026 (A9) : la règle de filtrage
+# de la file d'examen (seuil_v1, 26.08) est déclarative — sans elle, un
+# socle rejoué filtrait sans règle.
 for t in sectors watch_questions sector_watch_questions sources \
-         indicators indicator_watch_questions source_bindings flux_sources; do
+         indicators indicator_watch_questions source_bindings flux_sources \
+         flux_filtrage_regles; do
   docker exec "$CONTENEUR" pg_dump -U "$U" -d "$D" \
     --data-only --no-owner --column-inserts --table="public.$t" >> "$TMP/ref.sql"
 done

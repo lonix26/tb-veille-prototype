@@ -40,7 +40,7 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 | `dashboard-app/` | Application React/Vite/ECharts servie par nginx, lecture seule sur l'API n8n |
 | `exports/` | Scripts de génération des annexes depuis la base |
 | `DEPLOIEMENT.md` | Séquence complète de mise en service et d'exploitation |
-| `PASSATION_PROTOTYPE.md` *(racine du TB)* | Journal d'état : ce qui est démontré, ce qui ne l'est pas, et les défauts trouvés |
+| `PASSATION_PROTOTYPE.md` | Journal d'état : ce qui est démontré, ce qui ne l'est pas, et les défauts trouvés |
 
 ### Les chaînes de traitement
 
@@ -52,7 +52,7 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 | Synthèse | `analyse_tendances_alertes` (commentaire exécutif), `lecture_transversale` (hypothèses citant leurs faits) | à la demande |
 | Restitution | `api_restitution` (webhook, lecture seule) | permanent |
 
-`scenario_c_agent_autonome.json` reste un **artefact expérimental hors production** : il publie sans validation humaine et n'écrit que dans le schéma `sandbox`. Ne jamais rediriger ses écritures vers les tables de production.
+La confrontation B/C (§ 10.5) a été portée par le script **`scenario_c/agent_autonome.py`**, qui écrit dans le schéma `sandbox` et publie sans validation humaine : artefact expérimental, hors production, à ne jamais rediriger vers les tables de production. La maquette n8n `scenario_c_agent_autonome.json` n'a jamais été importée ni exécutée ; elle est archivée dans `n8n_workflows/archive/squelettes_2026-08-04/` (jusqu'au 02.09.2026, ce paragraphe lui attribuait à tort l'expérience).
 
 ## État
 

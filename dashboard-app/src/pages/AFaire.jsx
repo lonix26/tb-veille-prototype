@@ -56,9 +56,8 @@ function Fiche({ a }) {
       )}
       <div className="fiche-pied">
         <a className="bouton-primaire" href={a.url} target="_blank" rel="noreferrer">Ouvrir l'avis ↗</a>
-        {a.acheteur_courriel && (
-          <a className="bouton-second" href={"mailto:" + a.acheteur_courriel}>Écrire à l'acheteur</a>
-        )}
+        {/* 02.09.2026 (A9) : plus de lien « Écrire à l'acheteur » — le courriel
+            de contact ne sort plus des vues de restitution ; il est dans l'avis. */}
         <button className="bouton-lien" onClick={() => setOuvert(o => !o)}>
           {ouvert ? "Masquer le raisonnement" : "Pourquoi cet avis ?"}
         </button>
@@ -174,7 +173,7 @@ export default function AFaire() {
                 <tr><th>Organisation</th><th>Marché</th>
                     <th style={{ textAlign: "right" }}>Avis</th>
                     <th style={{ textAlign: "right" }}>dont ouverts</th>
-                    <th>Actif depuis</th><th>Contact</th></tr>
+                    <th>Actif depuis</th><th>Site</th></tr>
               </thead>
               <tbody>
                 {(tout ? acheteurs : acheteurs.slice(0, 10)).map((a, i) => (
@@ -191,8 +190,8 @@ export default function AFaire() {
                         : <span className="neutre">n.d.</span>}
                     </td>
                     <td className="cell-note">{dateCH(a.premier_avis)}</td>
-                    <td>{a.acheteur_courriel
-                          ? <a href={"mailto:" + a.acheteur_courriel}>écrire</a>
+                    <td>{a.acheteur_site
+                          ? <a href={a.acheteur_site} target="_blank" rel="noreferrer">ouvrir</a>
                           : <span className="neutre">n.d.</span>}</td>
                   </tr>
                 ))}

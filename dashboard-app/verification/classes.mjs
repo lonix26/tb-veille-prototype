@@ -13,7 +13,7 @@ const VIVANTS = [
   "src/App.jsx", "src/pages/Accueil.jsx", "src/pages/Secteur.jsx",
   "src/pages/Referentiel.jsx", "src/pages/Executions.jsx",
   "src/pages/AFaire.jsx", "src/pages/Anticiper.jsx", "src/pages/Fiabilite.jsx",
-  "src/api.jsx", "src/Mini.jsx", "src/Chart.jsx"
+  "src/api.jsx", "src/Chart.jsx"  // Mini.jsx archivé le 02.09.2026 (A9), plus aucune page ne l'importait
 ];
 const FEUILLE = readFileSync("src/styles.css", "utf8");
 const definies = new Set([...FEUILLE.matchAll(/\.([a-z][a-z0-9_-]*)/gi)].map(m => m[1]));

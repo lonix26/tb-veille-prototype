@@ -11,7 +11,10 @@
 services:
 
   db:
-    image: postgres:16-alpine
+    # Versions ÉPINGLÉES le 02.09.2026 (A9) par empreinte : c'est l'image qui
+    # tourne réellement, relevée par `docker image inspect`. En clair :
+    # PostgreSQL 16.14 (postgres:16-alpine du 07.07.2026).
+    image: postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     container_name: veille_db
     restart: unless-stopped
     environment:
@@ -33,7 +36,10 @@ services:
       retries: 10
 
   n8n:
-    image: n8nio/n8n:latest
+    # n8n 2.20.7-exp.0 sur Node 24.14.1 (n8nio/n8n:latest tel que tiré, image
+    # du 13.05.2026). Épinglé par empreinte le 02.09.2026 : `latest` changeait
+    # de version à chaque tirage, et 2.x a déjà cassé deux fois le rejeu.
+    image: n8nio/n8n@sha256:ab26afca1a78fdb9b042eb6285565b869cdf1fd9c465cdcd9e2e5e7f764957d3
     container_name: veille_n8n
     restart: unless-stopped
     depends_on:
@@ -94,7 +100,8 @@ services:
       - "127.0.0.1:5678:5678"
 
   dashboard:
-    image: nginx:1.27-alpine
+    # nginx 1.27.5, épinglé par empreinte le 02.09.2026.
+    image: nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     container_name: veille_dashboard
     restart: unless-stopped
     depends_on:
@@ -108,7 +115,8 @@ services:
       - "127.0.0.1:8080:80"
 
   adminer:
-    image: adminer:latest
+    # Adminer 6.0.1, épinglé par empreinte le 02.09.2026 (outil optionnel).
+    image: adminer@sha256:f742dcf1b6ca95733b54c4e020488ce78f3e774d73543a6ded9b4eaea8974f3d
     container_name: veille_adminer
     restart: unless-stopped
     profiles: ["outils"]
