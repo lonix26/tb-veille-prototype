@@ -5643,3 +5643,35 @@ alimentée et jamais décidée. Décidée ce jour, migration
   Denied » le 02.09 (FHWA, DOT) alors que la file les avait vues en 200 le 22.08.
 - **Socle** : la colonne `motif` et la ligne `acea_incitations` seront reprises dans `db/` à la
   prochaine régénération (règle « à chaque gel »), pas fichier par fichier.
+
+## 02.09.2026 (suite 11) — Liste B, acte 2 : les textes servis relus
+
+Deuxième « jamais » du tour jury : les textes de modèle servis avec badge « non relu »
+n'avaient jamais été relus depuis le régime de diffusion du 31.08. Relus ce jour, migration
+`2026-09-02_b2_relecture_textes_servis.sql` (sortie en annexe 5). Décisions de l'étudiant
+sur proposition motivée ; `validated_by = 'N. Castillo'`.
+
+- **Contrôle préalable, automatisé** : chaque nombre des 5 commentaires servis (run 199) a été
+  cherché dans la charge d'entrée que le modèle avait reçue (`input_payload`) — **91/91
+  retrouvés**, aucun chiffre inventé ni calcul dérivé (les défauts de la fournée 1 du 24.08 ne
+  se reproduisent pas). Pour les 13 lectures transversales, les références `[Fn]` de
+  l'hypothèse ont été confrontées aux faits joints (`faits_cites`).
+- **Commentaires : 4 validés (85, 86, 88, 89), 1 rejeté (87, horlogerie)** — « les reculs
+  d'emploi et d'établissements » alors que H11 est à +0,44 %, ce que le § 5 du même texte dit.
+  Famille : affirmation contredite.
+- **Lectures : 7 validées (1, 2, 4, 8, 9, 12, 13), 6 rejetées.** Deux familles : *affirmation
+  contredite ou non fondée* (5 : un dénombrement mensuel ne fonde pas une « progression » ;
+  6 : « les plus nourris de tous les secteurs », 29 contre 34 en médical le même mois ; 10 :
+  dominance non lisible dans un seul type dénombré) et *référence invérifiable* (3 : [F7] ;
+  7 : [F29] ; 11 : [F59] [F60] absents des faits joints) — cette seconde famille est
+  **nouvelle** pour les lectures, à écrire au ch. 12. La 12 porte un incident « chiffre
+  étranger » du pipeline : faux positif (le « 20 » de « G20 »), consigné dans le motif.
+  Colonne `motif` ajoutée à `lectures_transversales` (absente jusqu'ici).
+- **Effet à l'écran, vérifié sur `/veille/donnees`** : quatre commentaires servis sans badge ;
+  pour l'horlogerie, l'API sert désormais le **82** (run 197, `a_valider`, badge) — repli
+  conçu sur le dernier texte non rejeté, à relire à son tour. Lectures servies : 8, 9, 12, 13
+  (les deux rejetées du run 200 ne sont plus servies).
+- **À dire dans le rapport** : la validation porte sur *le texte face à sa charge du jour*,
+  pas face à la base d'aujourd'hui — les dénombrements d'événements cités le 31.08 (F39 = 29)
+  ne sont plus ceux de la vue (9), les événements ayant bougé depuis. Taux mesurés une fois :
+  commentaires 1 rejet / 5, lectures 6 / 13.
