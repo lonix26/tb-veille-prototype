@@ -712,3 +712,8 @@ main{max-width:1240px;padding:30px 40px 40px}
 .e-ok{background:var(--vert-bg);color:var(--vert)}
 .e-attn{background:var(--ambre-bg);color:var(--ambre)}
 .e-mal{background:var(--rouge-bg);color:var(--rouge)}
+
+/* Revue du 02.09.2026 : bandeau d'échec de rechargement (données conservées). */
+.bandeau-echec{background:var(--ambre-bg);color:var(--ambre);border-radius:var(--r);
+  padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.5}
+.bandeau-echec .rafraichir{margin-left:8px}

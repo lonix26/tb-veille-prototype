@@ -146,6 +146,24 @@ Il rend chaque écran hors navigateur avec les données réelles de l'API (dix-s
 l'écran secteur compte cinq fois, l'écran fiabilité une fois par onglet) et sort en erreur si
 l'un d'eux lève une exception.
 
+### 3.1 Où l'application va chercher l'API — poste local par conception
+
+L'application interroge l'API de restitution **depuis le navigateur**, à l'adresse compilée
+dans le bundle : `VITE_API_BASE`, sinon `http://localhost:5678/webhook/veille`. Le compose
+n'expose n8n et nginx que sur `127.0.0.1` : l'ensemble est conçu pour le poste du décideur,
+et c'est ainsi qu'il est démontré. Ce n'est pas une limite cachée, c'en est une dite (revue
+du 02.09.2026).
+
+Si l'on servait un jour l'interface depuis un serveur, deux voies, sans changer le code :
+
+- **au build** : `VITE_API_BASE=https://<hôte>/webhook/veille npm run build` — l'adresse est
+  figée dans le bundle, à reconstruire si elle change ;
+- **par nginx** : ajouter dans la configuration du service `dashboard` un
+  `location /webhook/ { proxy_pass http://n8n:5678/webhook/; }` et construire avec
+  `VITE_API_BASE=/webhook/veille` — une seule origine, pas de CORS, n8n jamais exposé.
+
+Ni l'une ni l'autre n'est mise en œuvre ici : elles sont documentées, pas démontrées.
+
 ## 4. Importer les workflows
 
 ```bash
@@ -269,7 +287,9 @@ for e in sante donnees actions signaux opportunites attribution geographie; do
 done
 ```
 
-Les sept doivent répondre 200. Puis la restitution : **http://localhost:8080**
+Les sept doivent répondre 200 — l'application n'en lit que trois (`donnees`, `sante`,
+`actions`, depuis la revue du 02.09.2026), les quatre autres restent servis pour la requête
+directe. Puis la restitution : **http://localhost:8080**
 
 ---
 

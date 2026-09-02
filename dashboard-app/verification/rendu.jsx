@@ -58,10 +58,9 @@ const ECRANS = [
 const avert = console.error;
 console.error = (...a) => { if (!String(a[0] ?? "").includes("useLayoutEffect")) avert(...a); };
 
-const [D, S, G, O, A, AT, GEO] = await Promise.all(
-  ["/donnees", "/sante", "/signaux", "/opportunites", "/actions", "/attribution", "/geographie"].map(lire)
-);
-const valeur = { D, S, G, O, A, AT, GEO, erreur: null, erreursV4: {}, chargement: false,
+// Revue du 02.09.2026 : trois points lus, comme le fournisseur (api.jsx).
+const [D, S, A] = await Promise.all(["/donnees", "/sante", "/actions"].map(lire));
+const valeur = { D, S, A, erreur: null, erreursV4: {}, chargement: false,
                  misAJour: new Date(), recharger: () => {} };
 
 let echecs = 0;

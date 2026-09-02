@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDonnees, nb, pct, clsVar, nomZone, relu, BadgeCommentaire,
-         sensMouvement, SENS_ETQ } from "../api.jsx";
+         sensMouvement, SENS_ETQ, alertesSignificatives } from "../api.jsx";
 import { MarkdownLeger } from "../api.jsx";
 import { Synthetique } from "./Secteur.jsx";
 
@@ -25,8 +25,10 @@ export default function Accueil() {
   const r = D.referentiel || [];
   const certifies = r.filter(i => i.status === "certifie");
   const collectes = certifies.filter(i => i.observations > 0);
-  const alertes = D.alertes || [];
-  const diff = alertes.filter(a => a.diffusable);
+  // Revue du 02.09.2026 : même règle que la navigation et les pages
+  // secteur (diffusable ET poids ≥ SEUIL_POIDS_PCT %) — la liste « À
+  // examiner » ne doit pas montrer une série que les vignettes ne comptent pas.
+  const diff = alertesSignificatives(D).retenues;
   const run = D.run_courant || {};
   const totalObs = r.reduce((s, i) => s + Number(i.observations || 0), 0);
   const secteurs = [...new Map(r.map(i => [i.sector_code, i.sector_label])).entries()]
@@ -51,8 +53,10 @@ export default function Accueil() {
           const inds = r.filter(i => i.sector_code === c &&
             (i.en_vitrine === undefined ? i.observations > 0 : i.en_vitrine));
           const n = inds.filter(i => i.observations > 0).length;
-          const al = new Set(alertes.filter(a => a.sector_code === c && a.diffusable)
-            .map(a => a.indicator_id)).size;
+          // Revue du 02.09.2026 : compter avec la règle UNIQUE (seuil de
+          // poids compris), comme la navigation — l'accueil disait 3 en
+          // aérospatial quand la navigation disait 2 (S3 Allemagne, 0,47 %).
+          const al = new Set(diff.filter(a => a.sector_code === c).map(a => a.indicator_id)).size;
           const com = (D.commentaires || []).find(k => k.sector_code === c);
           const extrait = retenir(com?.text);
           return (
@@ -112,7 +116,7 @@ export default function Accueil() {
                 <span className={clsVar(a.glissement_annuel_pct ?? a.variation_periode_pct)}>
                   {pct(a.glissement_annuel_pct ?? a.variation_periode_pct)}
                 </span>{" "}
-                <span className={"etq " + SENS_ETQ[sensMouvement(D, a)][0]}>{SENS_ETQ[sensMouvement(D, a)][1]}</span>{a._n > 1 && <span style={{ color: "var(--gris)" }}> · {a._n} zones concernées</span>}
+                <span className={"etq " + SENS_ETQ[sensMouvement(D, a)][0]}>{SENS_ETQ[sensMouvement(D, a)][1]}</span>{a._n > 1 && <span style={{ color: "var(--gris)" }}> · {a._n} zones pesantes concernées</span>}
               </div>
             </div>
           ))}

@@ -5754,3 +5754,92 @@ motivée ; `audite_par = 'N. Castillo'`, échantillon `2026-09`.
 (puis 82 validé) ; lectures 6 / 13 ; événements 6 / 30 (20 %) ; filtrage 1 / 40 (2,5 %). Aucun
 de ces chiffres ne se cite depuis un texte : `commentaries.status`,
 `lectures_transversales.statut`, `flux_evenements.statut`, `v_bilan_filtrage`.
+
+## 02.09.2026 (suite 14) — Revue de code de l'application : douze constats, corrections
+
+Revue demandée après la clôture des listes A et B (« code review » de `dashboard-app/`). La revue
+déléguée a été coupée par la limite de session ; ses douze candidats ont été **vérifiés un à un
+sur le code et sur la charge `/veille/donnees` du jour**, puis corrigés à la demande de
+l'étudiant (« toutes les corrections, en étant certain que l'application ne casse pas »).
+Aucune donnée ni vue de base touchée ; commit unique. Les comptes ci-dessous sont lus sur les
+textes rendus avant/après (`verification/rendu.jsx`, `TEXTE=…`) et sur les captures.
+
+**Corrigé, visible à l'écran aujourd'hui :**
+
+1. **Troisième copie de la règle des franchissements** (`Accueil.jsx`) : les vignettes de
+   l'accueil comptaient les alertes `diffusable` sans le seuil de poids — aérospatial **3 à
+   l'accueil, 2 dans la navigation** (S3 Allemagne, 0,47 % du flux). L'accueil lit
+   `alertesSignificatives`, comme la navigation et les pages secteur ; sa liste « À examiner »
+   aussi (« zones pesantes concernées »). Après : 2/2/5/2 partout. Note datée ajoutée sous le
+   commentaire du 23.08 dans `api.jsx`, sans le réécrire.
+2. **Période de référence des paniers** (`Secteur.jsx`) : la période commune était exigée de
+   toutes les zones, marginales comprises — un micro-déclarant en retard figeait le panier :
+   **A3 lu au titre de 2023, M3 de 2021**. Règle : exigée des zones **pesantes** (≥ 1 % de la
+   somme des dernières valeurs, même seuil que les mouvements) ; une grandeur non additive n'a
+   pas de panier, elle se lit à la période la plus récente. Après : A3 → **2025** (3 marginales
+   sans valeur, dites), M3 → **2023** (Ukraine sans valeur, dite), M1/H3 restent à 2024 (la Chine,
+   pesante, n'a pas déclaré 2025 — c'est le bon comportement). Deux notes distinctes : les
+   pesantes en retard qui justifient le recul, les zones absentes de la période retenue.
+3. **Franchissement non strict** (`Secteur.jsx`) : la vue sert « franchi (variation de periode,
+   faute de glissement) » pour 42 métriques, dont **A2/EU27** listée en tête de page comme
+   mouvement mais carte muette (`=== "franchi"`). Test préfixé comme le cas « sous », et la
+   phrase cite la variation effectivement jugée (« depuis le point précédent (+20,2 %), faute de
+   glissement annuel »).
+4. **Doublons** dans le détail des mouvements : `retenues` sont des copies (`syntheseZones`),
+   `includes` par référence ne les excluait jamais → comparaison par `geo`.
+5. **Lien QV3 circulaire** : « dynamique géographique (QV3) ↗ » renvoyait vers `/qv/<secteur>`,
+   c'est-à-dire la page courante rechargée en tête. Il descend vers la carte de l'indicateur
+   (`id="ind-<ID>"`, « carte A1 ci-dessous ↓ »). La route `/qv/:code` est conservée (redirection
+   inoffensive). `useNavigate` retiré de `Secteur.jsx`.
+
+**Corrigé, latent (ne se voyait pas sur les données du jour) :**
+
+6. **Rechargement en échec silencieux** : un échec après une charge réussie laissait les
+   anciennes données sans le dire, et un point secondaire en échec repassait à `null` (écran
+   vidé sans mot). `api.jsx` conserve la valeur précédente et consigne l'erreur ;
+   `App.jsx` affiche un bandeau `.bandeau-echec` (« Le rechargement a échoué : … — données
+   affichées : celles chargées à HH:MM », points secondaires nommés, bouton Réessayer).
+7. **Points de lecture et code mort** : l'en-tête annonçait quatre points, le code en lisait
+   sept, dont quatre sans consommateur (`/signaux`, `/opportunites`, `/attribution`,
+   `/geographie`). Trois restent lus (`/donnees`, `/sante`, `/actions`) ; les quatre autres
+   restent **servis** par l'API (DEPLOIEMENT § 6 le dit). Retirés : `MentionTriage`,
+   `signatureCommentaire` (`api.jsx`) et huit sections de `phrases.jsx` sans appelant depuis la
+   refonte de l'accueil du 28.08 (état du marché, direction longue, variation, brief,
+   mouvement, article, écart/nouveauté, nature du fait) — note datée en tête, numérotation des
+   sections restantes conservée. `verification/rendu.jsx` adapté (trois points).
+8. **Instance ECharts** (`Chart.jsx`) : `init`/`dispose` à chaque rendu → instance persistante
+   par `useInstance` (ResizeObserver, `dispose` au démontage), `setOption` avec
+   `replaceMerge: ["series"]`, légende toujours déclarée (sinon une ancienne légende survivait à
+   la fusion). Vérifié aux captures : courbes, légende, zoom, treemap rendent.
+9. **Valeurs nulles** dans les séries : `Math.round(null * 100)` donnait 0 (un trou devenait un
+   zéro tracé) → `null` conservé.
+10. **Gabarits sans zone de référence** : `metrDe(D, id, null)` ne trouvait jamais rien (8
+    indicateurs sans `geo_reference`). `metrReference` (api.jsx) accepte une métrique **unique** ;
+    plusieurs métriques sans référence restent un échec silencieux — jamais une zone au hasard
+    (UI-1). Appliqué à `resoudreGabarit` et à la lecture calculée.
+11. **Réserve « aucun signal d'avance »** sur un marché sans série : aurait écrit « les zéro
+    séries qui portent ce score » → marché sauté (`Fiabilite.jsx`).
+
+**Documenté seulement (conception, pas défaut) :**
+
+12. **Adresse de l'API compilée** (`VITE_API_BASE` sinon `localhost:5678`) : application locale
+    par conception, compose sur `127.0.0.1`. `DEPLOIEMENT.md` § 3.1 le dit et donne les deux voies
+    pour un serveur (variable au build ; `proxy_pass` nginx vers `n8n:5678`) — **documentées,
+    pas démontrées**.
+
+**Ce qui a cassé pendant la revue, et ce qui l'a attrapé.** En retirant `misAJour` de la
+destructuration de la coquille (n° 6), j'ai laissé le pied de page l'utiliser : `npm run build`
+passait, **le harnais `rendu.jsx` passait (17 écrans)**, et l'application était **blanche dans le
+navigateur** (`ReferenceError: misAJour is not defined`). Le harnais ne rend que les pages, pas la
+coquille ni ECharts. Correctif immédiat, et **nouvelle passe `verification/console.mjs`**
+(Puppeteer : erreurs de page, de console, de requête, écran vide sur les onze routes), intégrée
+à `executer.sh` en troisième passe — elle suppose l'application servie sur 8080. Résultat :
+« Aucune erreur de navigateur sur les onze écrans. » À dire dans le rapport : c'est exactement
+la faute que le seul rendu serveur ne voit pas.
+
+**Preuves** : `bash verification/executer.sh` (hooks, classes, 17 rendus, sonde navigateur, tout
+vert) ; `npm run build` (bundle `index-*.js`, servi par nginx, vérifié par `curl`) ; captures
+`annexes/6_captures/2026-09-02_revue/` (11 écrans, pleine page — un premier jeu à 900 px de haut
+était le symptôme de l'écran blanc, écrasé). Non couvert : le bandeau de rechargement (n° 6) n'a
+pas été vu à l'écran — il faudrait couper n8n pendant un rechargement ; le code est relu, pas
+démontré.

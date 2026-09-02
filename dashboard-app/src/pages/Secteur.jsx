@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   useDonnees, nb, pct, clsVar, dateCH, estAgregat, nomZone,
-  serieDe, zonesDe, metrDe, BadgeStatut, MarkdownLeger, relu,
+  serieDe, zonesDe, metrDe, metrReference, BadgeStatut, MarkdownLeger, relu,
   sensMouvement, SENS_ETQ, QV_LIBELLES, qvDe, syntheseZones, SEUIL_POIDS_PCT,
   alertesSignificatives, TYPE_EVT, SENS_EVT, BadgeEvenement
 } from "../api.jsx";
@@ -17,11 +17,9 @@ function Lecture({ code, inds }) {
   // était établie sur la PREMIÈRE métrique servie par indicateur — Aruba pour H1,
   // l'Afghanistan pour M3. Elle l'est désormais sur la zone de référence déclarée
   // au référentiel ; un indicateur sans métrique sur cette zone n'est pas compté.
-  const refDe = id => (D?.referentiel || []).find(r => r.indicator_id === id);
-  const ms = collectes.map(i => {
-    const g = refDe(i.indicator_id)?.geo_reference;
-    return g ? metrDe(D, i.indicator_id, g) : null;
-  }).filter(Boolean);
+  // Revue du 02.09.2026 : un indicateur mono-zone sans référence déclarée est
+  // accepté (metrReference) ; le principe reste « jamais une zone au hasard ».
+  const ms = collectes.map(i => metrReference(D, i.indicator_id)).filter(Boolean);
   const varsOk = ms.filter(m => m.glissement_annuel_pct !== null);
   const hausses = varsOk.filter(m => m.glissement_annuel_pct > 0).length;
   const baisses = varsOk.filter(m => m.glissement_annuel_pct < 0).length;
@@ -112,7 +110,6 @@ const signe = a => Math.sign(Number(a.glissement_annuel_pct ?? a.variation_perio
 
 export function Alertes({ code }) {
   const { D } = useDonnees();
-  const navigate = useNavigate();
   if (D.alertes === undefined)
     return <div className="note">Mouvements inhabituels : non interrogés (clé absente de la charge utile).</div>;
   const liste = (D.alertes || []).filter(a => code === undefined || a.sector_code === code);
@@ -248,9 +245,12 @@ export function Alertes({ code }) {
               {e.zones.length > 0 && (
                 <div className="a-m">
                   Le déplacement se lit en points de part dans la{" "}
-                  <span className="src-inline" onClick={() => navigate("/qv/" + e.rows[0].sector_code)}>
-                    dynamique géographique (QV3) ↗
+                  <span className="src-inline" onClick={() => document.getElementById("ind-" + e.rows[0].indicator_id)?.scrollIntoView({ behavior: "smooth" })}>
+                    carte {e.rows[0].indicator_id} ci-dessous ↓
                   </span>
+                  {/* Revue du 02.09.2026 : le lien renvoyait vers /qv/<secteur>, c'est-à-dire la page
+                      courante rechargée en tête (aller-retour sans destination). Il descend maintenant
+                      vers la carte de l'indicateur, où le graphique est déjà lu par zone. */}
                 </div>
               )}
               <details style={{ marginTop: 4 }}>
@@ -258,7 +258,7 @@ export function Alertes({ code }) {
                   les {e.rows.length} mouvements détectés : agrégats, puis zones par poids décroissant
                 </summary>
                 <div style={{ marginTop: 6 }}>
-                  {[...e.agregats, ...e.retenues, ...e.zones.filter(a => !e.retenues.includes(a)), ...e.anciens].map(ligne)}
+                  {[...e.agregats, ...e.retenues, ...e.zones.filter(a => !e.retenues.some(r => r.geo === a.geo)), ...e.anciens].map(ligne)}
                 </div>
               </details>
             </div>
@@ -304,7 +304,10 @@ function resoudreGabarit(gabarit, D) {
   let ok = true;
   const texte = gabarit.replace(/\{([A-Z]+\d+)\.(val|unit|ga|vp|pt|per)\}/g, (_, id, champ) => {
     const ref = (D?.referentiel || []).find(r => r.indicator_id === id);
-    const m = ref ? metrDe(D, id, ref.geo_reference) : metrDe(D, id);
+    // Revue du 02.09.2026 : `metrDe(D, id, null)` ne trouvait jamais rien
+    // (aucune métrique n'a geo === null) ; un indicateur sans zone de
+    // référence mais mono-zone est désormais résolu — voir metrReference.
+    const m = metrReference(D, id);
     if (!m) { ok = false; return ""; }
     const lis = valeurLisible(m.value, ref?.unit || "");
     switch (champ) {
@@ -628,7 +631,7 @@ function CarteIndicateur({ ind }) {
   const PLAF = 10;
 
   return (
-    <div className="carte ind">
+    <div className="carte ind" id={"ind-" + ind.indicator_id}>
       <div className="i-code">
         {ind.indicator_id} · {ind.category === "hard" ? "collecté par code" : "composite · IA + validation"}
         {ind.questions && <span className="etq e-violet" style={{ marginLeft: 6 }}>{ind.questions}</span>}
@@ -672,10 +675,18 @@ function CarteIndicateur({ ind }) {
             refLabel="moyenne mobile"
             zoom={sPrincipale.length > 18}
           />
-          {m && m.franchissement === "franchi" && (
+          {/* Revue du 02.09.2026 : la vue sert aussi « franchi (variation de
+              periode, faute de glissement) » (42 métriques, dont A2/EU27) ; le
+              test strict === "franchi" laissait ces cartes muettes alors que
+              l'alerte était listée plus haut. Même test préfixé que le cas
+              « sous », et la variation citée est celle qui a été jugée. */}
+          {m && String(m.franchissement || "").startsWith("franchi") && (
             <div className="i-seuil">
               <span className="etq e-rouge">seuil franchi</span>
-              la variation annuelle ({pct(m.glissement_annuel_pct)}) dépasse le seuil de matérialité
+              {m.glissement_annuel_pct !== null && m.glissement_annuel_pct !== undefined
+                ? <>la variation annuelle ({pct(m.glissement_annuel_pct)})</>
+                : <>la variation depuis le point précédent ({pct(m.variation_periode_pct)}), faute de glissement annuel,</>}
+              {" "}dépasse le seuil de matérialité
               ({nb(m.seuil_materialite_pct, 1)} %) : ce mouvement sort de l'ordinaire pour cette série.
             </div>
           )}
@@ -699,7 +710,26 @@ function CarteIndicateur({ ind }) {
         const additif = /USD|EUR|CHF|unité|appareil|nombre/i.test(ind.unit || "");
         const periodesParZone = new Map(pays.map(z0 => [z0, new Set(serieDe(D, ind.indicator_id, z0).map(p => p.period))]));
         const toutes = [...new Set(pays.flatMap(z0 => [...periodesParZone.get(z0)]))].sort();
-        const communes = toutes.filter(p => pays.every(z0 => periodesParZone.get(z0).has(p)));
+        /* Revue du 02.09.2026 : la période commune était exigée de TOUTES
+           les zones, marginales comprises — un micro-déclarant en retard
+           figeait le panier des années en arrière (M3 lu au titre de 2021,
+           A3 de 2023, M1/H3 de 2024). Elle est désormais exigée des zones
+           PESANTES (≥ SEUIL_POIDS_PCT % de la somme des dernières valeurs,
+           même seuil que les mouvements inhabituels). Les marginales sans
+           valeur à la période retenue sont dites dans la note, pas tues.
+           Une grandeur NON additive (taux, indice, part du PIB) n'a pas de
+           panier : aucune part ni total n'en dépend, chaque zone se lit
+           seule — la période retenue est alors la plus récente, et les
+           zones qui ne l'ont pas déclarée sont listées (M3 : 206 pays lus
+           au titre de 2021 parce que l'Ukraine manquait en 2022-2023). */
+        const derniereDe = z0 => { const s = serieDe(D, ind.indicator_id, z0); return s.length ? Number(s[s.length - 1].value) || 0 : 0; };
+        const dernieres = new Map(pays.map(z0 => [z0, derniereDe(z0)]));
+        const sommeDernieres = [...dernieres.values()].reduce((s, v) => s + v, 0);
+        const pesantes = !additif ? []
+          : sommeDernieres > 0
+            ? pays.filter(z0 => dernieres.get(z0) / sommeDernieres * 100 >= SEUIL_POIDS_PCT)
+            : pays;
+        const communes = toutes.filter(p => pesantes.every(z0 => periodesParZone.get(z0).has(p)));
         const pRef = communes.length ? communes[communes.length - 1] : toutes[toutes.length - 1];
         const pRecente = toutes[toutes.length - 1];
         const pPrev = String(parseInt(pRef.slice(0, 4), 10) - 1) + pRef.slice(4);
@@ -737,6 +767,9 @@ function CarteIndicateur({ ind }) {
           g: "__reste__", v: total - sommePanier, vp: null
         } : null;
         const manquants = pays.filter(z0 => !periodesParZone.get(z0).has(pRecente));
+        const pesantesEnRetard = manquants.filter(z0 => pesantes.includes(z0));
+        const manquantsRef = pays.filter(z0 => !periodesParZone.get(z0).has(pRef));
+        const manquantsRefMarginaux = additif && manquantsRef.every(z0 => !pesantes.includes(z0));
         // Le max sert l'échelle des barres — indépendant de l'ordre de tri
         // (avec un compagnon de volume, la première ligne n'est plus le max).
         const maxRef = Math.max(...lignesRef.map(z => z.v));
@@ -877,11 +910,18 @@ function CarteIndicateur({ ind }) {
                 )}
               </>
             )}
-            {pRecente !== pRef && manquants.length > 0 && (
+            {pRecente !== pRef && pesantesEnRetard.length > 0 && (
               <div className="note">
-                {pRecente} est encore incomplète ({manquants.slice(0, 6).map(nomZone).join(", ")}{manquants.length > 6 ? "…" : ""} sans soumission) :
-                lecture au titre de {pRef}, la dernière période où tout le panier a déclaré. Classer sur
-                l'année incomplète donnerait une part nulle aux retardataires.
+                {pRecente} est encore incomplète ({pesantesEnRetard.slice(0, 6).map(nomZone).join(", ")}{pesantesEnRetard.length > 6 ? "…" : ""} sans soumission) :
+                lecture au titre de {pRef}, la dernière période où toutes les zones pesantes (≥ {SEUIL_POIDS_PCT} % du panier) ont déclaré.
+                Classer sur l'année incomplète donnerait une part nulle aux retardataires.
+              </div>
+            )}
+            {manquantsRef.length > 0 && (
+              <div className="note">
+                {manquantsRef.length} zone{manquantsRef.length > 1 ? "s" : ""}{manquantsRefMarginaux ? <> marginale{manquantsRef.length > 1 ? "s" : ""} (&lt; {SEUIL_POIDS_PCT} % du panier)</> : null} sans
+                valeur pour {pRef} ({manquantsRef.slice(0, 6).map(nomZone).join(", ")}{manquantsRef.length > 6 ? "…" : ""}) :
+                absente{manquantsRef.length > 1 ? "s" : ""} du classement{additif ? " et du total du panier suivi" : ""} à cette période.
               </div>
             )}
             {additif && (

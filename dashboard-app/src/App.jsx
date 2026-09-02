@@ -110,6 +110,28 @@ function Erreur({ erreur, recharger }) {
   );
 }
 
+// Revue du 02.09.2026 : un rechargement en échec après une charge réussie
+// laissait l'écran muet — les données affichées étaient celles d'avant,
+// sans le dire. Le bandeau nomme l'échec (charge principale et points
+// secondaires) et l'heure des données encore affichées.
+function BandeauRechargement() {
+  const { D, erreur, erreursV4, misAJour, recharger } = useDonnees();
+  const secondairesEnEchec = Object.entries(erreursV4 || {}).filter(([, e]) => e);
+  if (!D || (!erreur && !secondairesEnEchec.length)) return null;
+  return (
+    <div className="bandeau-echec" role="status">
+      <strong>Le rechargement a échoué</strong>
+      {erreur && <> : {erreur}</>}
+      {secondairesEnEchec.length > 0 && (
+        <> — point{secondairesEnEchec.length > 1 ? "s" : ""} secondaire{secondairesEnEchec.length > 1 ? "s" : ""} en échec :{" "}
+          {secondairesEnEchec.map(([c, e]) => `${c} (${e})`).join(", ")}</>
+      )}
+      {" "}— données affichées : celles chargées à {heureCH(misAJour)}.{" "}
+      <button className="rafraichir" onClick={recharger}>Réessayer</button>
+    </div>
+  );
+}
+
 function Coquille() {
   const { D, erreur, chargement, misAJour, recharger } = useDonnees();
   if (chargement && !D) return (<><Entete /><Squelette /></>);
@@ -118,6 +140,7 @@ function Coquille() {
     <>
       <Navigation />
       <main>
+        <BandeauRechargement />
         <Routes>
           <Route path="/" element={<Accueil />} />
           <Route path="/secteur/:code" element={<Secteur />} />

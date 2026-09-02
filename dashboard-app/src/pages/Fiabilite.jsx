@@ -24,6 +24,10 @@ function reservesDuDispositif(D, S) {
 
   // 1. Marchés sans indicateur avancé.
   for (const m of marches) {
+    // Revue du 02.09.2026 : un marché sans aucune série instrumentée n'a
+    // pas « aucun signal d'avance », il n'a rien — la réserve aurait dit
+    // « les zéro séries qui portent ce score ». Il est couvert plus bas.
+    if (!m.indicateurs?.length) continue;
     const c = compositionLatence(D, m.indicateurs);
     if (c.avance === 0) r.push({
       gravite: "grave", ou: m.sector_label,

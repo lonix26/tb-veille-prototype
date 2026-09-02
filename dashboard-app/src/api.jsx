@@ -13,21 +13,27 @@ export const API_URL = API_BASE + "/donnees";
 // teste qu'en l'ouvrant à la main, ce qui n'est pas une vérification.
 export const Ctx = createContext(null);
 
-// La v4 lit QUATRE points de lecture, tous en lecture seule :
-//   /donnees      — la charge utile historique (v2/v3), conservée telle quelle
-//   /sante        — santé sectorielle et compteurs (écran « Cette semaine »)
-//   /signaux      — signaux VALIDÉS, axes du triage et confirmateurs (écran Radar)
-//   /opportunites — items de marchés publics EXAMINÉS par un humain (écran 4)
-// Les trois derniers échouent sans faire tomber l'application : un écran qui
+// Trois points de lecture, tous en lecture seule (revue du 02.09.2026 —
+// l'en-tête en annonçait quatre et le code en interrogeait sept, dont
+// quatre sans aucun consommateur : /signaux, /opportunites, /attribution,
+// /geographie ; ils restent servis par l'API, ils ne sont plus lus ici) :
+//   /donnees — la charge utile principale (référentiel, valeurs, métriques,
+//              alertes, commentaires, événements…)
+//   /sante   — santé sectorielle, filtrage, exposition (« Fiabilité », « Anticiper »)
+//   /actions — avis de marchés publics adressables (« À faire »)
+// Les deux derniers échouent sans faire tomber l'application : un écran qui
 // ne peut pas se peupler le dit, il ne disparaît pas.
+//
+// Rechargement (revue du 02.09.2026) : un échec de rechargement ne remplace
+// plus les données affichées par du vide — la dernière charge réussie reste
+// à l'écran, et la coquille le dit avec l'heure de cette charge. Avant, un
+// point secondaire en échec repassait à null et l'écran concerné se vidait
+// sans mot ; la charge principale, elle, restait affichée mais l'erreur
+// n'était montrée que si rien n'avait jamais été chargé.
 export function FournisseurDonnees({ children }) {
   const [donnees, setDonnees] = useState(null);
   const [sante, setSante] = useState(null);
-  const [signaux, setSignaux] = useState(null);
-  const [opportunites, setOpportunites] = useState(null);
   const [actions, setActions] = useState(null);
-  const [attribution, setAttribution] = useState(null);
-  const [geographie, setGeographie] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [erreursV4, setErreursV4] = useState({});
   const [chargement, setChargement] = useState(true);
@@ -43,7 +49,7 @@ export function FournisseurDonnees({ children }) {
         poser(await r.json());
         setErreursV4(e => ({ ...e, [chemin]: null }));
       } catch (e) {
-        poser(null);
+        // Valeur précédente conservée ; l'erreur est consignée et affichée.
         setErreursV4(er => ({ ...er, [chemin]: String(e) }));
       }
     };
@@ -57,11 +63,7 @@ export function FournisseurDonnees({ children }) {
     }
     await Promise.all([
       secondaire("/sante", setSante),
-      secondaire("/signaux", setSignaux),
-      secondaire("/opportunites", setOpportunites),
-      secondaire("/actions", setActions),
-      secondaire("/attribution", setAttribution),
-      secondaire("/geographie", setGeographie)
+      secondaire("/actions", setActions)
     ]);
     setChargement(false);
   }, []);
@@ -69,7 +71,7 @@ export function FournisseurDonnees({ children }) {
   useEffect(() => { recharger(); }, [recharger]);
 
   return (
-    <Ctx.Provider value={{ D: donnees, S: sante, G: signaux, O: opportunites, A: actions, AT: attribution, GEO: geographie,
+    <Ctx.Provider value={{ D: donnees, S: sante, A: actions,
                            erreur, erreursV4, chargement, misAJour, recharger }}>
       {children}
     </Ctx.Provider>
@@ -86,16 +88,6 @@ export function LienSource({ href, children, titre }) {
     <a className="src" href={href} target="_blank" rel="noreferrer" title={titre}>
       {children || "voir la source"} ↗
     </a>
-  );
-}
-
-// Mention affichée partout où un score de triage IA apparaît : il ordonne
-// une lecture, il ne vaut jamais validation (conception v4, règle 2).
-export function MentionTriage() {
-  return (
-    <span className="mention-triage">
-      score de triage : il ordonne la lecture, il ne vaut pas validation
-    </span>
   );
 }
 
@@ -195,6 +187,18 @@ export const zonesDe = (D, id) => [...new Set(serieDe(D, id).map(v => v.geo))];
 export const metrDe = (D, id, geo) =>
   (D?.metriques || []).find(m => m.indicator_id === id && (geo === undefined || m.geo === geo));
 
+// Métrique de l'indicateur sur sa zone de référence déclarée au référentiel.
+// Revue du 02.09.2026 : sans zone déclarée, une métrique UNIQUE est acceptée
+// (un indicateur mono-zone n'a pas à déclarer sa référence) ; plusieurs
+// métriques sans référence restent un échec silencieux — on ne choisit pas
+// une zone au hasard, c'est la faute UI-1 qu'on vient de corriger.
+export function metrReference(D, id) {
+  const ref = (D?.referentiel || []).find(r => r.indicator_id === id);
+  if (ref?.geo_reference) return metrDe(D, id, ref.geo_reference) || null;
+  const ms = (D?.metriques || []).filter(m => m.indicator_id === id);
+  return ms.length === 1 ? ms[0] : null;
+}
+
 // ---------------------------------------------------------------------
 // FRANCHISSEMENTS SIGNIFICATIFS — règle UNIQUE, partagée par l'écran
 // « Cette semaine » et par les pastilles de la navigation.
@@ -209,6 +213,12 @@ export const metrDe = (D, id, geo) =>
 // variation relative énorme sur un marché minuscule est un artefact de
 // petits nombres, pas un signal. Constaté sur pièces — Congo +938 %,
 // Nicaragua +810 %, pour 0,000 % des exportations.
+//
+// Note du 02.09.2026 (revue de code) : une troisième copie subsistait sur
+// l'accueil — la pastille par secteur y comptait les alertes `diffusable`
+// sans le seuil de poids (aérospatial : 3 à l'accueil, 2 dans la
+// navigation, S3 Allemagne pesant 0,47 %). L'accueil lit maintenant
+// `alertesSignificatives` comme les autres.
 // ---------------------------------------------------------------------
 export const SEUIL_POIDS_PCT = 1;
 
@@ -255,13 +265,6 @@ export function BadgeCommentaire({ c }) {
   return relu(c)
     ? <span className="etq e-vert">relu et validé</span>
     : <span className="etq e-ambre">rédigé par un modèle, non relu</span>;
-}
-
-// Mention de pied : qui répond du texte, et depuis quand.
-export function signatureCommentaire(c, dateCH) {
-  return relu(c)
-    ? [c.validated_by, dateCH(c.validated_at), c.model].filter(Boolean).join(" · ")
-    : ["aucune relecture humaine", dateCH(c.created_at), c.model].filter(Boolean).join(" · ");
 }
 
 // ---------------------------------------------------------------------------
