@@ -251,7 +251,31 @@ workflows ne portaient pas l'identifiant de l'instance (B-2, B-3 du tour « jury
   valeurs que 16-17 acceptés) ; `composite_queue` doc 1 — auteur et date pris dans sa `note`.
 - État : 38/38 rejets de commentaires motivés (33 avec auteur), 5/5 rejets de file motivés,
   1/1 écart motivé.
-- **Reste, hors A3** : `composite_queue` 9-11 portent encore « (délégation du 31.08.2026) »
-  dans `verifie_par` — même défaut, statut `traite`, à nettoyer avec A4 ou A10 ; le motif n'est
-  pas encore exposé par l'API ni par l'écran ; `signals` et `flux_evenements` n'ont pas été
-  traités (hors périmètre du plan).
+- **Reste, hors A3** : le motif n'est pas encore exposé par l'API ni par l'écran ; `signals`
+  et `flux_evenements` n'ont pas été traités (hors périmètre du plan). Les mentions
+  « N. Castillo (délégation du JJ.MM.2026) » dans `verifie_par` (liaisons, `composite_queue`
+  9-11) ne sont **pas** de ce défaut : elles sont voulues et justifiées dans la migration du
+  25.08 — l'acte a été délégué en session terminal et le champ le dit en toutes lettres.
+
+## 02.09.2026 (suite 3) — A4 : deux observations fausses ou doublées passent à `rejete`
+
+**A4 — M3 WORLD run 33 (valeur de l'Éthiopie sous la zone monde) et A2 2025-11 run 30 (même
+validation rejouée) étaient servies sans marque (DATA-5, DATA-10).** Migration
+`2026-09-02_a4_rejets_du_registre.sql`, sortie en annexe 5.
+
+- Le registre est en ajout seul (D-18, déclencheur `trg_registre_ajout_seul`) et le statut
+  `rejete`, prévu par les contraintes, n'était atteignable par aucun chemin pour une ligne déjà
+  écrite. **Le déclencheur admet désormais une transition, et une seule** : `validation_status`
+  → `rejete` avec `rejet_motif` (colonne ajoutée), `validated_by` et `validated_at`, toutes les
+  autres colonnes devant rester identiques (comparées une à une dans le déclencheur). Trois
+  contrôles rejoués dans la migration : modification de valeur refusée, suppression refusée,
+  rejet sans motif refusé. **Tension signalée** : D-18 est précisée, non révisée — décision
+  d'étudiant du 02.09.2026, à inscrire à l'inventaire § 7.2.2.
+- Rejetés : `value_id` 4249 (M3 WORLD run 33, 2,803 = ETH, première ligne du brut ; valeur
+  mondiale 6,828 portée par les runs 34 → 209) et 3400 (A2 2025-11 run 30, rejeu à 50 min de la
+  validation du run 29 ; la période reste portée par 3399). `v_current` sert M3 WORLD 2023 =
+  6,828 (run 209) et une seule ligne A2 2025-11 (run 29, 887 491) — vérifié.
+- Le mappage géographique GHO, second correctif proposé par DATA-5, était **déjà corrigé le
+  17.08** (note de la liaison 25, `SpatialDim`) : rien à faire.
+- Non traité, et dit : les 1 077 valeurs « écartées par contrôles qualité » du run 209 (BD-5)
+  n'ont jamais été écrites ; leur persistance ligne à ligne reste une perspective (liste D).
