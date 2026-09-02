@@ -29,25 +29,26 @@ export default function Executions() {
           </tbody>
         </table>
       </div>
-      <h2>Révisions constatées par la source</h2>
+      <h2>Valeurs qui ont changé entre deux collectes</h2>
       <div className="carte">
         {rev.length === 0 && (
           <div className="note">
-            Aucune révision repérée sur {Number(D.comparaisons_runs || 0)} comparaison(s) : aucune
-            source n'a corrigé une valeur déjà publiée entre deux collectes. Le mécanisme tourne, il
-            n'a simplement encore rien attrapé.
+            Aucun écart repéré sur {Number(D.comparaisons_runs || 0)} comparaison(s) : aucune valeur
+            déjà collectée n'a changé entre deux collectes. Le mécanisme tourne, il n'a simplement
+            encore rien attrapé.
           </div>
         )}
         {rev.length > 0 && (
           <table>
             <thead>
-              <tr><th>Indicateur</th><th>Période</th><th>Zone</th><th>Run</th><th>Écart</th></tr>
+              <tr><th>Indicateur</th><th>Période</th><th>Zone</th><th>Run</th><th>Écart</th><th>Nature</th></tr>
             </thead>
             <tbody>
               {rev.map((e, i) => (
                 <tr key={i}>
                   <td>{e.indicator_id}</td><td>{e.period}</td><td>{e.geo}</td>
                   <td>{e.run_id}</td><td>{pct(e.ecart_pct)}</td>
+                  <td>{e.nature_ecart || "n.d."}</td>
                 </tr>
               ))}
             </tbody>

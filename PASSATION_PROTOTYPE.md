@@ -83,8 +83,9 @@ pourcentage ».
 
 **Vérifié avant de retirer** : le workflow `analyse_tendances_alertes` nourrit le modèle avec
 `description_metier`. La phrase supprimée (« interdit au modèle de commenter la variation »)
-n'était pas le garde-fou : celui-ci est structurel — `alert_threshold_pct` est **nul** sur A7,
-M6, T8 et T10, et RI4 est appliquée par la consigne du workflow. La consigne de lecture utile
+n'était pas le garde-fou : celui-ci est structurel — `alert_threshold_pct` est **nul** sur T8 et
+T10 (et l'était sur A7 et M6 jusqu'aux calibrages du 31.08 : 55 puis 38 % pour A7, 22 puis 20 %
+pour M6 — phrase corrigée le 02.09, A7), et RI4 est appliquée par la consigne du workflow. La consigne de lecture utile
 (lire en points, pas en pourcentage) est conservée côté lecteur.
 
 **Où le journal reparaît** : onglet « La grille » de l'écran Fiabilité, servi par
@@ -300,6 +301,54 @@ sur 1 407 lignes (§ 3.1 de l'évaluation).**
   (§ 12.5, liste C). Non traité ici : dépôt d'un fichier brut pour les flux et les avis TED
   (`raw_ref = 'run N · flux'`), A1 et CP qui citent une URL distante, la couche 0 sans run —
   E6 reste **tenue pour les hard data, A2 et le signal ; non tenue ailleurs**.
+
+## 02.09.2026 (suite 6) — A7 : les textes portés par la base alignés sur la base
+
+Migration `migrations/2026-09-02_a7_notes_et_commentaires.sql`, sortie dans
+`annexe_5/2026-09-02_a7_notes_et_commentaires.txt` (BD-2, BD-3, BD-7, BD-11).
+
+- **M6** (BD-3) : la note disait « seuil laissé nul à dessein, RI4 inapplicable » ; la base
+  portait 22 depuis le 31.08. M6 est lu sur le **même jeu OCDE qu'A7** (DSD_PATENTS, dimension
+  PRIORITY), donc `periodes_incompletes_source = 2` est posé comme sur A7 et le seuil est
+  **recalibré sur les périodes complètes** (≤ 2020, méthode du 10.08 : n = 36, p90 20,7 %)
+  → **20 %**. Contrôle de méthode : la même requête redonne les chiffres d'A7 du 01.09
+  (n = 36, p90 38,1). Effet vérifié : les deux « franchi » de M6 (CHE et FRA 2022, −31,6 % et
+  −25,9 %) passent à « non signalé : période en consolidation » ; `alertes` de l'API ne
+  contient plus M6. **À dire honnêtement** : la série de M6 prouve nettement 2022 (les six pays
+  baissent ensemble, −19 % en moyenne) et faiblement 2021 (−7 %, trois hausses, trois
+  baisses) ; la déclaration « deux périodes » suit le mécanisme de la source, identique à
+  celui d'A7, plus que la seule lecture de la série — **décision d'étudiant, à ratifier**.
+- **H2 / H12** (BD-11) : H2 affirmait que les observations STATENT « ont été réattribuées à
+  H12 » ; H12 disait qu'elles « n'ont PAS été déplacées ». Tranché par requête : 56 lignes
+  `etl/valide_source`, runs 43-161, restent sous H2 ; H12 en porte 33 (runs 173-212). La note
+  de H2 est corrigée, celle de H12 inchangée. Le premier contrôle de la migration comptait la
+  citation « réattribuées à H12 » reprise entre guillemets par la correction (1 au lieu de 0) ;
+  contrôle refait sur l'affirmation « ont été réattribuées » (0), complément en fin de
+  sortie, requête corrigée dans le fichier.
+- **`sante_a_la_date()`** (BD-7) : la fonction filtrait `status = 'certifie'` quand
+  `v_sante_secteur` filtre `en_vitrine` ; horlogerie 0,93 contre 0,71, les deux servis
+  (`/veille/sante` : `sante` et `ecart_7j`). Prédicat aligné sur `en_vitrine`, commentaire
+  réécrit ; contrôle après : cinq secteurs, même score par les deux objets. La colonne
+  `indicateurs_certifies` de `v_sante_secteur` compte les indicateurs **en vitrine** ; elle
+  n'est pas renommée (l'écran la lit) mais commentée, et `CetteSemaine.jsx` dit désormais
+  « sur n en vitrine ». Conséquence sur `ecart_7j` : l'écart à sept jours de l'horlogerie
+  se lit maintenant 1,20 → 0,71 (le « précédent » est calculé par la fonction corrigée).
+- **`v_ecart_entre_runs`** (BD-2) : le commentaire attribuait tout écart à « une révision par
+  la source ». Vérifié ligne à ligne sur les 241 écarts non nuls : H2 ×11 = changement de
+  source sous le même identifiant, A1 ×28 = ré-extractions par modèle, M3 ×1 = valeur rejetée
+  (A4), 201 (A5, M2, H1, T6, T8, …, même collecteur, écarts de l'ordre du pour-cent)
+  compatibles avec une révision **présumée**. La vue reçoit `nature_ecart` (quatre cas, par
+  ce que le registre sait) ; `v_run_history` expose `obtained_by`. Colonnes ajoutées en fin
+  de liste, aucun consommateur ne change de forme. Écran : onglet « Révisions » →
+  « Écarts entre collectes », colonne « Nature », phrase « corrigées par leur source »
+  retirée (`Fiabilite.jsx`, `Executions.jsx`). `Dispositif.jsx` porte le même texte mais n'est
+  pas routé (UI-30, A9).
+- **PASSATION** : la phrase « `alert_threshold_pct` est nul sur A7, M6, T8 et T10 » (entrée du
+  26.08) était fausse pour A7 et M6 depuis le 31.08 ; corrigée sur place, avec la date.
+- **A7 (indicateur)** : le « 57,1 → 55 » relevé par l'audit est dans le commentaire de la
+  migration du 31.08, pas en base ; la note d'A7 dit 38 % depuis le 01.09. Rien à changer.
+- API republiée (`publish:workflow` + `restart`), build refait, `verification/executer.sh` :
+  17 rendus sans exception. `db/01_socle.sql` non touché — reconsolidation à A10.
 
 ## 02.09.2026 (suite 5) — A6 : six corrections d'interface (UI-1, 2, 4, 5, 6, 9)
 

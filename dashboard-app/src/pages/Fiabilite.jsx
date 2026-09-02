@@ -123,6 +123,10 @@ export default function Fiabilite({ vueInitiale }) {
   const total = bilan.find(b => !b.sector_code) || {};
   const runs = D?.sante_runs || [];
   const rev = D?.revisions || [];
+  // Nature des écarts (A7, 02.09.2026) : ce que le registre sait de chacun.
+  const natures = Object.entries(rev.reduce((m, e) => {
+    const k = e.nature_ecart || "n.d."; m[k] = (m[k] || 0) + 1; return m;
+  }, {})).sort((a, b) => b[1] - a[1]);
 
   // Couverture des questions de veille PAR LA VITRINE — l'ancienne vue de
   // couverture comptait la grille d'avant l'élagage. Recalculée ici depuis ce
@@ -190,7 +194,7 @@ export default function Fiabilite({ vueInitiale }) {
         </div>
         <div className="fi-case">
           <div className="fi-n">{(D?.revisions || []).length}</div>
-          <div className="fi-l">révisions constatées, sur {Number(D?.comparaisons_runs || 0).toLocaleString("fr-CH")} comparaisons entre runs</div>
+          <div className="fi-l">écarts entre collectes, sur {Number(D?.comparaisons_runs || 0).toLocaleString("fr-CH")} comparaisons entre runs</div>
         </div>
       </div>
 
@@ -198,7 +202,7 @@ export default function Fiabilite({ vueInitiale }) {
         ["reserves", `Les réserves (${reserves.length})`],
         ["grille", "La grille"],
         ["collectes", "Les collectes"],
-        ["revisions", `Révisions (${rev.length})`],
+        ["revisions", `Écarts entre collectes (${rev.length})`],
         ["elagage", "L'élagage"],
         ["filtrage", "Le filtrage"],
         ["methode", "La méthode"]
@@ -329,25 +333,30 @@ export default function Fiabilite({ vueInitiale }) {
         <div className="carte">
           {rev.length === 0 ? (
             <p className="bloc-intro">
-              Aucune révision repérée. Le mécanisme tourne ; il n'a rien attrapé. Ce n'est pas un
+              Aucun écart repéré entre collectes. Le mécanisme tourne ; il n'a rien attrapé. Ce n'est pas un
               résultat vide : c'est la démonstration qu'aucune valeur publiée n'a bougé entre deux
               collectes.
             </p>
           ) : (
             <>
               <p className="bloc-intro">
-                {rev.length} valeurs ont été <strong>corrigées par leur source</strong> entre deux
-                collectes. Sans registre en ajout seul, ces corrections seraient invisibles.
+                {rev.length} valeurs ont <strong>changé entre deux collectes</strong>. Sans registre
+                en ajout seul, ces écarts seraient invisibles. Tous ne sont pas des corrections de la
+                source : la colonne « Nature » dit ce que le registre en sait —
+                {" "}{natures.map(([n, k]) => `${k} ${n}`).join(", ")}. La révision par la source
+                n'est jamais prouvée par le dispositif, seulement présumée quand aucune autre cause
+                n'est enregistrée.
               </p>
               <table >
                 <thead><tr><th>Indicateur</th><th>Période</th><th>Zone</th>
-                           <th>Avant</th><th>Après</th><th>Écart</th></tr></thead>
+                           <th>Avant</th><th>Après</th><th>Écart</th><th>Nature</th></tr></thead>
                 <tbody>
                   {rev.slice(0, 50).map((e, i) => (
                     <tr key={i}>
                       <td><strong>{e.indicator_id}</strong></td><td>{e.period}</td><td>{e.geo}</td>
                       <td>{nb(e.value_run_precedent)}</td><td>{nb(e.value)}</td>
                       <td className={Math.abs(e.ecart_pct) > 1 ? "baisse" : "neutre"}>{pct(e.ecart_pct)}</td>
+                      <td>{e.nature_ecart || "n.d."}</td>
                     </tr>
                   ))}
                 </tbody>

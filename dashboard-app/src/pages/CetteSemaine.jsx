@@ -146,7 +146,7 @@ function TuileSante({ s, onClic }) {
               pas de case vide — la phrase, pour que la limite se lise. */}
           <div className="k-v base-insuffisante">base insuffisante</div>
           <div className="k-s">
-            {s.n_indicateurs_orientables || 0} indicateur orientable sur {s.indicateurs_certifies} certifiés —
+            {s.n_indicateurs_orientables || 0} indicateur orientable sur {s.indicateurs_certifies} en vitrine —
             il en faut au moins deux pour qu'une moyenne ait un sens
           </div>
         </>
