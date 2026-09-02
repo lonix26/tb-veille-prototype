@@ -26,7 +26,10 @@ GENERE_LE=$(q "SELECT to_char(now(), 'DD.MM.YYYY');")
 # À ne mettre à jour qu'après avoir relancé la vérification — elle était
 # auparavant confondue avec la date de génération, ce qui faisait affirmer
 # au texte une campagne qui n'avait pas eu lieu.
-VERIF_LE="30.08.2026"
+VERIF_LE="02.09.2026"
+# Les dates de campagnes ANTÉRIEURES citées dans les notes (27.08, 30.08) sont des faits
+# historiques codés en dur : elles ne doivent pas suivre VERIF_LE (02.09.2026 : le
+# paragraphe OFS attribuait la découverte du 30.08 à la campagne courante).
 
 # Décompte des URL externes : par requête, jamais en toutes lettres.
 # La mention « vingt-cinq » codée en dur ici avait dérivé (27 sources au
@@ -99,10 +102,11 @@ militaires du SIPRI (échec de négociation TLS). Les deux ont été corrigés e
 le seul texte — au moyen des adresses que les liaisons de collecte utilisaient déjà et qui
 répondent ; ils répondent toujours à la campagne du ${VERIF_LE}.
 
-La campagne du ${VERIF_LE} n'a relevé **aucun lien mort**, mais une inexactitude de nature
-différente : l'entrée de l'Office fédéral de la statistique portait une adresse générique et un
-format (« CSV / Excel ») qui ne décrivaient pas l'accès réellement pratiqué — les liaisons de H2
-et M4 interrogent l'API PX-Web en POST, format JSON-stat2. L'entrée a été corrigée en base
+La campagne du ${VERIF_LE} n'a relevé **aucun lien mort**. Celle du 30.08.2026 n'en avait pas
+relevé non plus, mais une inexactitude de nature différente : l'entrée de l'Office fédéral de la
+statistique portait une adresse générique et un format (« CSV / Excel ») qui ne décrivaient pas
+l'accès réellement pratiqué — les liaisons qui la consomment interrogent l'API PX-Web en POST,
+format JSON-stat2. L'entrée a été corrigée en base
 (migration \`2026-08-30_source_ofs_url_reelle.sql\`). Le fait mérite d'être noté pour lui-même,
 et pour la même raison que les deux liens morts : la source de vérité existait dans la base, à
 un autre endroit que celui où la bibliographie allait la chercher. Un lien qui répond n'est pas

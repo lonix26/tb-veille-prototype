@@ -46,13 +46,12 @@ WORKFLOWS = [
      "Cadre le besoin à partir d'une question de veille du référentiel, puis "
      "interroge quatre modèles avec recherche web. Les candidats sont déposés en "
      "file de qualification, jamais inscrits au référentiel."),
-    ("scenario_c_agent_autonome.json", ["Agent de veille autonome",
-                                        "Auto-critique (substitut de la validation humaine)"],
-     "Artefact agentique (scénario C, non retenu)",
-     "Construit pour être CONFRONTÉ au scénario B, non pour être déployé. "
-     "L'auto-critique y remplace la validation humaine — c'est le point exact que "
-     "la confrontation devait mettre à l'épreuve."),
 ]
+# 02.09.2026 (A10) : le scénario C ne figure plus ici. La maquette n8n
+# `scenario_c_agent_autonome.json` n'a jamais été importée ni exécutée (archivée
+# sous n8n_workflows/archive/squelettes_2026-08-04/ le 02.09, A9) ; les prompts
+# réellement envoyés lors de la confrontation B/C (§ 10.5) sont ceux du script
+# scenario_c/agent_autonome.py, extraits ci-dessous avec les scripts.
 
 SCRIPTS = [
     ("etage2/lecture_decision_ted.py", ["PROFIL", "QUESTION"],
@@ -65,6 +64,12 @@ SCRIPTS = [
      "Deux profils dégradés — l'un sans liste d'exclusion, l'autre sans mise en "
      "situation — lus sur le même corpus avec la même question, pour chiffrer ce "
      "que le profil décide à lui seul."),
+    ("scenario_c/agent_autonome.py", ["MESSAGE_SYSTEME", "CONSIGNE_AUTOCRITIQUE"],
+     "Agent autonome (scénario C, confrontation expérimentale)",
+     "Construit pour être CONFRONTÉ au scénario B, non pour être déployé. "
+     "L'auto-critique y remplace la validation humaine — c'est le point exact que "
+     "la confrontation devait mettre à l'épreuve. Prompts repris mot pour mot de "
+     "la maquette n8n archivée, qui n'a elle-même jamais été exécutée."),
 ]
 
 
@@ -77,7 +82,7 @@ def lisible(texte):
 
 
 def prompts_du_workflow(chemin, noms):
-    d = json.loads(chemin.read_text())
+    d = json.loads(chemin.read_text(encoding="utf-8"))
     sorties = []
     for n in d.get("nodes", []):
         if n["name"] not in noms:
@@ -91,14 +96,18 @@ def prompts_du_workflow(chemin, noms):
         blocs = re.findall(r"`((?:[^`\\]|\\.){200,})`", brut)
         if not blocs:
             blocs = re.findall(r'"((?:[^"\\]|\\.){200,})"', brut)
-            blocs = [b.encode().decode("unicode_escape") for b in blocs]
+            # 02.09.2026 (A10) : l'ancien `b.encode().decode("unicode_escape")`
+            # réencodait en UTF-8 puis décodait en latin-1 — les accents des
+            # prompts sortaient en mojibake (« Ã© ») dans l'annexe du 24.08.
+            # Les échappements JSON sont déjà résolus par json.loads ; seuls
+            # les « \n » littéraux restent, traités par lisible().
         for b in blocs:
             sorties.append((n["name"], lisible(b)))
     return sorties
 
 
 def prompts_du_script(chemin, noms):
-    arbre = ast.parse(chemin.read_text())
+    arbre = ast.parse(chemin.read_text(encoding="utf-8"))
     sorties = []
     for n in ast.walk(arbre):
         if not isinstance(n, ast.Assign):
@@ -152,7 +161,7 @@ tracé dans la charge d'entrée conservée avec chaque sortie.
             print(texte)
             print("```\n")
 
-    print("\n---\n\n## A2.2 Prompts portés par les scripts de l'étage 2\n")
+    print("\n---\n\n## A2.2 Prompts portés par les scripts hors orchestrateur (étage 2, scénario C)\n")
     for fichier, noms, titre, motif in SCRIPTS:
         chemin = RACINE / fichier
         if not chemin.exists():

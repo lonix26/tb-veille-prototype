@@ -6,7 +6,9 @@
 -- --schema-only` de la base en service. Première consolidation le 25.08.2026
 -- après les 78 migrations d'alors ; RECONSOLIDÉ LE 01.09.2026 (gel) après les
 -- migrations postérieures (et de nouveau le soir même, après la migration
--- d'éligibilité des sources à la lecture événementielle) — entre les deux, le fichier avait dérivé de la base
+-- d'éligibilité des sources à la lecture événementielle), PUIS LE 02.09.2026 après les corrections
+-- A3-A9 du tour « jury » (vues v_ecart_entre_runs, v_run_history, v_actions, v_acheteurs_recurrents,
+-- fonction sante_a_la_date, colonnes de motif) — entre les deux premières, le fichier avait dérivé de la base
 -- (41 vues contre 44, colonnes et tables nouvelles absentes) : une base neuve
 -- construite depuis le dépôt n'aurait pas été celle du rapport. Il remplace le
 -- socle écrit à la main du 04.08 (conservé dans `db_origine_2026-08-04/`).
@@ -58,6 +60,20 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA IF NOT EXISTS public;
+
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
 -- Name: sandbox; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -69,20 +85,6 @@ CREATE SCHEMA IF NOT EXISTS sandbox;
 --
 
 COMMENT ON SCHEMA sandbox IS 'Espace de l''artefact agentique du scénario C (§ 10.5). DÉLIBÉRÉMENT SANS CONTRAINTES : l''agent publie sans validation, et cette absence de garde-fou est l''objet même de la comparaison. Aucune vue du tableau de bord ne lit ce schéma.';
-
-
---
--- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
---
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
-
-
---
--- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
 
 --
@@ -186,10 +188,33 @@ CREATE FUNCTION public.interdire_modification_du_registre() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+    IF TG_OP = 'UPDATE'
+       AND OLD.validation_status <> 'rejete' AND NEW.validation_status = 'rejete'
+       AND NEW.rejet_motif IS NOT NULL AND NEW.validated_by IS NOT NULL AND NEW.validated_at IS NOT NULL
+       AND NEW.value_id = OLD.value_id AND NEW.indicator_id = OLD.indicator_id
+       AND NEW.run_id = OLD.run_id AND NEW.period = OLD.period AND NEW.geo = OLD.geo
+       AND NEW.value IS NOT DISTINCT FROM OLD.value
+       AND NEW.obtained_by = OLD.obtained_by
+       AND NEW.consensus_score IS NOT DISTINCT FROM OLD.consensus_score
+       AND NEW.raw_ref IS NOT DISTINCT FROM OLD.raw_ref
+       AND NEW.collected_at IS NOT DISTINCT FROM OLD.collected_at
+    THEN
+        -- Seule transition admise (02.09.2026, A4) : le rejet motivé, signé et
+        -- daté d'une ligne existante. La valeur reste lisible ; elle cesse
+        -- d'être servie.
+        RETURN NEW;
+    END IF;
     RAISE EXCEPTION
-      'Le registre des valeurs est en ajout seul (D-18). Pour corriger une valeur, ajoutez-la dans un nouveau run : la correction fait partie de l''historique, elle ne l''efface pas.';
+      'Le registre des valeurs est en ajout seul (D-18). Pour corriger une valeur, ajoutez-la dans un nouveau run : la correction fait partie de l''historique, elle ne l''efface pas. Seule exception : passer une ligne au statut rejete avec motif, auteur et date, sans toucher au reste.';
 END;
 $$;
+
+
+--
+-- Name: FUNCTION interdire_modification_du_registre(); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.interdire_modification_du_registre() IS 'Registre en ajout seul (D-18). Depuis le 02.09.2026 (A4), admet une seule mise à jour : validation_status → rejete, avec rejet_motif, validated_by et validated_at, toutes les autres colonnes inchangées.';
 
 
 --
@@ -271,7 +296,9 @@ CREATE FUNCTION public.sante_a_la_date(p_limite timestamp with time zone) RETURN
     SELECT i.sector_code, i.indicator_id,
            r.dernier_residu / NULLIF(r.sd_residu, 0) * i.sens_favorable::numeric AS z
       FROM resume r JOIN droite d USING (indicator_id) JOIN indicators i USING (indicator_id)
-     WHERE i.sens_favorable IN (-1, 1) AND i.status = 'certifie'
+     -- 02.09.2026 (A7) : en_vitrine, comme v_sante_secteur — la fonction
+     -- filtrait status = 'certifie' et servait un autre score que la vue.
+     WHERE i.sens_favorable IN (-1, 1) AND i.en_vitrine
        AND r.sd_residu IS NOT NULL AND r.sd_residu > 0 AND d.n_points >= 8
   )
   SELECT p.sector_code, count(*),
@@ -284,7 +311,7 @@ $$;
 -- Name: FUNCTION sante_a_la_date(p_limite timestamp with time zone); Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON FUNCTION public.sante_a_la_date(p_limite timestamp with time zone) IS 'Score de santé sectorielle tel qu''il était à une date donnée. Identique à v_sante_secteur, borné aux observations collectées avant cette date. Le registre étant en ajout seul, l''état passé est intact : ce n''est pas une reconstitution.';
+COMMENT ON FUNCTION public.sante_a_la_date(p_limite timestamp with time zone) IS 'Score de santé sectorielle tel qu''il était à une date donnée : même calcul et même périmètre (indicateurs en vitrine, orientables, ≥ 8 points) que v_sante_secteur, borné aux observations collectées avant cette date. Le registre étant en ajout seul, l''état passé est intact : ce n''est pas une reconstitution. Jusqu''au 02.09.2026 la fonction filtrait status = ''certifie'' et servait un autre score que la vue (horlogerie 0,93 contre 0,71) ; aligné le 02.09 (A7).';
 
 
 SET default_tablespace = '';
@@ -345,6 +372,7 @@ CREATE TABLE public.commentaries (
     validated_by text,
     validated_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    motif text,
     CONSTRAINT chk_commentaire_valide_trace CHECK (((status <> 'valide'::text) OR ((validated_by IS NOT NULL) AND (validated_at IS NOT NULL)))),
     CONSTRAINT commentaries_status_check CHECK ((status = ANY (ARRAY['a_valider'::text, 'valide'::text, 'rejete'::text])))
 );
@@ -355,6 +383,13 @@ CREATE TABLE public.commentaries (
 --
 
 COMMENT ON COLUMN public.commentaries.input_payload IS 'Conservation du contexte exact fourni au modèle. Sans lui, la fidélité du commentaire (« aucun chiffre absent des données fournies ») est invérifiable a posteriori — l''affirmation du § 11.2 deviendrait indémontrable.';
+
+
+--
+-- Name: COLUMN commentaries.motif; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.commentaries.motif IS 'Motif du rejet, en clair. Obligatoire pour toute ligne rejetée écrite après le 02.09.2026 (chk_commentaire_rejet_trace, NOT VALID : cinq rejets antérieurs du run 101 sont sans trace). Ajouté le 02.09.2026 (A3).';
 
 
 --
@@ -392,6 +427,8 @@ CREATE TABLE public.composite_queue (
     run_id bigint,
     traite_le timestamp with time zone,
     note text,
+    motif text,
+    CONSTRAINT chk_cq_ecart_motive CHECK (((statut <> 'ecarte'::text) OR ((motif IS NOT NULL) AND (verifie_par IS NOT NULL) AND (verifie_le IS NOT NULL)))),
     CONSTRAINT chk_doc_verifie CHECK (((statut <> ALL (ARRAY['a_traiter'::text, 'traite'::text])) OR ((verifie_par IS NOT NULL) AND (verifie_le IS NOT NULL)))),
     CONSTRAINT composite_queue_statut_check CHECK ((statut = ANY (ARRAY['a_verifier'::text, 'a_traiter'::text, 'traite'::text, 'ecarte'::text])))
 );
@@ -402,6 +439,13 @@ CREATE TABLE public.composite_queue (
 --
 
 COMMENT ON TABLE public.composite_queue IS 'File de documents du pipeline composite (mise en série du 17.08.2026). Le veilleur inscrit et vérifie les documents ; le workflow consomme le plus ancien a_traiter. L''inscription est l''acte humain de sélection du scénario B.';
+
+
+--
+-- Name: COLUMN composite_queue.motif; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.composite_queue.motif IS 'Motif de l''écart d''un document (statut ecarte). Obligatoire (chk_cq_ecart_motive). `note` reste la note de travail libre. Ajouté le 02.09.2026 (A3).';
 
 
 --
@@ -789,9 +833,11 @@ CREATE TABLE public.indicator_values (
     validated_at timestamp with time zone,
     raw_ref text NOT NULL,
     collected_at timestamp with time zone DEFAULT now() NOT NULL,
+    rejet_motif text,
     CONSTRAINT chk_consensus_reserve_ia CHECK (((consensus_score IS NULL) OR (obtained_by = 'ia_extraction'::text))),
     CONSTRAINT chk_consensus_unanime CHECK (((validation_status <> 'pre_valide_consensus'::text) OR (consensus_score = (1)::numeric))),
     CONSTRAINT chk_hierarchie_controle CHECK ((((obtained_by = 'etl'::text) AND (validation_status = ANY (ARRAY['valide_source'::text, 'rejete'::text]))) OR ((obtained_by = 'ia_extraction'::text) AND (validation_status = ANY (ARRAY['pre_valide_consensus'::text, 'valide_humain'::text, 'rejete'::text]))))),
+    CONSTRAINT chk_rejet_trace CHECK (((validation_status <> 'rejete'::text) OR ((rejet_motif IS NOT NULL) AND (validated_by IS NOT NULL) AND (validated_at IS NOT NULL)))),
     CONSTRAINT chk_validation_humaine_tracee CHECK (((validation_status <> 'valide_humain'::text) OR ((validated_by IS NOT NULL) AND (validated_at IS NOT NULL)))),
     CONSTRAINT indicator_values_consensus_score_check CHECK (((consensus_score IS NULL) OR ((consensus_score >= (0)::numeric) AND (consensus_score <= (1)::numeric)))),
     CONSTRAINT indicator_values_obtained_by_check CHECK ((obtained_by = ANY (ARRAY['etl'::text, 'ia_extraction'::text]))),
@@ -811,6 +857,13 @@ COMMENT ON TABLE public.indicator_values IS 'Registre des valeurs. En AJOUT SEUL
 --
 
 COMMENT ON COLUMN public.indicator_values.validation_status IS 'Aucun statut « en attente » ici : une valeur non tranchée n''entre pas au registre, elle attend dans validation_queue. Le registre ne contient que du décidé.';
+
+
+--
+-- Name: COLUMN indicator_values.rejet_motif; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.indicator_values.rejet_motif IS 'Motif du rejet, en clair. Obligatoire quand validation_status = rejete (chk_rejet_trace). Ajouté le 02.09.2026 (A4).';
 
 
 --
@@ -1315,6 +1368,11 @@ CREATE TABLE public.ted_lecture_ia (
     justification text,
     horodatage timestamp with time zone DEFAULT now() NOT NULL,
     profil text DEFAULT 'A_metier_declare'::text NOT NULL,
+    statut text DEFAULT 'non_relu'::text NOT NULL,
+    valide_par text,
+    valide_le timestamp with time zone,
+    CONSTRAINT chk_lecture_ted_relecture_tracee CHECK (((statut = 'non_relu'::text) OR ((valide_par IS NOT NULL) AND (valide_le IS NOT NULL)))),
+    CONSTRAINT chk_lecture_ted_statut CHECK ((statut = ANY (ARRAY['non_relu'::text, 'valide'::text, 'rejete'::text]))),
     CONSTRAINT ted_lecture_ia_adressable_check CHECK (((adressable >= 0) AND (adressable <= 2)))
 );
 
@@ -1331,6 +1389,20 @@ COMMENT ON TABLE public.ted_lecture_ia IS 'Lecture décisionnelle des appels d''
 --
 
 COMMENT ON COLUMN public.ted_lecture_ia.profil IS 'Profil métier ayant produit la lecture. A_metier_declare est le profil de référence, seul servi à la restitution ; les autres n''existent que pour la mesure de sensibilité et ne doivent jamais atteindre un écran.';
+
+
+--
+-- Name: COLUMN ted_lecture_ia.statut; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ted_lecture_ia.statut IS 'Relecture humaine de la lecture d''adressabilité : non_relu (défaut, jamais changé par un workflow), valide, rejete. Ajouté le 02.09.2026 : avant, aucune validation n''était possible.';
+
+
+--
+-- Name: COLUMN ted_lecture_ia.valide_par; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ted_lecture_ia.valide_par IS 'Relecteur humain ; obligatoire dès que le statut quitte non_relu (contrainte).';
 
 
 --
@@ -1411,7 +1483,6 @@ COMMENT ON VIEW public.v_a1_recouvrement_editions IS 'Contrôle inter-éditions 
 CREATE VIEW public.v_acheteurs_recurrents AS
  SELECT acheteur,
     acheteur_pays,
-    acheteur_courriel,
     acheteur_site,
     sector_code,
     count(*) AS avis_publies,
@@ -1427,7 +1498,7 @@ CREATE VIEW public.v_acheteurs_recurrents AS
           WHERE ((b.acheteur = a.acheteur) AND (NOT (b.sector_code IS DISTINCT FROM a.sector_code)))) AS cpv_distincts
    FROM public.ted_avis a
   WHERE (acheteur IS NOT NULL)
-  GROUP BY acheteur, acheteur_pays, acheteur_courriel, acheteur_site, sector_code
+  GROUP BY acheteur, acheteur_pays, acheteur_site, sector_code
  HAVING (count(*) >= 2)
   ORDER BY (count(*)) DESC, (max(date_publication)) DESC;
 
@@ -1436,7 +1507,7 @@ CREATE VIEW public.v_acheteurs_recurrents AS
 -- Name: VIEW v_acheteurs_recurrents; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.v_acheteurs_recurrents IS 'Acheteurs publics ayant publié au moins deux avis sur la période. Un acheteur récurrent est un compte à démarcher, pas un événement. Corrigé le 24.08.2026 : la jointure LATERAL sur les CPV multipliait le décompte des avis.';
+COMMENT ON VIEW public.v_acheteurs_recurrents IS 'Acheteurs publics ayant publié au moins deux avis sur la période. Un acheteur récurrent est un compte à démarcher, pas un événement. Corrigé le 24.08.2026 : la jointure LATERAL sur les CPV multipliait le décompte des avis. Le 02.09.2026 (A9) : le courriel de contact ne sort plus par cette vue (il reste dans ted_avis, pièce d''audit) et n''entre plus dans le groupement — un organisme à deux contacts comptait pour deux lignes.';
 
 
 --
@@ -1458,7 +1529,6 @@ CREATE VIEW public.v_actions AS
     a.acheteur,
     a.acheteur_pays,
     a.acheteur_ville,
-    a.acheteur_courriel,
     a.acheteur_site,
     a.valeur_estimee,
     a.devise,
@@ -1477,6 +1547,8 @@ CREATE VIEW public.v_actions AS
     l.action_proposee,
     l.justification,
     l.modele,
+    l.statut AS lecture_statut,
+    l.valide_par AS lecture_valide_par,
     r.avis_publies AS acheteur_avis_publies,
     r.dont_encore_ouverts AS acheteur_appels_ouverts,
     (r.acheteur IS NOT NULL) AS acheteur_recurrent
@@ -1484,6 +1556,13 @@ CREATE VIEW public.v_actions AS
      LEFT JOIN public.ted_lecture_ia l ON (((l.publication_number = a.publication_number) AND (l.profil = 'A_metier_declare'::text))))
      LEFT JOIN recurrence r ON ((r.acheteur = a.acheteur)))
   WHERE (a.est_appel_ouvert AND (a.date_limite IS NOT NULL) AND (a.date_limite >= CURRENT_DATE));
+
+
+--
+-- Name: VIEW v_actions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.v_actions IS 'Appels d''offres encore ouverts, avec la lecture d''adressabilité du modèle et SON STATUT de relecture (lecture_statut, ajouté le 02.09.2026). Servie par l''API veille/actions ; l''écran badge toute lecture non relue. Depuis le 02.09.2026 (A9), sans le courriel de contact de l''acheteur : il est dans l''avis TED (colonne url), publié pour cet usage, et n''a pas à être redistribué par le dispositif.';
 
 
 --
@@ -2339,7 +2418,8 @@ CREATE VIEW public.v_run_history AS
     iv.run_id,
     r.executed_at,
     iv.value,
-    iv.validation_status
+    iv.validation_status,
+    iv.obtained_by
    FROM (public.indicator_values iv
      JOIN public.runs r ON ((r.run_id = iv.run_id)))
   ORDER BY iv.indicator_id, iv.period, iv.geo, iv.run_id;
@@ -2361,7 +2441,14 @@ CREATE VIEW public.v_ecart_entre_runs AS
         CASE
             WHEN ((lag(value) OVER w IS NULL) OR (lag(value) OVER w = (0)::numeric)) THEN NULL::numeric
             ELSE round((((value - lag(value) OVER w) / lag(value) OVER w) * (100)::numeric), 2)
-        END AS ecart_pct
+        END AS ecart_pct,
+        CASE
+            WHEN (lag(value) OVER w IS NULL) THEN NULL::text
+            WHEN ((validation_status = 'rejete'::text) OR (lag(validation_status) OVER w = 'rejete'::text)) THEN 'valeur rejetee au registre'::text
+            WHEN (obtained_by IS DISTINCT FROM lag(obtained_by) OVER w) THEN 'changement de collecteur ou de source'::text
+            WHEN (obtained_by = 'ia_extraction'::text) THEN 're-extraction par modele'::text
+            ELSE 'revision par la source (presumee)'::text
+        END AS nature_ecart
    FROM public.v_run_history
   WINDOW w AS (PARTITION BY indicator_id, period, geo ORDER BY run_id);
 
@@ -2370,7 +2457,7 @@ CREATE VIEW public.v_ecart_entre_runs AS
 -- Name: VIEW v_ecart_entre_runs; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.v_ecart_entre_runs IS 'Un écart non nul signale une révision de la donnée par sa source entre deux collectes — information de veille en soi, invisible d''un dispositif qui écraserait ses valeurs.';
+COMMENT ON VIEW public.v_ecart_entre_runs IS 'Écart entre deux collectes successives d''une même valeur (indicateur, période, zone). Un écart non nul est une information de veille, invisible d''un dispositif qui écraserait ses valeurs — mais il n''est PAS toujours une révision par la source : nature_ecart le qualifie par ce que le registre sait (valeur rejetée, changement de collecteur ou de source sous le même identifiant, ré-extraction par modèle) ; la révision par la source n''est que le cas résiduel, présumé. Vérifié le 02.09.2026 : H2 (+13 à +15 %) est le passage STATENT → Convention patronale, A1 des ré-extractions, M3 2023 une valeur rejetée ; seuls A5, M2, H1, T6, T8 (même collecteur, écarts de l''ordre du pour-cent) sont compatibles avec une révision.';
 
 
 --
@@ -2538,7 +2625,7 @@ CREATE VIEW public.v_indicateur_synthetique AS
 -- Name: VIEW v_indicateur_synthetique; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.v_indicateur_synthetique IS 'Indicateur synthétique (engagement de la ratification, séance 2) : part de la Suisse dans le commerce d''articles d''horlogerie (SH 91) du panier de déclarants H3. Calcul par vue, une seule source, part calculée uniquement à panier complet — sinon l''absence est énoncée avec les déclarants manquants (leçon Chine 2024, § 12.5).';
+COMMENT ON VIEW public.v_indicateur_synthetique IS 'Indicateur synthétique (engagement de la ratification, séance 2) : part de la Suisse dans les exportations d''articles d''horlogerie (SH 91) d''un PANIER DE SEPT DÉCLARANTS (CHE, CHN, DEU, FRA, HKG, ITA, JPN — les déclarants de H3), PAS dans le commerce mondial. Vérifié le 02.09.2026 sur Comtrade, tous déclarants, 2023 : monde 61,17 Mrd USD → part suisse 48,65 % ; panier 48,51 Mrd (79,3 % du monde) → 61,35 %, identique à la vue. Calcul par vue, une seule source, part calculée uniquement à panier complet — sinon l''absence est énoncée avec les déclarants manquants (leçon Chine 2024, § 12.5).';
 
 
 --
@@ -2917,6 +3004,13 @@ COMMENT ON VIEW public.v_sante_secteur IS 'Score de santé DÉTENDANCÉ (§ 5.6,
 
 
 --
+-- Name: COLUMN v_sante_secteur.indicateurs_certifies; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.v_sante_secteur.indicateurs_certifies IS 'Nombre d''indicateurs EN VITRINE du secteur (en_vitrine), pas de certifiés : le nom date d''avant l''élagage du 25-26.08.2026 et n''a pas été changé parce que la restitution le lit. L''écran dit « en vitrine ».';
+
+
+--
 -- Name: v_sante_secteur_brut; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -2977,7 +3071,9 @@ CREATE TABLE public.validation_queue (
     decision text,
     decided_by text,
     decided_at timestamp with time zone,
+    motif text,
     CONSTRAINT chk_decision_complete CHECK (((decision IS NULL) OR ((decided_by IS NOT NULL) AND (decided_at IS NOT NULL)))),
+    CONSTRAINT chk_vq_rejet_motive CHECK (((decision IS DISTINCT FROM 'rejete'::text) OR (motif IS NOT NULL))),
     CONSTRAINT validation_queue_decision_check CHECK (((decision IS NULL) OR (decision = ANY (ARRAY['accepte'::text, 'corrige'::text, 'rejete'::text]))))
 );
 
@@ -2987,6 +3083,13 @@ CREATE TABLE public.validation_queue (
 --
 
 COMMENT ON TABLE public.validation_queue IS 'Sas entre l''extraction par IA et le registre. Tout désaccord entre modèles, toute valeur aberrante y transite. Le taux de correction observé ici est la métrique de preuve qui conditionne le passage en supervision par exception (§ 10.4.2).';
+
+
+--
+-- Name: COLUMN validation_queue.motif; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.validation_queue.motif IS 'Motif de la décision humaine, en clair. Obligatoire pour un rejet (chk_vq_rejet_motive). Ajouté le 02.09.2026 (A3).';
 
 
 --
@@ -3581,6 +3684,14 @@ ALTER TABLE ONLY sandbox.commentaires_attribution ALTER COLUMN id SET DEFAULT ne
 
 ALTER TABLE ONLY public.alerts
     ADD CONSTRAINT alerts_pkey PRIMARY KEY (alert_id);
+
+
+--
+-- Name: commentaries chk_commentaire_rejet_trace; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.commentaries
+    ADD CONSTRAINT chk_commentaire_rejet_trace CHECK (((status <> 'rejete'::text) OR ((validated_by IS NOT NULL) AND (validated_at IS NOT NULL) AND (motif IS NOT NULL)))) NOT VALID;
 
 
 --

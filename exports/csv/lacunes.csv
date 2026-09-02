@@ -1,4 +1,4 @@
 Secteur,Question,Angle,Question non couverte,Criticité,Indicateurs rattachés,dont certifiés,Nature
-Aérospatial,QV4,Dynamique technologique,"Quelles ruptures techniques — lanceurs réutilisables, constellations, propulsion alternative — modifient les volumes et les tolérances demandés ?",dominante,0,0,lacune — aucun indicateur
-Automobile,QV5,Impulsions publiques,"Quelles décisions réglementaires — normes d'émission, calendrier d'interdiction du thermique, dispositifs d'incitation — modifient la composition de la demande ?",dominante,0,0,lacune — aucun indicateur
-Horlogerie,QV5,Impulsions publiques,"Quelles décisions publiques — droits de douane, accords commerciaux, réglementation Swiss made — modifient les conditions d'accès aux marchés ?",marginale,1,0,couverture nominale — aucun indicateur certifié
+Aérospatial,QV4,Dynamique technologique,"Quelles ruptures techniques, lanceurs réutilisables, constellations, propulsion alternative, modifient les volumes et les tolérances demandés ?",dominante,1,0,couverture nominale — aucun indicateur certifié
+Automobile,QV5,Impulsions publiques,"Quelles décisions réglementaires, normes d'émission, calendrier d'interdiction du thermique, dispositifs d'incitation, modifient la composition de la demande ?",dominante,2,0,couverture nominale — aucun indicateur certifié
+Horlogerie,QV5,Impulsions publiques,"Quelles décisions publiques, droits de douane, accords commerciaux, réglementation Swiss made, modifient les conditions d'accès aux marchés ?",significative,1,0,couverture nominale — aucun indicateur certifié

@@ -69,7 +69,8 @@ export function phraseEcheance(jours) {
   if (j === 0) return "aujourd’hui";
   if (j === 1) return "demain";
   if (j <= 7) return `dans ${j} jours`;
-  if (j <= 31) return `dans ${Math.round(j / 7)} semaines`;
+  // 02.09.2026 (A10, vu sur capture) : « dans 1 semaines » — accord du pluriel.
+  if (j <= 31) { const s = Math.round(j / 7); return `dans ${s} semaine${s > 1 ? "s" : ""}`; }
   return `dans ${Math.round(j / 30)} mois`;
 }
 
@@ -103,7 +104,8 @@ export function phraseFraicheur(execute_le) {
   const j = Math.round(h / 24);
   if (j === 1) return "collecté hier";
   if (j <= 14) return `collecté il y a ${j} jours`;
-  return `dernière collecte il y a ${Math.round(j / 7)} semaines`;
+  const s = Math.round(j / 7);
+  return `dernière collecte il y a ${s} semaine${s > 1 ? "s" : ""}`;
 }
 
 // ---------------------------------------------------------------------

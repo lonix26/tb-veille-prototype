@@ -5551,3 +5551,58 @@ l'historique n'est réécrit.
   (plus de 404). Build refait, 17 rendus sans exception.
 - **Non fait** : pas d'`errorWorkflow` n8n (les 59 runs `echec` restent tels quels, statuts non
   comparables — constat DOC-16 laissé ouvert, dit en limites) ; `.git` de 115 Mo inchangé.
+
+## 02.09.2026 (suite 9) — A10 : socle, référentiel et exports reconsolidés après la liste A
+
+Dernier item de la liste A du tour jury (règle « à chaque gel » : la base en service et les
+fichiers `db/` doivent redire la même chose). Tout ce qui suit est vérifié sur pièce.
+
+- **`db/01_socle.sql` et `db/02_referentiel.sql` régénérés** par `./regenerer_socle.sh`
+  (la boucle des tables inclut désormais `flux_filtrage_regles`, ajoutée en A9). Base en service :
+  27 tables · 44 vues · 53 indicateurs · 103 liaisons actives · 24 flux. Base de recette
+  reconstruite depuis les fichiers : **51 indicateurs** (T12/T13, orphelins, retirés à la
+  régénération) ; empreintes md5 identiques sur les neuf tables déclaratives (indicators hors
+  T12/T13, source_bindings, flux_sources, sector_watch_questions, indicator_watch_questions,
+  flux_filtrage_regles, sources, watch_questions, sectors) ; 44 vues / 44 fonctions /
+  4 déclencheurs / 818 colonnes / 143 contraintes identiques. `veille_recette` supprimée après
+  comparaison. En-têtes des deux fichiers complétés à la main (mention du 02.09 et de A3-A9).
+  Bilan `v_bilan_referentiel` total en service : `|53|41|38|3|10|40|13` ; en recette
+  `|51|41|38|3|10|40|11` (l'écart de deux est T12/T13, écartés, sans observation).
+- **Exports régénérés** : `exports/csv/*.csv` (7 fichiers) et `exports/1_tableau_de_veille.xlsx`
+  par `generer_classeur.sh` ; `annexes/1_tableau_de_veille.md` (394 lignes) et `.xlsx` ;
+  `annexes/4_workflows_orchestration.md` (186 lignes). **Les heures que ces fichiers citent depuis
+  la base sont en UTC** (« produit le 02.09.2026 à 07:55 » = 09:55 locale) — le conteneur
+  PostgreSQL n'a pas de fuseau ; à savoir avant de citer une heure de run dans le rapport.
+- **D2 (section « Sources de données ») régénéré, après une vraie campagne.** Le générateur
+  porte `VERIF_LE` en dur (règle du 30.08 : ne l'avancer qu'après une campagne réelle). Les
+  **27 URL externes** (26 au 30.08 + `cp`, Convention patronale, qualifiée le 30.08) ont été
+  testées par curl le 02.09, sortie brute dans `annexes/verif_urls_2026-09-02.txt` : aucun lien
+  mort ; AIE et FMI toujours en 403 ; `ocde_brevets` en `ERR(3)` sous curl à cause des crochets
+  non encodés de l'URL (200 avec `-g`, même profil qu'au 30.08 — défaut de forme de l'outil, pas
+  de la source) ; ACEA en 200 sur l'accueil comme sur un communiqué PDF, avec et sans en-tête de
+  navigateur (complément journalisé dans le même fichier, parce que la note du rapport l'affirme).
+  **Défaut de gabarit corrigé au passage** : le paragraphe OFS du générateur attribuait la
+  découverte de l'adresse inexacte à « la campagne du ${VERIF_LE} » — une régénération aurait
+  déplacé un fait du 30.08 au 02.09. Date historique codée en dur, commentaire dans le script.
+  Autres différences visibles du D2 régénéré par rapport au fichier du 30.08 : source `cp`
+  ajoutée (23 sources exploitables au lieu de 22), H2 rattaché à `cp` et H12 à l'OFS (migration
+  du 30.08), tirets cadratins des titres devenus deux-points (choix du générateur, non retouché).
+- **Annexe 2 (prompts) régénérée, deux défauts du générateur corrigés.** (1) L'entrée scénario C
+  pointait sur `n8n_workflows/scenario_c_agent_autonome.json`, archivé en A9 — l'annexe aurait
+  dit « fichier absent du dépôt ». Déplacée vers les scripts : `scenario_c/agent_autonome.py`,
+  constantes `MESSAGE_SYSTEME` et `CONSIGNE_AUTOCRITIQUE`, qui sont les prompts réellement
+  envoyés lors de la confrontation B/C (la maquette n8n n'a jamais été exécutée). (2) Les accents
+  des prompts extraits des nœuds Code sortaient en mojibake (« Ã© », déjà dans l'annexe du
+  24.08) : `b.encode().decode("unicode_escape")` réencodait en UTF-8 puis décodait en latin-1.
+  Supprimé — `json.loads` résout déjà les échappements. Annexe sans « Ã » (158 lignes).
+- **Captures régénérées** dans `annexes/6_captures/2026-09-02/` (11 écrans, build du 02.09 servi
+  par nginx). Contrôle visuel du socle transversal (titre « Part suisse … d'un panier de
+  7 exportateurs », 11 indicateurs suivis) et des actions (colonne « Site », plus de courriel).
+  Vu sur capture et corrigé : « dans 1 semaines » — accord du pluriel dans `phrases.jsx`
+  (échéance et ancienneté de collecte). Build refait, 17 rendus sans exception, captures reprises.
+- **Contrôle avant commit** : aucun `.env`, `data/`, `*.tar.gz` dans `git status`.
+- **Non fait / restes signalés** : le commentaire exécutif validé sur le socle (01.09) dit encore
+  « série semestrielle » pour T4 (à réviser à la prochaine fournée, pas à la main) ; `errorWorkflow`
+  n8n et statuts d'échec (DOC-16) non traités ; `.git` de 115 Mo ; annexes et D2 sont hors dépôt
+  (copie Drive). **La liste A est close** ; les listes B (actes humains) et C (rapport) restent à
+  l'étudiant.
