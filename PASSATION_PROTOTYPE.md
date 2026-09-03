@@ -5925,3 +5925,41 @@ boucle `read` — relevé calculé une fois, hors boucle, commentaire dans le sc
 **Tension signalée** : CLAUDE.md (état au 22.08) dit encore « 30 indicateurs, 26 certifiés » ; la
 base et la passation disent 53 / 41 depuis la famille d'intensité et le socle transversal (suite
 9). Le relevé figé fait foi ; CLAUDE.md est à mettre à jour côté Cowork.
+
+## 03.09.2026 (suite 17) — Les quatre actes demandés par la session rapport : captures, annexes 2 et 4, date de l'annexe 7
+
+Commande reçue par `rapport/notes_de_redaction.md` (entrée « 03.09.2026 (suite 12) »).
+
+1. **Captures.** `bash dashboard-app/verification/executer.sh` vert (trois passes, onze écrans
+   sans erreur de navigateur), puis `node verification/captures.mjs` → `annexes/6_captures/
+   2026-09-03/` (11 écrans pleine page, 9,8 Mo). Ce jeu est postérieur à la suite 15 : l'écran
+   Exécutions ne montre plus de run « en cours ». L'annexe 6 se rédige sur ce jeu, côté rapport.
+2. **`exports/generer_annexe_2.py`.** Trouvé **déjà modifié, non commité**, avec des
+   commentaires datés du 03.09 (inventaire réaligné sur les chaînes qui appellent un modèle ;
+   extraction des littéraux JavaScript par parcours du source à la place de l'expression
+   régulière qui attrapait du code entre deux chaînes courtes ; lecture décisionnelle extraite
+   du JSON en service). La modification n'est tracée dans aucune passation — je ne sais pas
+   quelle session l'a faite. Relue ligne à ligne, exécutée : les trois défauts signalés sont
+   résolus (couche 0 rend le prompt « Tu assistes la constitution d'un référentiel… » ; lecture
+   décisionnelle depuis `lecture_decision_ted.json` ; CP, A1, événements, lecture transversale,
+   triage, attribution ancrée présents ; `veille_documentaire_annuelle` exclu à raison, il
+   n'appelle aucun modèle). Commitée telle quelle sous ce constat.
+3. **`exports/generer_annexe_4.py`.** Fiche du commentaire exécutif alignée sur le régime du
+   31.08 ; sept descripteurs ajoutés (notices de la suite 12 reprises mot pour mot) ; les cinq
+   squelettes archivés le 02.09 retirés de l'inventaire et le paragraphe final réécrit (un
+   « Superseded » en place, cinq archivés, l'export A2 du 17.08 dans l'archive) — l'ancien texte
+   disait « cinq workflows conservés au dépôt » et « confrontation non exécutée », faux depuis le
+   23.08 et le 02.09. Deux fiches recomptées par requête : API « sept points de lecture » (le
+   fichier en déclare sept, l'application en lit trois) ; collecteur générique « 58 runs à son
+   nom au 03.09, dont 28 en `ok` » (`runs.note like 'Collecteur générique%'`), à la place de
+   « plus de nonante fois ». Aucun « Non inventorié » dans l'annexe régénérée.
+4. **Annexe 7, date.** Tranché sur le schéma `sandbox` : `agent_runs.clos_le` de 21:12 à 21:30
+   UTC le 23.08, `agent_values` et `agent_commentaries` idem, 52 valeurs et 15 commentaires ;
+   fichier `annexe_5/confrontation_B_C_execution_2026-08-24.txt` écrit le 23.08 à 23:38 locale.
+   **L'exécution et le dépouillement datent du 23.08.2026 au soir** ; l'annexe 7 est juste, le
+   rapport (§ 10.5.3, § 11.1 : « 24.08 ») et le nom du fichier d'annexe 5 sont en avance d'un
+   jour. Le nom de fichier est laissé (renommer casserait les renvois) ; la correction du texte
+   revient à la session rapport.
+
+Annexes 2 et 4 régénérées (`annexes/`, datées du 03.09). Hors dépôt git ; couvertes par la copie
+Drive. Commit : générateurs seuls.

@@ -2,6 +2,12 @@
 # -*- coding: utf-8 -*-
 """Génération de l'annexe 4 — index des workflows d'orchestration. 24.08.2026.
 
+03.09.2026 : sept descripteurs ajoutés (CP, A1, événements, lecture transversale,
+dérivation des intensités, veille documentaire, erreur commune) ; fiche du
+commentaire exécutif alignée sur le régime de diffusion du 31.08 ; les cinq
+squelettes archivés le 02.09 (A9) ne sont plus inventoriés ici, ils ont leur
+README sous n8n_workflows/archive/.
+
 L'annexe 4 est un INDEX, pas une reproduction : les fichiers JSON sont le
 livrable, joints au dépôt. Ce que l'index ajoute, et qu'aucun JSON ne dit,
 c'est l'ÉTAT de chaque workflow — spécifié, exécuté une fois, en service.
@@ -54,18 +60,21 @@ ETATS = {
     "collecte_generique.json": (
         "En service", "Collecteur générique piloté par les liaisons du référentiel",
         "Le collecteur principal : il lit `source_bindings` et interroge chaque source active. "
-        "Exécuté plus de nonante fois ; dernier run en date au § 11.8."),
+        "58 runs à son nom au 03.09.2026, dont 28 clos en `ok` du 09.08 au 02.09 (par "
+        "requête sur `runs`)."),
     "collecte_xlsx_indexe.json": (
         "En service", "Collecteur de classeur derrière une page d'index",
         "Pour les producteurs qui publient un classeur dont l'URL change à chaque millésime "
         "(CPB, SIPRI) : la page d'index est lue, le lien du classeur courant en est extrait."),
     "analyse_tendances_alertes.json": (
         "En service", "Commentaire exécutif sous règles d'interprétation RI0-RI10",
-        "Produit le texte de tête de chaque vue sectorielle. Aucune sortie n'est diffusée "
-        "sans validation humaine nominative."),
+        "Produit le texte de tête de chaque vue sectorielle. Sorties stockées avec leur "
+        "statut ; depuis le 31.08.2026, servies avec ce statut et badgées à l'écran — la "
+        "relecture humaine est un audit a posteriori (§ 12.5)."),
     "api_restitution.json": (
         "En service", "Interface de lecture de la restitution (lecture seule)",
-        "Cinq points de lecture servant l'application de tableau de bord. Aucune écriture."),
+        "Sept points de lecture servant l'application de tableau de bord (trois lus par "
+        "l'application, § 6 de DEPLOIEMENT.md). Aucune écriture."),
     "extraction_composite_A2.json": (
         "Démontré en série", "Extraction composite multi-IA (A2, communiqués ACEA)",
         "Sept périodes validées, six routages en validation humaine pour quatre motifs "
@@ -85,21 +94,45 @@ ETATS = {
         "Superseded", "Pilote de la tranche verticale (A5, Eurostat)",
         "Premier collecteur, du 06.08.2026. Conservé comme pièce : c'est lui qui a démontré "
         "la chaîne de bout en bout avant que le collecteur générique ne le remplace."),
-    "collecte_a5_multi_geo.json": (
-        "Superseded", "Collecte A5 multi-zones (branches parallèles)",
-        "Étape intermédiaire, conservée pour la traçabilité du chemin suivi."),
-    "collecte_m2_eurostat.json": (
-        "Superseded", "Collecte M2 (Eurostat)", "Remplacé par le collecteur générique."),
-    "collecte_hard_data.json": (
-        "Superseded", "Collecte des hard data (première forme)",
-        "Remplacé par le collecteur générique piloté par liaisons."),
-    "extraction_composite_multi_ia.json": (
-        "Superseded", "Extraction composite (forme générique initiale)",
-        "Remplacé par `extraction_composite_A2.json`, spécialisé et démontré en série."),
+    # 03.09.2026 — sept descripteurs, notices rédigées sur pièces (passation, suites
+    # du 30.08 au 02.09 ; notes de rédaction du 03.09, suite 12).
+    "extraction_composite_CP.json": (
+        "Démontré sur un run", "Extraction composite par la voie multimodale (H2 emplois, "
+        "H11 entreprises ; Convention patronale)",
+        "Run 167 : 32 valeurs identiques au chargement par script (run 163) ; trois défauts "
+        "de câblage corrigés, aucun visible à la lecture du JSON (§ 11.16)."),
+    "extraction_composite_A1_ccfa.json": (
+        "Démontré", "Extraction composite A1 (annuaire CCFA, republication OICA) — découpe "
+        "par sentinelles (~2,5 % du document soumis), consensus, confrontation OICA "
+        "opportuniste, recouvrement inter-éditions",
+        "Série 2021-2024, trois éditions traitées (§ 11.16)."),
+    "extraction_evenements_flux.json": (
+        "En service", "Événements typés depuis le titre seul des items — modèle unique, "
+        "vocabulaire fermé (huit types, trois sens), non_relu par défaut, éligibilité "
+        "déclarée par source",
+        "690 événements au registre au 02.09.2026, 309 servis."),
+    "lecture_transversale.json": (
+        "Démontré sur un run", "Lectures transversales sous génération contrainte (faits "
+        "calculés fournis, aucun chiffre autorisé, citations obligatoires)",
+        "Run 194 : 7 hypothèses, zéro incident de format ; servies avec statut."),
+    "derivation_intensite_signalement.json": (
+        "En service", "Dérivation des intensités (S9, A9, A10, H10) depuis le triage — la vue "
+        "calcule, le workflow ouvre le run et écrit en file de validation",
+        "Premiers points validés le 27.08.2026, H10 activé le 31.08."),
+    "veille_documentaire_annuelle.json": (
+        "En service", "Détection des éditions annuelles CP et CCFA — détecter n'est pas lire : "
+        "inscription en file a_verifier, idempotente",
+        "Run 202 vert, comportement de référence ; les trois pipelines composites sont "
+        "auto-amorcés."),
+    "erreur_commune.json": (
+        "En service", "Clôture automatique des runs en échec — errorWorkflow commun aux 21 "
+        "autres workflows",
+        "Démontré au banc d'essai le 02.09.2026 (run 216) ; hypothèse « une exécution à la "
+        "fois » déclarée dans le fichier ; à publier après tout réimport, sinon muet."),
 }
 
 ORDRE = ["En service", "Démontré en série", "Démontré", "Démontré sur un run",
-         "Spécifié, non confronté", "Superseded"]
+         "Démonstration, hors production", "Superseded"]
 
 
 def main():
@@ -153,13 +186,19 @@ justificatifs dans l'interface, ce qui est documenté au fichier de passation.
 
     print("""---
 
-## Lecture de l'état « Superseded »
+## Lecture de l'état « Superseded », et l'archive
 
-Cinq workflows sont conservés au dépôt alors qu'ils ne sont plus exécutés. Ce n'est pas de la
-négligence : ce sont les étapes réelles du chemin suivi, et l'historique du dépôt doit se lire
-comme le déroulé du projet. Le premier d'entre eux — le pilote de la tranche verticale du
-6 août — est la pièce qui établit que la chaîne de bout en bout a fonctionné avant d'être
-généralisée. Les supprimer rendrait le dossier plus propre et moins vrai.
+Un workflow est conservé au dépôt alors qu'il n'est plus exécuté : le pilote de la tranche
+verticale du 6 août, la pièce qui établit que la chaîne de bout en bout a fonctionné avant d'être
+généralisée. Cinq autres états antérieurs — collecte A5 multi-zones, collecte M2, collecte des
+hard data (première forme), extraction composite générique, maquette du scénario C — ont été
+déplacés le 02.09.2026 sous `n8n_workflows/archive/squelettes_2026-08-04/`, hors de la boucle
+d'import : ils s'importaient avec les autres et un lecteur ne distinguait pas le vivant du mort.
+Aucun des cinq n'a produit de run ; la maquette du scénario C n'a jamais été exécutée, la
+confrontation du § 10.5 ayant été menée par le script `scenario_c/agent_autonome.py` (annexe 7).
+L'archive contient aussi l'export de la version d'`extraction_composite_A2` qui a réellement
+produit les runs 51 à 58, et un README qui dit pourquoi. Supprimer tout cela rendrait le dossier
+plus propre et moins vrai.
 """)
     return 0
 
