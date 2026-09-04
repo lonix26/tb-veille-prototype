@@ -103,7 +103,8 @@ ETATS = {
         "de câblage corrigés, aucun visible à la lecture du JSON (§ 11.16)."),
     "extraction_composite_A1_ccfa.json": (
         "Démontré", "Extraction composite A1 (annuaire CCFA, republication OICA) — découpe "
-        "par sentinelles (~2,5 % du document soumis), consensus, confrontation OICA "
+        "par sentinelles (~1 % du document soumis : 5 100 caractères sur ~530 000, mesuré sur "
+        "les exécutions du 31.08.2026, corrigé de 2,5 % le 04.09), consensus, confrontation OICA "
         "opportuniste, recouvrement inter-éditions",
         "Série 2021-2024, trois éditions traitées (§ 11.16)."),
     "extraction_evenements_flux.json": (

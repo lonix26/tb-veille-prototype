@@ -529,6 +529,7 @@ CREATE TABLE public.flux_evenements (
     verifie_par text,
     verifie_le timestamp with time zone,
     horodatage timestamp with time zone DEFAULT now() NOT NULL,
+    motif text,
     CONSTRAINT chk_evenement_verifie CHECK (((statut = 'non_relu'::text) OR ((verifie_par IS NOT NULL) AND (verifie_le IS NOT NULL)))),
     CONSTRAINT flux_evenements_sens_sous_traitance_check CHECK ((sens_sous_traitance = ANY (ARRAY['opportunite'::text, 'menace'::text, 'neutre'::text]))),
     CONSTRAINT flux_evenements_statut_check CHECK ((statut = ANY (ARRAY['non_relu'::text, 'valide'::text, 'rejete'::text]))),
@@ -541,6 +542,13 @@ CREATE TABLE public.flux_evenements (
 --
 
 COMMENT ON TABLE public.flux_evenements IS 'Événements typés lus par un modèle unique dans les items de flux pertinents. Diffusés sous étiquette « non relu » tant qu''aucun humain n''a tranché — le régime du commentaire exécutif (décision du 31.08.2026).';
+
+
+--
+-- Name: COLUMN flux_evenements.motif; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.flux_evenements.motif IS 'Motif humain de la décision de relecture (obligatoire en pratique pour un rejet).';
 
 
 --
@@ -1008,6 +1016,7 @@ CREATE TABLE public.lectures_transversales (
     validated_by text,
     validated_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    motif text,
     CONSTRAINT chk_lecture_validee CHECK (((statut = 'a_valider'::text) OR ((validated_by IS NOT NULL) AND (validated_at IS NOT NULL)))),
     CONSTRAINT lectures_transversales_confiance_check CHECK ((confiance = ANY (ARRAY['haute'::text, 'moyenne'::text, 'basse'::text]))),
     CONSTRAINT lectures_transversales_statut_check CHECK ((statut = ANY (ARRAY['a_valider'::text, 'valide'::text, 'rejete'::text])))
@@ -1019,6 +1028,13 @@ CREATE TABLE public.lectures_transversales (
 --
 
 COMMENT ON TABLE public.lectures_transversales IS 'Hypothèses de liaison inter-signaux, générées sous contrainte : le modèle ne reçoit que des faits calculés (F1..Fn), n''écrit aucun chiffre, cite ses faits. La validation humaine tranche ; une hypothèse rejetée reste en base — le taux de rejet est une mesure du dispositif, pas un déchet.';
+
+
+--
+-- Name: COLUMN lectures_transversales.motif; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.lectures_transversales.motif IS 'Motif de la décision humaine, obligatoire dès qu''une décision est posée (02.09.2026).';
 
 
 --
@@ -1253,8 +1269,16 @@ CREATE TABLE public.source_qualification_queue (
     decision text,
     decided_by text,
     decided_at timestamp with time zone,
+    motif text,
     CONSTRAINT source_qualification_queue_decision_check CHECK (((decision IS NULL) OR (decision = ANY (ARRAY['inscrite'::text, 'ecartee'::text, 'differee'::text]))))
 );
+
+
+--
+-- Name: COLUMN source_qualification_queue.motif; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.source_qualification_queue.motif IS 'Motif de la décision humaine, obligatoire dès qu''une décision est posée (02.09.2026).';
 
 
 --
@@ -2000,7 +2024,8 @@ CREATE VIEW public.v_bilan_filtrage AS
         CASE
             WHEN (items_audites = 0) THEN 'Règle appliquée, jamais auditée : le taux de faux négatifs est inconnu.'::text
             WHEN (faux_negatifs = 0) THEN format('Aucun faux négatif sur %s items audités.'::text, items_audites)
-            ELSE format('%s faux négatifs sur %s items audités — la règle doit être révisée.'::text, faux_negatifs, items_audites)
+            WHEN (((100.0 * (faux_negatifs)::numeric) / (items_audites)::numeric) <= (5)::numeric) THEN format('%s faux négatif(s) sur %s items audités (%s %%), restitué(s) à la file. Règle maintenue : taux sous la tolérance de 5 %% (fixée le 02.09.2026, après le premier audit).'::text, faux_negatifs, items_audites, round(((100.0 * (faux_negatifs)::numeric) / (items_audites)::numeric), 1))
+            ELSE format('%s faux négatifs sur %s items audités (%s %%) — au-delà de la tolérance de 5 %% : la règle doit être révisée.'::text, faux_negatifs, items_audites, round(((100.0 * (faux_negatifs)::numeric) / (items_audites)::numeric), 1))
         END AS enonce_audit
    FROM b;
 

@@ -5991,3 +5991,50 @@ Commande reçue par `rapport/notes_de_redaction.md` (suites 15 et 17 du 03.09).
 
 Retour écrit dans `notes_de_redaction.md` (entrée du 04.09). Commit : migration, script,
 passation.
+
+## 04.09.2026 (suite 19) — Passe de preuve avant assemblage (section B de la checklist)
+
+Commande reçue par `rapport/CHECKLIST_ASSEMBLAGE.md` § B et les notes du 04.09.
+
+1. **Harnais** : `verification/base.sh` vert (13 invariants, 6 faits figés) ;
+   `dashboard-app/verification/executer.sh` vert (hooks, classes, 17 rendus, sonde navigateur
+   sur 11 routes). Relancé après les deux migrations du jour : toujours vert.
+2. **Liste « à revérifier par requête au figeage », soldée** — conforme : 46 indicateurs
+   alimentés / 203 176 observations / 215 runs (ids 1-216, le 31 n'existe pas) ; 23 sources
+   certifiées (6 à confirmer) ; A7 38, T6 15, T7 10, T9 4,5 ; 116/89 événements médicaux datés
+   du 31.08 (aujourd'hui 127/91, le texte est daté) ; 309 servis sur 690 (par
+   `flux_sources.lecture_evenementielle` ; 309 = actualité 159 + communications 150, 287 marchés
+   publics, 94 réglementaire) ; H10 25,8 % validé humainement (la vue vivante dit 8/32 = 25,0 %
+   au 04.09, le texte date le 31.08 : 8/31) ; seuil de consensus 32/34 au chargement CP et 0/8
+   A2 (datés ; cumul du 04.09 : H2 60/1, H11 36/1, A1 323/0, A2 0 directe) ; 38 rejets sur 63
+   commentaires décidés au 31.08 ; run 163 (32 valeurs, 2 en file) et 167 (première exécution
+   du workflow, 32 lignes identiques puis purgées, passation du 31.08) ; couche 0 : 1 inscrite /
+   5 différées / 13 écartées ; événements 6 rejetés / 24 validés / 660 non relus ; filtrage
+   1/40 ; annexe 7 : fidélité 91 % ; architecture au dépôt `7508124` : 51 nœuds Code, 2 684
+   lignes (par sauts de ligne), 47 Ko, nœuds de 287 et 154 lignes, `v_metriques` 223 lignes,
+   `Secteur.jsx` 1 120 lignes — recomptés identiques ce soir (125 migrations désormais, +1 ce
+   jour). **241 écarts entre runs** : reproduit avec `ecart_pct <> 0` ; par comparaison exacte
+   des valeurs la base en compte 273, et « 43 des 44 points de T6 » se lit par comparaison
+   exacte (17 seulement dépassent l'arrondi de `ecart_pct`) — deux définitions dans la même
+   phrase du § 12.5 (3), toutes deux reproductibles, signalé aux notes.
+   **Trois écarts, texte corrigé** : (a) `E_publication.md` « 216 exécutions » → 215 ;
+   (b) C2 § 8.11 « M6 (22) » → « M6 (20, recalibré de 22 le 02.09 sur les périodes complètes,
+   2021-2022 en consolidation) » — migration A7 du 02.09, la base porte 20 ;
+   (c) **part du document A1 envoyée aux modèles : 1 %, pas 2,5 %** — tranchée sur pièce dans
+   les données d'exécution n8n 1803-1806 du 31.08 (tranche `t.slice` de 5 100 caractères sur
+   des textes de 527 417 / 550 155 / 526 095 / 527 417 caractères, soit 0,93-0,97 %) ; la
+   passation du 31.08 (suite 5, « ~5 100 car., 2,5 % ») divisait mal, l'estimation antérieure
+   « ~2 % » visait une tranche de 10-14 k. Corrigé : C3 § 10.4 ; `generer_annexe_2.py` et
+   `generer_annexe_4.py` (annexes régénérées) ; `sources.notes` d'`oica` par la migration
+   `2026-09-04_source_oica_part_document.sql` (écrite ce matin avec le 2,5 %). Le nœud de
+   découpe du workflow porte encore « ~5 100 caractères » sans pourcentage — juste.
+3. **Régénéré** : `db/01_socle.sql` et `02_referentiel.sql` (`regenerer_socle.sh`, recette
+   rejouée : 27 tables · 44 vues · 51 indicateurs en recette contre 53 en service, écart connu
+   depuis le 01.09) ; annexe 1 (`.md`, `csv/`, classeur `.xlsx` copié dans `annexes/`) ; annexes
+   2 et 4. D2 inchangé depuis ce matin (la note de source n'y est pas projetée). F.2.2 après ce
+   commit.
+4. **Fichiers bruts archivés** : `annexes/fichiers_bruts_run_214_2026-09-02/` — 98 fichiers,
+   9,8 Mo, run 214 (collecteur générique, 02.09 07:26 UTC, `ok`, 11 438 observations sur 31
+   indicateurs, dernier run complet avant le tour jury), README qui dit le rapprochement par
+   `run_id` et `raw_ref`. Le rapport ne nomme pas de « run de référence » ; c'est celui qui
+   porte l'état du 02.09 qu'il cite.

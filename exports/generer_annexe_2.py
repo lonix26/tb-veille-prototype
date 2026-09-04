@@ -54,7 +54,8 @@ WORKFLOWS = [
     ("extraction_composite_A1_ccfa.json", ["Préparer la charge"],
      "Extraction composite A1 (annuaire CCFA, republication OICA)",
      "La section statistique est découpée par sentinelles avant l'envoi — environ "
-     "2,5 % du document soumis. Consensus à trois modèles, confrontation "
+     "1 % du document soumis (5 100 caractères sur ~530 000, mesuré sur les exécutions du "
+     "31.08.2026 ; corrigé de 2,5 % le 04.09). Consensus à trois modèles, confrontation "
      "opportuniste à la source OICA, recouvrement entre éditions (§ 11.16)."),
     ("extraction_signal_qualitatif.json", ["Consolider le contexte"],
      "Extraction de signal qualitatif",
