@@ -6038,3 +6038,15 @@ Commande reçue par `rapport/CHECKLIST_ASSEMBLAGE.md` § B et les notes du 04.09
    indicateurs, dernier run complet avant le tour jury), README qui dit le rapprochement par
    `run_id` et `raw_ref`. Le rapport ne nomme pas de « run de référence » ; c'est celui qui
    porte l'état du 02.09 qu'il cite.
+
+## 04.09.2026 (suite 20) — Audit de véracité du rapport : sept relecteurs, corrections portées au texte
+
+À la demande de l'étudiant (« qu'il n'existe pas de fait inventé »), sept relectures parallèles
+en lecture seule (00+A+B ; C1+D2+F ; C2 ; C3 ; C4 § 11 ; C4 § 11.14-13 ; cohérence transversale
+rapport ↔ annexes), chacune confrontant les affirmations à la base, au dépôt et aux annexes.
+Environ 1 100 affirmations instruites ; ~60 fausses, ~60 imprécises, le reste confirmé ; aucun
+renvoi « § » cassé. Corrections portées dans `rapport/*.md` (détail par fichier dans
+`rapport/notes_de_redaction.md`, entrée du 04.09 « suite 10 »). Côté prototype, un seul
+changement : `exports/generer_sources_donnees.sh` — la campagne qui a rendu les deux liens
+morts (CPB, SIPRI) est celle du **24.08.2026** (migration `2026-08-24_urls_sources.sql`), non du
+27.08 ; D2 régénéré. Base intacte.

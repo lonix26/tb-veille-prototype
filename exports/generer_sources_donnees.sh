@@ -27,7 +27,7 @@ GENERE_LE=$(q "SELECT to_char(now(), 'DD.MM.YYYY');")
 # auparavant confondue avec la date de génération, ce qui faisait affirmer
 # au texte une campagne qui n'avait pas eu lieu.
 VERIF_LE="02.09.2026"
-# Les dates de campagnes ANTÉRIEURES citées dans les notes (27.08, 30.08) sont des faits
+# Les dates de campagnes ANTÉRIEURES citées dans les notes (24.08, 30.08) sont des faits
 # historiques codés en dur : elles ne doivent pas suivre VERIF_LE (02.09.2026 : le
 # paragraphe OFS attribuait la découverte du 30.08 à la campagne courante).
 
@@ -96,7 +96,7 @@ une invention.
 
 ## Note sur la vérification des liens
 
-La campagne du 27.08.2026 avait rendu **deux liens morts** au référentiel : celui du CPB
+La campagne du 24.08.2026 avait rendu **deux liens morts** au référentiel : celui du CPB
 Netherlands Bureau for Economic Policy Analysis (404) et celui de la base des dépenses
 militaires du SIPRI (échec de négociation TLS). Les deux ont été corrigés en base — et non dans
 le seul texte — au moyen des adresses que les liaisons de collecte utilisaient déjà et qui
