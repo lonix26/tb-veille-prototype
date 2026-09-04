@@ -5963,3 +5963,31 @@ Commande reçue par `rapport/notes_de_redaction.md` (entrée « 03.09.2026 (suit
 
 Annexes 2 et 4 régénérées (`annexes/`, datées du 03.09). Hors dépôt git ; couvertes par la copie
 Drive. Commit : générateurs seuls.
+
+## 04.09.2026 (suite 18) — Deux actes pour le rapport : la source d'A1 dit le CCFA, le journal F.2.2 se génère
+
+Commande reçue par `rapport/notes_de_redaction.md` (suites 15 et 17 du 03.09).
+
+1. **Source d'A1.** Migration `migrations/2026-09-04_source_oica_ccfa.sql`, appliquée :
+   `sources.oica` garde l'OICA en producteur et dit désormais le document collecté (annuaire
+   CCFA, PDF, « Source : OICA » imprimé, éditions 2023 et 2024 + page courante, composite_queue
+   9-11), le format réel (PDF CCFA ; tableaux web OICA en vérité terrain opportuniste), la date de
+   vérification en réponse réelle (31.08.2026, runs 187-189) et une note complète. Contrôle en
+   fin de migration : `nomme_ccfa = t`, indicateurs = A1. `verification/base.sh` : conforme.
+   `D2_sources_de_donnees.md` et `annexes/1_tableau_de_veille.md` régénérés par leurs scripts ;
+   diff limité à la date, à la ligne OICA et, pour l'annexe 1, à la source `acea_incitations`
+   (02.09) qui n'y était pas encore. Non fait : le classeur `.xlsx` (au figeage) ; la ligne A1
+   du tableau § 8.6.4 de C2 (« Tableaux web »), côté rapport.
+2. **Journal F.2.2.** Le tableau tenu à la main s'arrêtait au 26.08 au matin (55 actes) ; git en
+   comptait 63 le soir même, 101 au 03.09. Écrit `exports/generer_journal_f22.py` (une ligne par
+   jour d'auteur, trois premiers sujets sans préfixe, « et n autre(s) acte(s) », décompte et note)
+   : il reproduit **à l'identique** les sept lignes existantes du 10 au 25.08, ce qui valide la
+   règle ; la ligne du 26.08 passe à 9 actes ; 31.08, 01.09, 02.09, 03.09 ajoutées. Tableau et
+   note remplacés dans `rapport/F_partie_administrative.md`. Deux faits d'histoire codés en dur
+   dans la note, parce qu'ils ne se lisent pas dans git : aucun commit du 27 au 30.08 (les neuf du
+   31.08 portent ces jours — suite 8 du 02.09) ; aucune séance balisée parce qu'aucune n'a eu
+   lieu. Remarque au passage, non corrigée : deux commits du 17.08 portent le même sujet
+   (« instrumenter A3 et M3 (lot 1)… »), le tableau le montre tel quel.
+
+Retour écrit dans `notes_de_redaction.md` (entrée du 04.09). Commit : migration, script,
+passation.
