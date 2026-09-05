@@ -159,6 +159,26 @@
         1400,
         0
       ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur quotidien",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Chaque jour à 09:00, après le triage. La lecture événementielle ne porte que sur les sources déclarées éligibles."
     }
   ],
   "connections": {
@@ -233,6 +253,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur quotidien": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

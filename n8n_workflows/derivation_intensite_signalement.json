@@ -79,6 +79,26 @@
           "name": "postgres veille"
         }
       }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 5 1 * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Le 1er du mois, 05:00. Les intensités de signalement sont des séries mensuelles : la dérivation clôt le mois écoulé plutôt que de recalculer un mois en cours."
     }
   ],
   "connections": {
@@ -109,6 +129,17 @@
         [
           {
             "node": "Clore le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

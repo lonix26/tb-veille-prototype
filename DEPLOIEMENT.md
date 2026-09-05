@@ -199,7 +199,7 @@ produit les runs 51-58 ne correspondait à aucun commit. Elle est archivée tell
 alignés sur l'instance depuis le 02.09 et le réimport a été vérifié (21 workflows, aucun doublon,
 A2 identique nœud pour nœud entre le fichier et l'instance).
 
-Les 21 fichiers de la racine s'importent et sont exactement les 21 workflows de l'instance en
+Les 22 fichiers de la racine s'importent et sont exactement les 22 workflows de l'instance en
 service. Cinq états antérieurs jamais importés (`collecte_a5_multi_geo`, `collecte_hard_data`,
 `collecte_m2_eurostat`, `extraction_composite_multi_ia`, `scenario_c_agent_autonome`) ont été
 déplacés le 02.09.2026 dans `n8n_workflows/archive/squelettes_2026-08-04/` (correction A9 du tour
@@ -232,6 +232,44 @@ done
 
 > **Piège connu** : `n8n execute` en ligne de commande échoue sur « Task Broker's port 5679 is
 > already in use ». Passer **les deux** variables de port ci-dessus le contourne.
+
+### 5.1 Les cadences déclarées, et comment les activer (05.09.2026)
+
+La section précédente lance la chaîne **à la main**, et c'est ainsi qu'elle a tourné pendant
+toute la construction : le registre devait rester stable pendant que le rapport en citait
+l'état à une date figée, et les chaînes composites comme le triage appellent des modèles
+payants. Ce n'est pas la cible.
+
+Depuis le 05.09.2026, **seize collecteurs portent, à côté de leur déclencheur manuel, un
+déclencheur horaire** dont la cadence est calée sur la fréquence de publication de la source ;
+la note de chaque nœud dit pourquoi cette cadence et pas une autre. Trois familles :
+
+| Cadence | Workflows | Motif |
+|---|---|---|
+| Quotidienne (06:00 → 10:00) | `collecteFluxV1`, `tedEnrichiV1`, `triageFluxV1`, `extraction-evenements-flux`, `lectureDecisionV1` | Les flux publient au fil de l'eau ; l'ordre horaire reproduit celui du § 5 |
+| Hebdomadaire (lundi) | `veille-documentaire-annuelle`, `VoDfbXcbAS4JoNxf` (signal qualitatif), `commentaireExecV2`, `lecture-transversale` | Lectures et détections : une passe par semaine suffit, et elle est bon marché |
+| Mensuelle | `collecteGeneriqueV2` (le 5), `collecteXlsxIndexeV1` (le 5), `extraction_composite_CP` (le 6), `QSCRx2ogbAts5eVZ` (A1, le 6), `veilleAceaV1` (le 20), `0ay3mDuTGTSporSW` (A2, le 21), `dN8uiR4bud4RopM6` (intensités, le 1er) | Les séries conjoncturelles paraissent une fois par mois ; les composites ne traitent que ce que leur file porte |
+
+**Un seul de ces déclencheurs est publié** : `veille-documentaire-annuelle`, choisi parce qu'il
+est idempotent et n'appelle aucun modèle. Il a produit une exécution planifiée réelle le
+05.09.2026. Les autres sont déclarés et inactifs : un workflow importé n'est jamais publié par
+`import:workflow`, et rien ne se déclenche tant qu'on ne le publie pas.
+
+Pour activer un collecteur, deux gestes — et une correction obligatoire avant le premier :
+
+```bash
+docker exec veille_n8n n8n publish:workflow --id=<identifiant>
+docker compose restart n8n
+```
+
+> **À corriger avant d'activer** : le nœud « Ouvrir le run » de chaque collecteur inscrit
+> `trigger_type` **en dur** à `'manual'`. Activé tel quel, le workflow ferait mentir le registre
+> sur l'origine de ses propres exécutions. `veille_documentaire_annuelle.json` porte la forme
+> corrigée, à recopier : la valeur devient une expression qui constate quel déclencheur a
+> produit l'exécution. La colonne accepte `'manual'` et `'schedule'`, la contrainte est déjà là.
+
+Le fuseau de l'instance est `Europe/Zurich` (`GENERIC_TIMEZONE` du compose) : les heures des
+cadences sont des heures locales.
 
 ## 6. Vérifier
 

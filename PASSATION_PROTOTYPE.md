@@ -6050,3 +6050,55 @@ renvoi « § » cassé. Corrections portées dans `rapport/*.md` (détail par fi
 changement : `exports/generer_sources_donnees.sh` — la campagne qui a rendu les deux liens
 morts (CPB, SIPRI) est celle du **24.08.2026** (migration `2026-08-24_urls_sources.sql`), non du
 27.08 ; D2 régénéré. Base intacte.
+
+## 05.09.2026 — Les workflows portent leur cadence, et une exécution s'est déclenchée seule
+
+**Constat de départ** (soulevé par l'étudiant) : vingt workflows sur vingt-deux ne portaient
+qu'un déclencheur **manuel**, alors que le § 10.2 du rapport décrit une couche d'orchestration
+« déclenchée selon la fréquence de la source » et que l'exigence E1 demande de collecter « à leur
+fréquence de publication ». Le seul horaire existant était sur le pilote Eurostat, remplacé et
+non publié : il ne se déclenchait jamais. Écart réel entre le texte et les fichiers.
+
+**Ce qui est fait.**
+
+1. **Seize collecteurs reçoivent un nœud `scheduleTrigger`** à côté de leur déclencheur manuel,
+   branché sur le même premier nœud, avec la cadence en expression cron et **le motif en note** :
+   quotidiens 06:00→10:00 pour les flux (collecte, enrichissement TED, triage, événements,
+   lecture décisionnelle — l'ordre horaire reproduit celui des dépendances du § 5 de
+   `DEPLOIEMENT.md`) ; mensuels calés après la parution (générique le 5, xlsx indexé le 5,
+   composites CP et A1 le 6, ACEA le 20, extraction A2 le 21, intensités le 1er) ; hebdomadaires
+   le lundi (signal qualitatif 11:00, commentaire exécutif 12:00, lecture transversale 13:00,
+   veille documentaire 05:00). Diff **strictement additif** : 527 insertions, 0 suppression.
+   Non concernés : couche 0 (exploratoire, à la demande), attribution ancrée (démonstration hors
+   production), pilote A5 (remplacé, garde son cron), API de restitution (webhooks), erreur
+   commune (déclencheur d'erreur).
+2. **`veille_documentaire_annuelle` publié**, choisi parce qu'il est idempotent et n'appelle
+   aucun modèle. Son nœud « Ouvrir le run » **constate** le déclencheur au lieu de l'écrire en
+   dur : `trigger_type` vaut `'{{ $("Déclencheur hebdomadaire").isExecuted ? "schedule" :
+   "manual" }}'`. La contrainte de la colonne admettait `schedule` depuis l'origine ; aucun run
+   ne l'avait jamais porté.
+3. **Preuve** : cadence temporaire posée à 20:30 le 05.09 (`30 20 5 9 *`), import, publication,
+   redémarrage — puis, sans aucune intervention, **exécution n8n 2712 au mode `trigger`** à
+   18:30:00.050 UTC et **run 217 en base, `trigger_type=schedule`, statut `ok`**, ouvert et clos
+   dans la même seconde (les deux éditions annuelles attendues étaient déjà connues : aucune
+   inscription en file, comportement idempotent recherché). La cadence hebdomadaire réelle
+   (`0 5 * * 1`) a été aussitôt restaurée, réimportée, republiée ; c'est elle qui est au dépôt.
+   Après restauration : trois workflows actifs, sept points d'API en 200 (`/donnees` répond en
+   24 s, sous le délai par défaut de curl — le tester avec `-m 90`), `base.sh` conforme, harnais
+   de l'application vert.
+
+**Ce qui reste manuel, et pourquoi** : les quinze autres cadences sont **déclarées et non
+publiées**. Motifs, écrits au rapport (limite (20) du § 12.5) : des exécutions nocturnes non
+surveillées feraient dériver le registre pendant que le rapport en cite l'état à une date figée,
+et les chaînes composites comme le triage appellent des modèles payants. **Dette déclarée** :
+leur nœud d'ouverture inscrit encore `trigger_type = 'manual'` en dur ; activer l'un d'eux sans
+recopier la forme corrigée ferait mentir le registre sur l'origine de ses propres exécutions.
+
+**Documentation** : `DEPLOIEMENT.md` § 5.1 (tableau des trois familles de cadence, procédure de
+publication, avertissement sur `trigger_type`, fuseau `Europe/Zurich`) ; générateur de l'annexe 4
+(paragraphe de tête et état « En service, cadence activée ») ; rapport § 10.2 corrigé,
+**§ 11.17 créé**, limite (20) ajoutée au § 12.5 (le décompte passe de dix-neuf à vingt).
+
+**Effet sur les chiffres du rapport** : le registre passe à 216 runs (run 217 inclus, l'id 31
+n'existant pas). Toutes les affirmations du rapport sont datées « au 02.09.2026 » et restent
+exactes ; `base_attendu.txt` ne fige pas le décompte de runs, `base.sh` reste conforme.

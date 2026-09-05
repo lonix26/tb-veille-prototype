@@ -219,6 +219,26 @@
           "name": "postgres veille"
         }
       }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur quotidien",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Chaque jour à 08:00, après l'enrichissement. Le triage porte sur les items du jour ; il alimente le filtrage à seuil et la file d'examen humain."
     }
   ],
   "connections": {
@@ -316,6 +336,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur quotidien": {
+      "main": [
+        [
+          {
+            "node": "Lire les items sans score",
             "type": "main",
             "index": 0
           }

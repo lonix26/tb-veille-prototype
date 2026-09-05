@@ -278,6 +278,26 @@
           "name": "postgres veille"
         }
       }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 11 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur hebdomadaire",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        800
+      ],
+      "notes": "Chaque lundi à 11:00. Les actes réglementaires qualifiables en signal sont rares : une passe hebdomadaire suffit, et la sortie reste sous validation humaine nominative avant tout écran."
     }
   ],
   "connections": {
@@ -418,6 +438,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur hebdomadaire": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

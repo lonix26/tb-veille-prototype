@@ -181,6 +181,26 @@
           "name": "postgres veille"
         }
       }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 5 * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        700
+      ],
+      "notes": "Le 5 du mois, 07:00. Deux rythmes derrière la même famille d'accès : le moniteur du CPB paraît chaque mois, le classeur du SIPRI une fois l'an. La cadence suit le plus fréquent."
     }
   ],
   "connections": {
@@ -277,6 +297,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

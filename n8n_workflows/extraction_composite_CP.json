@@ -399,6 +399,26 @@
         3200,
         0
       ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 6 * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Le 6 du mois, 09:00, au lendemain de la veille documentaire. Le recensement de la Convention patronale est annuel : onze mois sur douze, la file est vide et l'extraction ne consomme rien."
     }
   ],
   "connections": {
@@ -600,6 +620,17 @@
         [
           {
             "node": "Clore le document traité",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

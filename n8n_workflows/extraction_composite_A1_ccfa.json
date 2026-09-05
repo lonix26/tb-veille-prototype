@@ -443,6 +443,26 @@
         3200,
         0
       ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 6 * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Le 6 du mois, 10:00. L'annuaire du CCFA paraît une fois l'an : comme pour la Convention patronale, la passe mensuelle ne traite que ce que la file porte."
     }
   ],
   "connections": {
@@ -677,6 +697,17 @@
         [
           {
             "node": "Clore le document traité",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

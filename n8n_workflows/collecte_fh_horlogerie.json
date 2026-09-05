@@ -161,6 +161,26 @@
           "name": "postgres veille"
         }
       }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 22 * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Le 22 du mois, 08:00. La Fédération horlogère publie ses exportations autour du 20 ; le déclenchement se place après, jamais avant."
     }
   ],
   "connections": {
@@ -246,6 +266,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

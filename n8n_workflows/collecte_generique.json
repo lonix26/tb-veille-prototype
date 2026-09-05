@@ -325,6 +325,26 @@
         400
       ],
       "notes": "Sans ce nœud, les deux voies d'appel alimentent directement la suite de la chaîne, et n8n l'exécute UNE FOIS PAR BRANCHE. Constaté le 09.08.2026 : le décodeur tournait deux fois, chaque passe ne voyant que ses propres liaisons. La passe Comtrade, qui ne décodait rien, levait une exception et mourait sans trace ; la note du run provenait de l'autre passe et annonçait un seul incident là où deux sources avaient échoué. Un bilan d'exécution faux est plus grave qu'une collecte incomplète — c'est le défaut que ce travail dénonce, reproduit par son propre dispositif. Le mode « append » réunit les deux voies en un seul flux et la chaîne aval ne s'exécute qu'une fois."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 5 * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        800
+      ],
+      "notes": "Le 5 du mois, 06:00. Le collecteur est piloté par les liaisons du référentiel, qui couvrent des séries mensuelles à annuelles : la cadence retenue est celle de la plus fréquente d'entre elles, une liaison annuelle ne rendant simplement rien de neuf onze mois sur douze. La fréquence du workflow suit celle des sources, elle ne la précède pas."
     }
   ],
   "connections": {
@@ -512,6 +532,17 @@
         [
           {
             "node": "Réapparier réponses et liaisons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

@@ -198,6 +198,26 @@
         0
       ],
       "notes": "UN RUN QUI N'A RIEN FAIT NE DOIT PAS EXISTER. Ouvrir le run avant de savoir s'il y a matière laissait une exécution ouverte à chaque rejeu à vide — cas NOMINAL d'un dispositif relancé régulièrement. Le garde est donc placé AVANT l'ouverture, et non après."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur quotidien",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Chaque jour à 10:00, après l'enrichissement des avis. La lecture décisionnelle porte sur les avis ouverts non encore lus."
     }
   ],
   "connections": {
@@ -288,6 +308,17 @@
           }
         ],
         []
+      ]
+    },
+    "Déclencheur quotidien": {
+      "main": [
+        [
+          {
+            "node": "Lire les appels sans lecture",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

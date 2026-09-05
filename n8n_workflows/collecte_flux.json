@@ -224,6 +224,26 @@
         0
       ],
       "notes": "Sans fusion explicite, les deux branches d'appel convergent sur le nœud de normalisation qui s'exécute DEUX FOIS : la sortie de la première branche est écrasée par celle de la seconde. Constaté au premier essai — les quatre flux de marchés publics, seuls à passer en POST, n'apparaissaient pas au bilan."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur quotidien",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Chaque jour à 06:00. Les quatre familles de flux — avis de marchés publics, dépêches, actes réglementaires, fils de syndication — publient au fil de l'eau ; c'est le seul étage du dispositif dont la cadence se compte en jours."
     }
   ],
   "connections": {
@@ -338,6 +358,17 @@
         [
           {
             "node": "Normaliser les items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur quotidien": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

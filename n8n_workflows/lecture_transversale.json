@@ -185,6 +185,26 @@
         1600,
         0
       ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 13 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur hebdomadaire",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Chaque lundi à 13:00, après le commentaire exécutif : la lecture transversale compose ses faits sur l'état consolidé de la semaine."
     }
   ],
   "connections": {
@@ -270,6 +290,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur hebdomadaire": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

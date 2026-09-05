@@ -362,6 +362,26 @@
         }
       },
       "notes": "La ligne de file passe à traite avec le run qui l'a consommée : le document ne sera pas retraité, et la file garde l'historique — quel run a traité quel document, et quand."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 21 * *"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur mensuel",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        800
+      ],
+      "notes": "Le 21 du mois, 09:00, au lendemain de la détection ACEA. L'extraction ne traite que ce que la file de vérification porte ; sans document neuf, elle ne consomme aucun appel de modèle."
     }
   ],
   "connections": {
@@ -553,6 +573,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur mensuel": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }

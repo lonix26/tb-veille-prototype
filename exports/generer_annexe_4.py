@@ -121,10 +121,12 @@ ETATS = {
         "calcule, le workflow ouvre le run et écrit en file de validation",
         "Premiers points validés le 27.08.2026, H10 activé le 31.08."),
     "veille_documentaire_annuelle.json": (
-        "En service", "Détection des éditions annuelles CP et CCFA — détecter n'est pas lire : "
-        "inscription en file a_verifier, idempotente",
+        "En service, cadence activée", "Détection des éditions annuelles CP et CCFA — détecter "
+        "n'est pas lire : inscription en file a_verifier, idempotente",
         "Run 202 vert, comportement de référence ; les trois pipelines composites sont "
-        "auto-amorcés."),
+        "auto-amorcés. Seul workflow dont le déclencheur horaire est publié (hebdomadaire, lundi "
+        "05:00) : il a produit une exécution planifiée réelle le 05.09.2026, et son nœud "
+        "d'ouverture constate le type de déclenchement au lieu de l'écrire en dur."),
     "erreur_commune.json": (
         "En service", "Clôture automatique des runs en échec — errorWorkflow commun aux 21 "
         "autres workflows",
@@ -132,7 +134,7 @@ ETATS = {
         "fois » déclarée dans le fichier ; à publier après tout réimport, sinon muet."),
 }
 
-ORDRE = ["En service", "Démontré en série", "Démontré", "Démontré sur un run",
+ORDRE = ["En service, cadence activée", "En service", "Démontré en série", "Démontré", "Démontré sur un run",
          "Démonstration, hors production", "Superseded"]
 
 
@@ -154,6 +156,16 @@ l'établit.
 import créait une copie : l'instance de développement a compté jusqu'à cinq exemplaires d'un
 même workflow, et une version périmée a effectivement été exécutée (§ 12.6). Un import
 reproduit désormais l'instance au lieu de la dupliquer.
+
+**Les cadences sont déclarées dans les fichiers, l'activation ne l'est pas.** Depuis le
+05.09.2026, seize collecteurs portent un déclencheur horaire à côté de leur déclencheur manuel —
+quotidien pour les flux, hebdomadaire pour les lectures, mensuel pour les séries conjoncturelles
+et les composites —, chaque nœud portant en note le motif de sa cadence. Un seul est publié et a
+produit une exécution planifiée réelle : la détection des éditions annuelles, choisie parce
+qu'elle est idempotente et n'appelle aucun modèle. Les autres sont déclarés et inactifs :
+pendant la construction, les exécutions ont été lancées à la main pour garder le registre stable
+et maîtriser les appels de modèles payants. La procédure d'activation, et la correction qu'elle
+suppose, figurent au § 5.1 du dossier de déploiement.
 
 **Ce que les fichiers ne contiennent pas, volontairement** : aucune valeur d'authentification.
 Les nœuds portent une *référence* de justificatif — un identifiant et un nom —, jamais son

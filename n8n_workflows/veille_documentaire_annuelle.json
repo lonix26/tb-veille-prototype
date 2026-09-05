@@ -16,7 +16,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('manual', 'B', 'en_cours', 'Veille documentaire annuelle : détection des nouvelles éditions CP et CCFA') RETURNING run_id;",
+        "query": "=INSERT INTO runs (trigger_type, scenario, status, note) VALUES ('{{ $(\"Déclencheur hebdomadaire\").isExecuted ? \"schedule\" : \"manual\" }}', 'B', 'en_cours', 'Veille documentaire annuelle : détection des nouvelles éditions CP et CCFA') RETURNING run_id;",
         "options": {}
       },
       "id": "v2",
@@ -32,7 +32,8 @@
       "position": [
         200,
         0
-      ]
+      ],
+      "notes": "Le type de déclenchement est constaté, non supposé : la colonne trigger_type reçoit « schedule » quand le nœud horaire a produit l'exécution, « manual » sinon. Sans cela le registre dirait « manual » d'une exécution planifiée (04.09.2026)."
     },
     {
       "parameters": {
@@ -182,6 +183,26 @@
         1600,
         0
       ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 5 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Déclencheur hebdomadaire",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Chaque lundi à 05:00. Les deux éditions annuelles surveillées (Convention patronale, CCFA) ne préviennent pas de leur parution : la détection est bon marché — deux requêtes HTTP, aucun appel de modèle — et idempotente, elle peut donc être fréquente sans coût."
     }
   ],
   "connections": {
@@ -274,6 +295,17 @@
         [
           {
             "node": "Clôturer le run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déclencheur hebdomadaire": {
+      "main": [
+        [
+          {
+            "node": "Ouvrir le run",
             "type": "main",
             "index": 0
           }
