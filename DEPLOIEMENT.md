@@ -68,15 +68,20 @@ passe mais chaque nœud Postgres ou Comtrade échoue à l'exécution :
 Deux voies. **Voie testée sur l'instance en service** : créer les deux *credentials* dans
 l'interface n8n (`http://127.0.0.1:5678`), relever leurs identifiants dans l'URL, puis les
 substituer dans les fichiers avant l'import (`sed -i 's/QdVRYX9pjTj9C8G3/<id>/' n8n_workflows/*.json`).
-**Voie non testée sur instance neuve** : `n8n import:credentials --input=<fichier>` accepte un
-JSON portant `id`, `name`, `type` et `data` en clair, qu'il chiffre à l'import — elle
-préserverait les identifiants tels quels ; elle n'a pas été rejouée ici, faute d'instance vierge.
+**Voie automatisée, testée sur instance vierge le 05.09.2026** : `n8n import:credentials
+--input=<fichier>` accepte un JSON portant `id`, `name`, `type` et `data` en clair, qu'il chiffre
+à l'import, et **préserve l'identifiant** — aucune substitution dans les fichiers n'est alors
+nécessaire. C'est ce que fait `demarrer.sh` pour le justificatif Postgres. Un piège mesuré :
+l'orchestrateur répond à son contrôle de santé **avant** que son outil en ligne de commande soit
+utilisable ; l'import échoue si on le lance trop tôt, d'où l'attente sur `n8n list:workflow` et
+les cinq tentatives du script. Le justificatif Comtrade, lui, porte une clé personnelle : il
+reste à créer à la main par qui veut relancer la collecte.
 
 ```bash
 docker compose up -d          # base, orchestrateur, service statique de restitution, adminer
 ```
 
-## 2. Schéma et référentiel — rien à lancer
+## 2. Schéma, référentiel et instantané — rien à lancer
 
 **Le `docker compose up -d` de l'étape précédente a déjà tout fait.** Le service de base monte
 `./db` sur `/docker-entrypoint-initdb.d` : au tout premier démarrage, sur un volume vide,
@@ -103,6 +108,32 @@ ce sont les collecteurs de l'étape 4 qui la remplissent.
 > `v_evenements_mois`) : même procédure, mêmes empreintes.
 > **Règle** : à chaque gel, reconsolider — un socle qui ne suit pas la base n'est plus une
 > reproductibilité, c'est une affirmation.
+
+### `db/03_donnees_demonstration.sql.gz` — pourquoi il existe (05.09.2026)
+
+Les deux premiers fichiers restaurent le schéma et le référentiel, **jamais les observations** :
+le registre est en ajout seul, et livrer des valeurs collectées comme si elles venaient de l'être
+serait une surdéclaration. Conséquence : une base neuve est juste et **vide**, et l'application
+n'a rien à montrer — un tiers en conclut qu'elle ne fonctionne pas.
+
+Un troisième fichier est donc livré : un **instantané daté** des exécutions de l'auteur, produit
+par `exports/generer_instantane_demonstration.sh` et chargé au premier démarrage comme les deux
+autres. Il rend le dispositif consultable sans clé d'API. La base restaurée est alors identique à
+celle en service — 53 indicateurs, 203 176 observations, 216 exécutions, bilan `53/41/38/3/40` —
+et les deux harnais passent dessus.
+
+Deux points que ce fichier assume au lieu de les masquer, et qui sont écrits en tête de son
+générateur : la contrainte `chk_commentaire_rejet_trace` est retirée le temps du chargement, cinq
+rejets antérieurs à sa pose lui étant contraires (limite (12) du § 12.5 du rapport) ; et les deux
+indicateurs écartés de la grille le 25.08 (T12, T13), que `regenerer_socle.sh` retire du socle
+faute de question de veille rattachée, y sont réinscrits — sans quoi la base livrée porterait 51
+indicateurs quand le rapport en cite 53, et leurs 322 observations seraient orphelines.
+
+**À régénérer au gel**, après le dernier commit et avant de constituer l'archive :
+
+```bash
+bash exports/generer_instantane_demonstration.sh
+```
 
 ### Ce que devient `migrations/`
 

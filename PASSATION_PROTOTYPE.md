@@ -6102,3 +6102,58 @@ publication, avertissement sur `trigger_type`, fuseau `Europe/Zurich`) ; génér
 **Effet sur les chiffres du rapport** : le registre passe à 216 runs (run 217 inclus, l'id 31
 n'existant pas). Toutes les affirmations du rapport sont datées « au 02.09.2026 » et restent
 exactes ; `base_attendu.txt` ne fige pas le décompte de runs, `base.sh` reste conforme.
+
+## 05.09.2026 (suite) — Le prototype livrable : instantané de données, script de mise en marche, essai sur instance vierge
+
+**Constat de départ** (question de l'étudiant : le jury pourra-t-il l'exécuter ?). Épreuve
+conduite sur une copie vierge, dans les conditions d'un tiers. Quatre obstacles mesurés :
+la base restaurée est **vide** (le socle ne restaure jamais `indicator_values`, à raison) ;
+l'interface doit être compilée, sinon nginx sert un dossier vide ; le justificatif Postgres doit
+être recréé à la main puis substitué dans 22 fichiers ; rien ne répond tant que l'API n'est pas
+publiée. Un tiers conclurait que le dispositif ne marche pas.
+
+**1. `exports/generer_instantane_demonstration.sh`** → `db/03_donnees_demonstration.sql.gz`
+(3,8 Mo), chargé au premier démarrage comme les deux autres fichiers de `db/`. Contenu : 22
+tables de données (public + sandbox), les neuf tables du référentiel exclues pour ne pas
+doublonner avec `02_referentiel.sql`. Trois défauts rencontrés et corrigés dans le générateur,
+chacun commenté sur place :
+- `chk_commentaire_rejet_trace` est posée **NOT VALID** : les cinq rejets saisis hors dépôt
+  (constat B-2 du 02.09) lui sont contraires. NOT VALID exempte les lignes déjà là, jamais celles
+  qu'on charge : la contrainte est retirée en tête de fichier et reposée à l'identique à la fin.
+- **T12 et T13 manquaient à la base restaurée** : `regenerer_socle.sh` les écarte du socle parce
+  qu'ils n'ont pas de question de veille et que `trg_indicateur_sans_question` les refuserait.
+  Résultat : 51 indicateurs au lieu de 53, et 322 observations orphelines. Ils sont réinscrits
+  dans l'instantané, déclencheurs neutralisés. **Défaut de reproductibilité mis au jour par
+  l'épreuve**, écrit au rapport (§ 11.18).
+- `pg_dump` 16.10+ encadre sa sortie de `\restrict` : même retrait que dans `regenerer_socle.sh`.
+  Et les INSERT de `--column-inserts` tiennent sur plusieurs lignes dès qu'un texte porte un saut
+  de ligne — un filtre `grep` les tronquait silencieusement ; découpage par instruction.
+
+**2. `demarrer.sh`** — une commande : prérequis Docker, `.env` créé si absent, compilation de
+l'interface dans un conteneur Node si `dist/` manque, services, attente de la base, justificatif
+Postgres importé **par identifiant** (`n8n import:credentials`, voie enfin testée sur instance
+vierge — DEPLOIEMENT § 1.3 mis à jour), import des 22 workflows, publication des trois workflows
+actifs, redémarrage, contrôle des 7 points de lecture et de l'interface. Deux courses au
+démarrage trouvées et traitées : `pg_isready` sur la socket répond « prêt » pendant que
+l'instantané se charge encore (on attend la voie réseau, qui n'ouvre qu'après l'initialisation) ;
+n8n répond à `/healthz` avant que sa ligne de commande soit utilisable (on attend
+`n8n list:workflow`, et l'import du justificatif est retenté cinq fois).
+
+**3. Épreuve, sur instance vierge, volumes détruits** (instance de travail arrêtée le temps de
+l'essai, ses volumes intacts) : `bash demarrer.sh` → base à **53 indicateurs / 203 176
+observations / 216 exécutions**, bilan `53/41/38/3/40` identique au relevé figé, **zéro
+observation orpheline**, les 44 vues lisibles, les **7 points de lecture en 200**, la sonde
+navigateur verte sur les **onze écrans**, et le tableau de bord affichant marchés, commentaires,
+lectures transversales, mouvements et indicateur synthétique. Instance de travail relancée
+ensuite, inchangée.
+
+**4. Documentation** : `LISEZ-MOI.md` créé (la commande, ce qu'on voit et ce que c'est, par où
+commencer, où creuser, les pannes probables) ; `README.md` ouvre sur `demarrer.sh` ;
+`DEPLOIEMENT.md` § 1.3 (voie automatisée testée, avec son piège de démarrage) et § 2 (pourquoi
+l'instantané existe, ce qu'il assume, à régénérer au gel) ; `.env.example` : `CLES_API_FICHIER`
+replié sur `./.env` — le compose exigeait un fichier existant, et l'exemple pointait un chemin
+absent, ce qui faisait échouer le démarrage documenté.
+
+**À refaire au gel, dans cet ordre** : dernier commit → `bash exports/generer_instantane_demonstration.sh`
+→ `cd dashboard-app && npm run build` → constituer l'archive **avec `dashboard-app/dist`** (exclu
+du dépôt git, indispensable dans le ZIP) et **sans** `.env`, `data/`, `.git` si l'on veut alléger.

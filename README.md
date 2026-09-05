@@ -15,6 +15,22 @@ Deux principes gouvernent l'implémentation :
 ## Démarrage
 
 ```bash
+bash demarrer.sh
+```
+
+Une commande, rien à installer d'autre que Docker : services, base chargée, justificatif d'accès,
+workflows importés, interface de lecture publiée, contrôle de santé. Puis <http://localhost:8080>.
+Le pas à pas expliqué reste **[DEPLOIEMENT.md](DEPLOIEMENT.md)**, dont ce script n'est que le
+raccourci ; **[LISEZ-MOI.md](LISEZ-MOI.md)** dit quoi regarder une fois l'application ouverte.
+
+Les données affichées sont un **instantané daté** des exécutions de l'auteur
+(`db/03_donnees_demonstration.sql.gz`), chargé au premier démarrage : le dispositif est donc
+consultable sans clé d'API. Ce n'est pas une collecte faite à l'instant, et relancer une collecte
+réelle demande les clés (§ 1.2 du déploiement).
+
+À la main, si l'on préfère :
+
+```bash
 cp .env.example .env      # renseigner POSTGRES_PASSWORD et CLES_API_FICHIER
 mkdir -p data/staging
 docker compose up -d
