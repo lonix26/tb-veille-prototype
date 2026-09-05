@@ -6157,3 +6157,22 @@ absent, ce qui faisait échouer le démarrage documenté.
 **À refaire au gel, dans cet ordre** : dernier commit → `bash exports/generer_instantane_demonstration.sh`
 → `cd dashboard-app && npm run build` → constituer l'archive **avec `dashboard-app/dist`** (exclu
 du dépôt git, indispensable dans le ZIP) et **sans** `.env`, `data/`, `.git` si l'on veut alléger.
+
+## 05.09.2026 (suite 2) — Le dépôt GitHub rattrapé et la remise préparée
+
+Le distant (`github.com/lonix26/tb-veille-prototype`, privé) était resté au gel du 01.09 :
+**24 commits locaux non poussés** — tour jury, listes A/B, revue de code, workflow d'erreur,
+harnais de base, annexes, cadences, livrable. Avant de pousser : **balayage de secrets** sur le
+diff des 24 commits (motifs de clés, mots de passe, jetons) — uniquement des NOMS de variables
+documentés, aucune valeur ; `archive/etats_anterieurs/docker-compose.yml.avant_cles_2026-08-22`
+vérifié : références ${VAR} seulement. Poussé : `main` et les deux balises.
+
+**`NOTES_DE_VERSION_DEPOT.md`** créé : le texte de la publication GitHub du jour du dépôt
+(quoi, comment l'ouvrir, ce que l'archive contient et ne contient pas, empreinte SHA-256 —
+celle du ZIP du 05.09 : `2a036a86147e18bf1ca81063f1e79cd4f162de5fd960ba498cec33625165e140` — et la procédure complète du 13.09 : régénérer l'instantané,
+reconstruire, archiver, étiqueter `depot-2026-09-13`, publier la release avec le ZIP joint,
+inviter directeur et expert en lecture). `gh` n'est pas installé : la publication se fait par
+l'interface web, les étapes sont écrites.
+
+**Reste à Nilo** : inviter le directeur et l'expert en lecture sur le dépôt (interface GitHub),
+et dérouler la procédure du 13.09.
