@@ -28,13 +28,20 @@ for ligne in journal.strip().splitlines():
     prefixe, sep, reste = sujet.partition(": ")
     if sep and " " not in prefixe:
         sujet = reste
-    jours.setdefault(date, []).append(sujet)
+    actes = jours.setdefault(date, [])
+    # Deux commits d'un même jour peuvent porter un sujet identique (constaté le
+    # 17.08) : l'acte est compté, mais son libellé n'est pas répété à l'affichage.
+    if sujet not in actes:
+        actes.append(sujet)
+    else:
+        actes.append("")
 
 print("| Date | Actes tracés (commits du jour) |")
 print("|---|---|")
 for date, actes in jours.items():
-    tete = " · ".join(actes[:3])
-    reste = len(actes) - 3
+    visibles = [x for x in actes if x]
+    tete = " · ".join(visibles[:3])
+    reste = len(actes) - len(visibles[:3])
     suffixe = f" — et {reste} autre(s) acte(s)" if reste > 0 else ""
     print(f"| {date} | {tete}{suffixe} |")
 
