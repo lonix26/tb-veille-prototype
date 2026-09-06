@@ -61,6 +61,7 @@ tar --exclude=./.env \
     --exclude=./data \
     --exclude='./**/node_modules' --exclude=node_modules \
     --exclude='*.tar.gz' \
+    --exclude=./.idea --exclude='__pycache__' --exclude='*.pyc' \
     $([ "$AVEC_GIT" = 1 ] || echo --exclude=./.git) \
     -cf - . | (cd "$DEST" && tar xf -)
 mkdir -p "$DEST/data/staging" && : > "$DEST/data/staging/.gitkeep"

@@ -104,7 +104,7 @@ ETATS = {
     "extraction_composite_A1_ccfa.json": (
         "Démontré", "Extraction composite A1 (annuaire CCFA, republication OICA) — découpe "
         "par sentinelles (~1 % du document soumis : 5 100 caractères sur ~530 000, mesuré sur "
-        "les exécutions du 31.08.2026, corrigé de 2,5 % le 04.09), consensus, confrontation OICA "
+        "les exécutions du 31.08.2026), consensus, confrontation OICA "
         "opportuniste, recouvrement inter-éditions",
         "Série 2021-2024, trois éditions traitées (§ 11.16)."),
     "extraction_evenements_flux.json": (
@@ -158,7 +158,7 @@ même workflow, et une version périmée a effectivement été exécutée (§ 12
 reproduit désormais l'instance au lieu de la dupliquer.
 
 **Les cadences sont déclarées dans les fichiers, l'activation ne l'est pas.** Depuis le
-05.09.2026, seize collecteurs portent un déclencheur horaire à côté de leur déclencheur manuel —
+05.09.2026, dix-sept collecteurs portent un déclencheur horaire à côté de leur déclencheur manuel —
 quotidien pour les flux, hebdomadaire pour les lectures, mensuel pour les séries conjoncturelles
 et les composites —, chaque nœud portant en note le motif de sa cadence. Un seul est publié et a
 produit une exécution planifiée réelle : la détection des éditions annuelles, choisie parce

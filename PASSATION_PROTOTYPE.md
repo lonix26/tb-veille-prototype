@@ -6176,3 +6176,42 @@ l'interface web, les étapes sont écrites.
 
 **Reste à Nilo** : inviter le directeur et l'expert en lecture sur le dépôt (interface GitHub),
 et dérouler la procédure du 13.09.
+
+## 06.09.2026 — Audit complet, troisième passe : corrections datées des entrées du 05.09
+
+Sept relectures en lecture seule (rapport, annexes, pilotage, prototype). Ce qui touche le
+prototype, consigné ici sans réécrire les entrées d'origine — les corrections sont datées.
+
+**Corrections aux entrées du 05.09 (cadences et livrable) :**
+- « seize collecteurs » → **dix-sept** : le commit `326c9dd` a instrumenté 17 fichiers (l'énumération
+  oubliait `collecte_fh_horlogerie`, cron `0 8 22 * *`) ; 18 fichiers portent un déclencheur
+  horaire en comptant le pilote A5, qui en a un depuis le 06.08 et n'est pas publié. Diff réel :
+  530 insertions, 2 suppressions (l'expression `trigger_type`), non « 527, 0 ». Par suite,
+  « quinze autres » → **seize autres**.
+- « aucun run ne l'avait jamais porté [schedule] » est **faux** : les runs 1 à 6 du pilote A5
+  (06.08, lancés à la main) portent `schedule` écrit en dur par leur nœud d'ouverture ; la base
+  compte 7 runs `schedule`. Le run 217 est le premier à le porter **à bon droit**. Le pilote A5
+  écrit `'schedule'` en dur comme les autres écrivent `'manual'` — DEPLOIEMENT § 5.1 le dit
+  désormais.
+- La cadence de démonstration (`30 20 5 9 *`) est dite explicitement au rapport (§ 11.17).
+- Commit `87ab817` (05.09, 22:38 : le journal F.2.2 ne répète plus un sujet identique) n'avait
+  pas d'entrée — le voici.
+
+**Défaut de livrable trouvé et corrigé** : `db/02_referentiel.sql` régénéré le 04.09 à 20:31,
+deux minutes **avant** la migration `2026-09-04_source_oica_part_document.sql` (20:33), livrait
+encore la note « ~2,5 % du document » sur la source d'A1 ; une base neuve construite par
+`demarrer.sh` l'aurait portée, et l'archive du 05.09 l'embarque. `regenerer_socle.sh` rejoué le
+06.09 (recette 27/44/51/103/24, identique) ; `NOTES_DE_VERSION_DEPOT.md` ajoute le socle à la
+procédure du 13.09 ; DEPLOIEMENT § 2 date les reconsolidations.
+
+**Autres corrections documentaires** : README (22 workflows, pas 26 ; décompte hard data par
+`v_bindings_actifs`) ; DEPLOIEMENT (22 workflows au justificatif, 29 sources, § 4 publie trois
+workflows, banc d'essai `bancEssaiErreur01` encore dans l'instance à supprimer, § 5.1 identifiant
+`PNd16YrFSehKUDIR` au lieu du nom de fichier et `collecteFhV1` ajouté, A1 composite au § 6,
+`en_grille` 40 / `ecartes` 13, adminer sous profil) ; LISEZ-MOI (trois services, écran Marché) ;
+générateurs des annexes 2 et 4 (« dix-sept », mention méta du 2,5 % retirée) et annexes
+régénérées ; `preparer_archive.sh` exclut désormais `.idea/`, `__pycache__/` et `*.pyc` (l'archive
+du 05.09 les embarquait — aucun secret, du bruit).
+
+**Reste à Nilo** : supprimer `bancEssaiErreur01` dans l'interface n8n ; refaire l'archive au gel
+(procédure des notes de version, socle compris).

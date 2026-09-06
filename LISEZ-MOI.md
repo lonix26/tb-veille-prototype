@@ -9,7 +9,7 @@ bash demarrer.sh
 
 Puis ouvrir **<http://localhost:8080>**.
 
-La commande met en marche les quatre services, charge la base, crée le justificatif d'accès dont
+La commande met en marche les trois services (la console d'inspection de la base est optionnelle), charge la base, crée le justificatif d'accès dont
 l'orchestrateur a besoin, importe les vingt-deux workflows, publie l'interface de lecture et
 vérifie que tout répond. Comptez deux à trois minutes au premier lancement, le temps que la base
 se charge. Le script dit ce qu'il fait à chaque étape, et s'arrête en nommant la cause s'il
@@ -40,6 +40,7 @@ requête.
 | **Vue d'ensemble** | l'état des quatre marchés, les mouvements inhabituels, l'indicateur synthétique |
 | **Actions** | les marchés publics adressables, jusqu'à l'acheteur nommé |
 | **Anticiper** | ce que les indicateurs avancés disent avant les séries de constat |
+| **Marché** (un par secteur, plus le socle) | le commentaire sous statut, les cartes d'indicateurs, les mouvements et les paniers |
 | **Référentiel** | les 53 indicateurs, leur source, leur statut, leur question de veille |
 | **Exécutions** | l'historique daté, et l'écart entre deux exécutions |
 | **Fiabilité** | ce qui est validé par un humain, ce qui ne l'est pas, et ce qui manque |

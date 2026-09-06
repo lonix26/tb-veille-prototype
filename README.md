@@ -52,7 +52,7 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 | `db/01_socle.sql` | Schéma, contraintes métier, vues de calcul et de restitution |
 | `db/02_referentiel.sql` | Grille d'indicateurs et questions de veille (le décompte se cite depuis `v_bilan_referentiel`) |
 | `migrations/` | Toute évolution du schéma ou du référentiel, datée — jamais d'UPDATE silencieux |
-| `n8n_workflows/` | 26 workflows importables ; les fichiers `*.avant_*` sont les états antérieurs conservés |
+| `n8n_workflows/` | 22 workflows importables ; `archive/` conserve les états antérieurs, hors boucle d'import |
 | `dashboard-app/` | Application React/Vite/ECharts servie par nginx, lecture seule sur l'API n8n |
 | `exports/` | Scripts de génération des annexes depuis la base |
 | `DEPLOIEMENT.md` | Séquence complète de mise en service et d'exploitation |
@@ -62,7 +62,7 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 
 | chaîne | workflows principaux | rythme |
 |---|---|---|
-| Collecte *hard data* (30 indicateurs) | `collecte_generique` (piloté par `source_bindings`, jetons de date), `collecte_fh_horlogerie`, `collecte_xlsx_indexe` | mensuel |
+| Collecte *hard data* (le décompte fait foi par `v_bindings_actifs`) | `collecte_generique` (piloté par `source_bindings`, jetons de date), `collecte_fh_horlogerie`, `collecte_xlsx_indexe` | mensuel |
 | Flux qualitatifs | `collecte_flux` → `triage_ia_flux` → `extraction_evenements_flux` → `derivation_intensite_signalement` | quotidien à mensuel |
 | Composites (extraction IA multi-modèles + validation humaine) | `veille_acea_A2` et `veille_documentaire_annuelle` (semeurs) → `extraction_composite_A2` / `_CP` / `_A1_ccfa` | mensuel / annuel |
 | Synthèse | `analyse_tendances_alertes` (commentaire exécutif), `lecture_transversale` (hypothèses citant leurs faits) | à la demande |

@@ -2,7 +2,8 @@
 
 *Écrit le 25.08.2026, après le portage intégral de la collecte vers l'orchestrateur. Révisé le
 02.09.2026 (correction A2 du tour « jury ») : prérequis complétés, identifiants alignés sur
-l'instance, valeurs attendues du § 6 recalculées par requête.*
+l'instance, valeurs attendues du § 6 recalculées par requête. Révisé le 05-06.09.2026 : voie
+automatisée des justificatifs (§ 1.3), instantané de données (§ 2), cadences (§ 5.1).*
 
 **Ce document répond à une seule question : que faut-il faire pour que, dans trois mois, tous les
 indicateurs se mettent à jour ?** Réponse courte — déployer le compose, rejouer les migrations,
@@ -62,7 +63,7 @@ passe mais chaque nœud Postgres ou Comtrade échoue à l'exécution :
 
 | Identifiant dans les fichiers | Nom | Type | Fichiers | Contenu |
 |---|---|---|---|---|
-| `QdVRYX9pjTj9C8G3` | `postgres veille` | Postgres | 23 workflows | hôte `db`, port 5432, base/utilisateur/mot de passe du `.env` |
+| `QdVRYX9pjTj9C8G3` | `postgres veille` | Postgres | 22 workflows | hôte `db`, port 5432, base/utilisateur/mot de passe du `.env` |
 | `comtradeKeyCred1` | `comtrade subscription` | *Header Auth* | `collecte_generique` (A4, H1, H3, M1, S6) | en-tête `Ocp-Apim-Subscription-Key`, clé gratuite du portail UN Comtrade |
 
 Deux voies. **Voie testée sur l'instance en service** : créer les deux *credentials* dans
@@ -78,7 +79,7 @@ les cinq tentatives du script. Le justificatif Comtrade, lui, porte une clé per
 reste à créer à la main par qui veut relancer la collecte.
 
 ```bash
-docker compose up -d          # base, orchestrateur, service statique de restitution, adminer
+docker compose up -d          # base, orchestrateur, service statique de restitution (adminer : --profile outils)
 ```
 
 ## 2. Schéma, référentiel et instantané — rien à lancer
@@ -90,7 +91,7 @@ PostgreSQL exécute lui-même les deux fichiers, dans l'ordre de leur nom.
 | Fichier | Ce qu'il pose |
 |---|---|
 | `db/01_socle.sql` | 31 tables (27 en `public`, 4 en `sandbox`), 44 vues, 4 déclencheurs, 8 fonctions propres (les 36 autres du schéma sont celles de l'extension `pgcrypto`), les contraintes métier et leurs commentaires |
-| `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 28 sources, 51 indicateurs, 120 liaisons dont 103 actives, 24 flux avec leur statut, 1 règle de filtrage du triage |
+| `db/02_referentiel.sql` | 5 secteurs, 6 questions de veille + 21 instanciations, 29 sources, 51 indicateurs, 120 liaisons dont 103 actives, 24 flux avec leur statut, 1 règle de filtrage du triage |
 
 Une base neuve repart donc dans l'**état qualifié** — pas dans un état par défaut qu'il faudrait
 requalifier source par source. Elle est en revanche **vide d'observations**, et c'est voulu :
@@ -106,6 +107,9 @@ ce sont les collecteurs de l'étape 4 qui la remplissent.
 > Reconsolidé une troisième fois le **01.09.2026 (soir)** après la migration d'éligibilité des
 > sources à la lecture événementielle (`flux_sources.lecture_evenementielle`, vue
 > `v_evenements_mois`) : même procédure, mêmes empreintes.
+> Reconsolidé une quatrième fois le **04.09.2026** (après la liste A), et une cinquième le
+> **06.09.2026** : le socle du 04.09 avait été régénéré deux minutes avant la migration qui
+> corrigeait la note de la source d'A1, et livrait encore « 2,5 % » — l'audit du 06.09 l'a vu.
 > **Règle** : à chaque gel, reconsolider — un socle qui ne suit pas la base n'est plus une
 > reproductibilité, c'est une affirmation.
 
@@ -215,6 +219,8 @@ for f in n8n_workflows/*.json; do            # la racine seulement : archive/ es
   docker exec veille_n8n n8n import:workflow --input="/workflows/$(basename "$f")"
 done                                          # ./n8n_workflows est monté en lecture seule sur /workflows
 docker exec veille_n8n n8n publish:workflow --id=apiRestitutionV4
+docker exec veille_n8n n8n publish:workflow --id=erreurCommuneV1              # sinon workflow d'erreur muet
+docker exec veille_n8n n8n publish:workflow --id=veille-documentaire-annuelle  # seule cadence activée (§ 5.1)
 docker compose restart n8n        # INDISPENSABLE : sans redémarrage, les webhooks
                                   # ne sont pas enregistrés et l'API répond 404
 ```
@@ -231,7 +237,8 @@ alignés sur l'instance depuis le 02.09 et le réimport a été vérifié (21 wo
 A2 identique nœud pour nœud entre le fichier et l'instance).
 
 Les 22 fichiers de la racine s'importent et sont exactement les 22 workflows de l'instance en
-service. Cinq états antérieurs jamais importés (`collecte_a5_multi_geo`, `collecte_hard_data`,
+service — celle-ci porte en outre un banc d'essai désactivé (`bancEssaiErreur01`, 02.09), à
+supprimer dans l'interface avant remise. Cinq états antérieurs jamais importés (`collecte_a5_multi_geo`, `collecte_hard_data`,
 `collecte_m2_eurostat`, `extraction_composite_multi_ia`, `scenario_c_agent_autonome`) ont été
 déplacés le 02.09.2026 dans `n8n_workflows/archive/squelettes_2026-08-04/` (correction A9 du tour
 « jury ») ; le `README` de l'archive dit ce que chacun était et ce qui l'a remplacé.
@@ -271,7 +278,7 @@ toute la construction : le registre devait rester stable pendant que le rapport 
 l'état à une date figée, et les chaînes composites comme le triage appellent des modèles
 payants. Ce n'est pas la cible.
 
-Depuis le 05.09.2026, **seize collecteurs portent, à côté de leur déclencheur manuel, un
+Depuis le 05.09.2026, **dix-sept collecteurs portent, à côté de leur déclencheur manuel, un
 déclencheur horaire** dont la cadence est calée sur la fréquence de publication de la source ;
 la note de chaque nœud dit pourquoi cette cadence et pas une autre. Trois familles :
 
@@ -279,7 +286,7 @@ la note de chaque nœud dit pourquoi cette cadence et pas une autre. Trois famil
 |---|---|---|
 | Quotidienne (06:00 → 10:00) | `collecteFluxV1`, `tedEnrichiV1`, `triageFluxV1`, `extraction-evenements-flux`, `lectureDecisionV1` | Les flux publient au fil de l'eau ; l'ordre horaire reproduit celui du § 5 |
 | Hebdomadaire (lundi) | `veille-documentaire-annuelle`, `VoDfbXcbAS4JoNxf` (signal qualitatif), `commentaireExecV2`, `lecture-transversale` | Lectures et détections : une passe par semaine suffit, et elle est bon marché |
-| Mensuelle | `collecteGeneriqueV2` (le 5), `collecteXlsxIndexeV1` (le 5), `extraction_composite_CP` (le 6), `QSCRx2ogbAts5eVZ` (A1, le 6), `veilleAceaV1` (le 20), `0ay3mDuTGTSporSW` (A2, le 21), `dN8uiR4bud4RopM6` (intensités, le 1er) | Les séries conjoncturelles paraissent une fois par mois ; les composites ne traitent que ce que leur file porte |
+| Mensuelle | `collecteGeneriqueV2` (le 5), `collecteXlsxIndexeV1` (le 5), `PNd16YrFSehKUDIR` (composite CP, le 6), `QSCRx2ogbAts5eVZ` (A1, le 6), `veilleAceaV1` (le 20), `0ay3mDuTGTSporSW` (A2, le 21), `collecteFhV1` (FH, le 22), `dN8uiR4bud4RopM6` (intensités, le 1er) | Les séries conjoncturelles paraissent une fois par mois ; les composites ne traitent que ce que leur file porte |
 
 **Un seul de ces déclencheurs est publié** : `veille-documentaire-annuelle`, choisi parce qu'il
 est idempotent et n'appelle aucun modèle. Il a produit une exécution planifiée réelle le
@@ -294,7 +301,7 @@ docker compose restart n8n
 ```
 
 > **À corriger avant d'activer** : le nœud « Ouvrir le run » de chaque collecteur inscrit
-> `trigger_type` **en dur** à `'manual'`. Activé tel quel, le workflow ferait mentir le registre
+> `trigger_type` **en dur** à `'manual'` (et à `'schedule'` pour le pilote A5, non publié). Activé tel quel, le workflow ferait mentir le registre
 > sur l'origine de ses propres exécutions. `veille_documentaire_annuelle.json` porte la forme
 > corrigée, à recopier : la valeur devient une expression qui constate quel déclencheur a
 > produit l'exécution. La colonne accepte `'manual'` et `'schedule'`, la contrainte est déjà là.
@@ -313,7 +320,7 @@ SELECT * FROM v_bilan_referentiel;
 
 -- Indicateurs certifiés sans aucune liaison active : ils ne collecteront jamais.
 -- Au 02.09.2026 (recalculé par cette requête), CINQ sont attendus, et aucun autre :
---   A1  production mondiale de véhicules — source non encore liée
+--   A1  production mondiale de véhicules — composite CCFA depuis le 31.08, alimenté par `composite_queue`
 --   A2  composite ACEA — alimenté par `composite_queue`, pas par une liaison (doctrine)
 --   H2  exportations horlogères — requalifié composite le 30.08 (lecture du document FH),
 --       ses liaisons STATENT (runs 43-161) sont closes
@@ -357,8 +364,8 @@ ORDER BY 1;
 -- conservées). Toute autre ligne est une régression à traiter.
 
 -- Et le décompte de la grille, qui fait foi. `en_grille` = indicateurs en vitrine
--- (suivis et affichés, 38 au 02.09), ce qui n'est PAS certifiés + à confirmer (41 + 10) ;
--- `ecartes` = indicateurs restés au référentiel mais hors vitrine (15).
+-- (suivis et affichés, 40 au 02.09), ce qui n'est PAS certifiés + à confirmer (41 + 10) ;
+-- `ecartes` = indicateurs restés au référentiel mais hors vitrine (13).
 SELECT * FROM v_bilan_referentiel;
 ```
 

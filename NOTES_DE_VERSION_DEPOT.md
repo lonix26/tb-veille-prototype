@@ -45,9 +45,10 @@ antérieures jalonnent le projet : `gel-2026-09-01` (gel du prototype), `tour-ju
 ```bash
 cd prototype
 git status                      # doit être propre
+./regenerer_socle.sh            # socle et référentiel (db/01, db/02) depuis la base en service
 bash exports/generer_instantane_demonstration.sh
 (cd dashboard-app && npm run build)
-git add db/03_donnees_demonstration.sql.gz && git commit -m "prototype: instantané du gel"
+git add db/ && git commit -m "prototype: socle et instantané du gel"
 bash preparer_archive.sh        # produit ../prototype_TB_Castillo_2026-09-13.zip
 sha256sum ../prototype_TB_Castillo_2026-09-13.zip   # → remplacer l'empreinte ci-dessus
 git tag -a depot-2026-09-13 -m "État remis au jury le 13.09.2026"
