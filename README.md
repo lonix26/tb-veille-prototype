@@ -54,9 +54,17 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 | `migrations/` | Toute évolution du schéma ou du référentiel, datée — jamais d'UPDATE silencieux |
 | `n8n_workflows/` | 22 workflows importables ; `archive/` conserve les états antérieurs, hors boucle d'import |
 | `dashboard-app/` | Application React/Vite/ECharts servie par nginx, lecture seule sur l'API n8n |
+| `verification/` | Harnais de vérification de la base : invariants structurels et faits figés, comparés au relevé |
+| `tests/` | Tests de contraintes : cinq écritures qui doivent échouer, pièce de l'annexe 5 |
+| `etage2/` | Analyse de sensibilité de la lecture décisionnelle au profil métier |
 | `exports/` | Scripts de génération des annexes depuis la base |
+| `demarrer.sh` | Mise en marche en une commande : compose, import des workflows, contrôle des points de lecture |
+| `regenerer_socle.sh` | Régénère `db/01_socle.sql` et `db/02_referentiel.sql` depuis l'instance en service |
+| `preparer_archive.sh` | Constitue l'archive de remise, clés et données exclues |
 | `DEPLOIEMENT.md` | Séquence complète de mise en service et d'exploitation |
 | `PASSATION_PROTOTYPE.md` | Journal d'état : ce qui est démontré, ce qui ne l'est pas, et les défauts trouvés |
+| `CONCEPTION_ETAGE2.md` | Conception de l'étage de flux : familles de sources, chaîne, schéma de données |
+| `NOTES_DE_VERSION_DEPOT.md` | Ce que porte l'état déposé, et ce qu'il ne porte pas |
 
 ### Les chaînes de traitement
 
