@@ -6215,3 +6215,48 @@ du 05.09 les embarquait — aucun secret, du bruit).
 
 **Reste à Nilo** : supprimer `bancEssaiErreur01` dans l'interface n8n ; refaire l'archive au gel
 (procédure des notes de version, socle compris).
+
+## 11.09.2026 — Le dépôt ne porte plus que ce qui fait tourner l'application
+
+**Le motif.** Un lecteur qui clone doit distinguer d'emblée le vivant du mort. La correction A9
+du tour « jury » (02.09) avait répondu en déplaçant les états morts sous `archive/` ; le dépôt
+gardait malgré tout vingt-sept fichiers à la racine, dont six seulement servent à démarrer, et
+vingt-sept mégaoctets à cloner pour sept mégaoctets utiles.
+
+**Quatre-vingt-neuf fichiers sortent de l'état courant**, tous vérifiés sans référent dans le
+code, dans les scripts, dans les documents d'entrée du dépôt ni dans les documents livrés :
+`exports/captures_v4/` (neuf captures de la v4, remplacée par la v9) ; le tableau de bord
+monofichier `tableau_de_bord.html`, `tableau_de_bord_v3.html` et `echarts.min.js` — nginx ne sert
+que `dashboard-app/dist` ; `archive/` (48 copies d'états antérieurs et pages non routées, hors
+de toute boucle d'import, de build et du compose, de son propre aveu) ; `db_origine_2026-08-04/`
+(socle manuel du 04.08, schéma SQLite périmé compris) ; `deploiement.md` ; les carnets
+`RUNBOOK.md`, `RUNBOOK_WEEKEND.md`, `PLAN_COLLECTE.md` ; `CONCEPTION_RESTITUTION_V4.md` et
+`V5.md` ; les deux notes `RECONNAISSANCE_SOURCES_*` ; les quatre requêtes `valider_*.sql`.
+
+**Ils restent dans l'historique git**, où ils continuent de faire foi pour le journal de suivi.
+L'historique n'a pas été réécrit : le journal F.2.2 du rapport est généré depuis `git log`, et
+le dossier `.git` pèse 124 Mo pour les captures recommittées — coût accepté, le clone reste rapide.
+
+**Deux fichiers gardés bien qu'ils ne s'exécutent pas.** `CONCEPTION_ETAGE2.md` est cité par
+l'annexe D du rapport livré. `PASSATION_PROTOTYPE.md` — ce fichier — est la source de l'état
+démontré selon le README, et le point de passation entre sessions selon `CLAUDE.md`.
+
+**Une collision de casse corrigée au passage.** `DEPLOIEMENT.md` et `deploiement.md` ne
+différaient que par la casse : sous Windows et macOS, où le système de fichiers l'ignore, un
+clone n'obtenait qu'un seul des deux. Le prototype est censé être exécuté par l'expert et le
+directeur ; le défaut était bloquant sans être visible ici.
+
+**Deux commentaires d'en-tête** renvoyaient à des fichiers sortis de l'état courant : ils
+renvoient désormais à l'historique (`migrations/2026-08-17_bindings_lot1.sql`, `db/01_socle.sql`).
+La note semée en base par cette même migration n'a pas été touchée — la réécrire ferait diverger
+la migration de l'instantané `db/03_donnees_demonstration.sql.gz`.
+
+**Le README décrit désormais chaque élément du dépôt**, les huit qui ne l'étaient pas compris :
+`verification/`, `tests/`, `etage2/`, les trois scripts d'exploitation et deux documents.
+
+**Vérifié sur clone neuf** : 222 fichiers, 6,9 Mo, arbre propre, tous les chemins exigés par
+`demarrer.sh` présents (`dashboard-app/dist` excepté, que le script construit lui-même).
+Avant : 311 fichiers, 27 Mo.
+
+**Reste à Nilo, inchangé** : supprimer `bancEssaiErreur01` dans l'interface n8n ; refaire
+l'archive au gel (procédure des notes de version, socle compris).
