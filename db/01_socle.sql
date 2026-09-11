@@ -11,7 +11,7 @@
 -- fonction sante_a_la_date, colonnes de motif) — entre les deux premières, le fichier avait dérivé de la base
 -- (41 vues contre 44, colonnes et tables nouvelles absentes) : une base neuve
 -- construite depuis le dépôt n'aurait pas été celle du rapport. Il remplace le
--- socle écrit à la main du 04.08 (conservé dans `db_origine_2026-08-04/`).
+-- socle écrit à la main du 04.08 (conservé dans l'historique du dépôt).
 -- Vérifié le 01.09.2026 par construction d'une base neuve et comparaison
 -- (tables, vues, déclencheurs, fonctions, référentiel) avec la base en service.
 --

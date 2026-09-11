@@ -7,9 +7,9 @@
 -- connecteurs existants (csv_generique, json_generique).
 --
 -- AUCUNE des URL ci-dessous n'a été vue en réponse réelle : la
--- reconnaissance du 17.08 s'est faite sans accès shell (voir
--- RECONNAISSANCE_SOURCES_LOT1_2026-08-17.md, commandes de vérification
--- incluses). Les liaisons sont donc semées a_verifier, sans verifie_par
+-- reconnaissance du 17.08 s'est faite sans accès shell (note de
+-- reconnaissance et commandes de vérification conservées dans
+-- l'historique du dépôt). Les liaisons sont donc semées a_verifier, sans verifie_par
 -- ni verifie_le. L'activation est un acte humain, nominatif et daté,
 -- après lecture de la réponse réelle — contrainte chk_binding_verifie.
 --
