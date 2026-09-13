@@ -1,11 +1,15 @@
 # Prototype de veille économique — pour l'ouvrir en une commande
 
 Travail de Bachelor, N. Castillo (HEG Arc). Ce dossier est le livrable technique.
-Il n'y a rien à installer d'autre que **Docker**.
+Il n'y a rien à installer d'autre que **Docker** — et, sous Windows, Git pour Windows.
 
 ```bash
 bash demarrer.sh
 ```
+
+Sous **Windows** : Docker Desktop lancé, puis double-clic sur `demarrer.cmd`. Il exécute le même
+script par Git Bash, livré avec [Git pour Windows](https://git-scm.com), ou à défaut par WSL.
+Docker Desktop seul ne suffit pas : le script est écrit pour bash.
 
 Puis ouvrir **<http://localhost:8080>**.
 

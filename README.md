@@ -59,6 +59,7 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 | `etage2/` | Analyse de sensibilité de la lecture décisionnelle au profil métier |
 | `exports/` | Scripts de génération des annexes depuis la base |
 | `demarrer.sh` | Mise en marche en une commande : compose, import des workflows, contrôle des points de lecture |
+| `demarrer.cmd` | Le même, pour Windows : lance `demarrer.sh` par Git Bash ou WSL |
 | `regenerer_socle.sh` | Régénère `db/01_socle.sql` et `db/02_referentiel.sql` depuis l'instance en service |
 | `preparer_archive.sh` | Constitue l'archive de remise, clés et données exclues |
 | `preparer_archive_execution.sh` | Constitue l'archive d'exécution : le strict nécessaire pour faire tourner le prototype, journal et outillage exclus |
@@ -77,7 +78,7 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 | Synthèse | `analyse_tendances_alertes` (commentaire exécutif), `lecture_transversale` (hypothèses citant leurs faits) | à la demande |
 | Restitution | `api_restitution` (webhook, lecture seule) | permanent |
 
-La confrontation B/C (§ 10.5) a été portée par le script **`scenario_c/agent_autonome.py`**, qui écrit dans le schéma `sandbox` et publie sans validation humaine : artefact expérimental, hors production, à ne jamais rediriger vers les tables de production. La maquette n8n `scenario_c_agent_autonome.json` n'a jamais été importée ni exécutée ; elle est archivée dans `n8n_workflows/archive/squelettes_2026-08-04/` (jusqu'au 02.09.2026, ce paragraphe lui attribuait à tort l'expérience).
+La confrontation B/C (§ 10.5) a été portée par le script `scenario_c/agent_autonome.py` — retiré de l'état courant le 11.09.2026, conservé dans l'historique du dépôt —, qui écrivait dans le schéma `sandbox` et publie sans validation humaine : artefact expérimental, hors production, à ne jamais rediriger vers les tables de production. La maquette n8n `scenario_c_agent_autonome.json` n'a jamais été importée ni exécutée ; elle est archivée dans `n8n_workflows/archive/squelettes_2026-08-04/` (jusqu'au 02.09.2026, ce paragraphe lui attribuait à tort l'expérience).
 
 ## État
 

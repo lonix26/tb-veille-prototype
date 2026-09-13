@@ -120,6 +120,10 @@ SCRIPTS = [
      "la maquette n8n archivée, qui n'a elle-même jamais été exécutée."),
 ]
 
+# scenario_c/ a été retiré de l'état courant le 11.09.2026 : on ne projette que ce qui existe.
+import os as _os
+SCRIPTS = [s for s in SCRIPTS if _os.path.exists(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', s[0]))]
+
 LONGUEUR_MIN = 200
 
 
@@ -243,7 +247,7 @@ def main():
 **Les prompts ne sont pas recopiés ici, ils en sont extraits.** Un prompt recopié à la main
 diverge du prompt exécuté dès la première correction ; c'est le mécanisme même qui avait produit
 quatre décomptes d'indicateurs contradictoires dans le corps du rapport. Cette annexe est donc
-une projection des fichiers `n8n_workflows/*.json`, `etage2/*.py` et `scenario_c/*.py` du dépôt,
+une projection des fichiers `n8n_workflows/*.json`, `etage2/*.py` et, jusqu'à son retrait du 11.09.2026, `scenario_c/*.py` du dépôt,
 régénérable par `python3 exports/generer_annexe_2.py`. Toute divergence entre cette annexe et le
 dispositif signale une annexe périmée, jamais un prompt inconnu.
 

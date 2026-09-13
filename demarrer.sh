@@ -23,6 +23,9 @@
 # d'API — voir DEPLOIEMENT.md § 1.2 et § 5.
 # =====================================================================
 set -euo pipefail
+# Sous Git Bash (Windows), MSYS réécrit un chemin comme /app en C:\Program Files\Git\app
+# avant de le passer à docker : on le lui interdit. Sans effet sur Linux et macOS.
+export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")"
 
 CRED_ID=QdVRYX9pjTj9C8G3          # identifiant référencé par les workflows
@@ -60,7 +63,8 @@ U=$(grep '^POSTGRES_USER=' .env | cut -d= -f2-)
 # --- 2. Interface : le dossier compilé -------------------------------
 if [ -z "$(ls -A dashboard-app/dist 2>/dev/null)" ]; then
   dire "L'interface n'est pas compilée. Compilation dans un conteneur Node (aucune installation sur le poste)."
-  docker run --rm -v "$PWD/dashboard-app:/app" -w /app node:24-alpine \
+  HOTE="$PWD"; command -v cygpath >/dev/null 2>&1 && HOTE="$(cygpath -w "$PWD")"   # chemin Windows sous Git Bash
+  docker run --rm -v "$HOTE/dashboard-app:/app" -w /app node:24-alpine \
     sh -c "npm ci --no-audit --no-fund && npm run build" \
     || { ko "La compilation a échoué (réseau indisponible ?). Voir DEPLOIEMENT.md § 3."; exit 1; }
 fi
@@ -103,17 +107,18 @@ docker exec veille_n8n n8n list:workflow >/dev/null 2>&1 || { ko "L'orchestrateu
 # nœud Postgres échoue. Le contenu n'est pas un secret d'affaires : c'est le
 # mot de passe local du conteneur, celui du .env.
 dire "Justificatif d'accès à la base"
-cat > /tmp/cred_veille.json <<CRED
+# Écrit dans ./data, que le compose monte dans l'orchestrateur sous /data : aucun
+# « docker cp », dont le chemin local ne survivrait pas à Git Bash sous Windows.
+cat > data/cred_veille.json <<CRED
 [{"id":"$CRED_ID","name":"postgres veille","type":"postgres",
   "data":{"host":"db","port":5432,"database":"$DB","user":"$U","password":"$MDP","ssl":"disable","allowUnauthorizedCerts":false,"sshTunnel":false}}]
 CRED
-docker cp /tmp/cred_veille.json veille_n8n:/tmp/cred.json >/dev/null
-rm -f /tmp/cred_veille.json
 IMPORTE=0
 for _ in 1 2 3 4 5; do
-  docker exec veille_n8n n8n import:credentials --input=/tmp/cred.json >/dev/null 2>&1 && { IMPORTE=1; break; }
+  docker exec veille_n8n n8n import:credentials --input=/data/cred_veille.json >/dev/null 2>&1 && { IMPORTE=1; break; }
   sleep 3
 done
+rm -f data/cred_veille.json
 [ "$IMPORTE" = 1 ] \
   && ok "justificatif « postgres veille » créé (identifiant $CRED_ID)" \
   || { ko "Import du justificatif refusé — créer les deux justificatifs à la main, DEPLOIEMENT.md § 1.3."; exit 1; }

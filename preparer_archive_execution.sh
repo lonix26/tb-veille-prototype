@@ -23,7 +23,7 @@ mkdir -p "$DEST"
 copier() { mkdir -p "$DEST/$(dirname "$1")"; cp -p "$1" "$DEST/$1"; }
 
 # Exécution
-for f in docker-compose.yml demarrer.sh .env.example \
+for f in docker-compose.yml demarrer.sh demarrer.cmd .env.example \
          db/01_socle.sql db/02_referentiel.sql db/03_donnees_demonstration.sql.gz \
          dashboard-app/index.html dashboard-app/package.json dashboard-app/package-lock.json \
          dashboard-app/vite.config.js dashboard-app/.nvmrc dashboard-app/.gitignore; do

@@ -407,7 +407,7 @@ Trois familles de fichiers Python subsistent au dépôt. **Aucune n'alimente le 
 et aucune n'a à être exécutée pour que les indicateurs se mettent à jour :
 
 - `exports/` — génération des annexes et du classeur, à la demande ;
-- `scenario_c/` — artefact de laboratoire de la confrontation B/C (§ 11.9), qui écrit dans un
-  schéma séparé ;
+- `scenario_c/` — artefact de laboratoire de la confrontation B/C (§ 11.9), qui écrivait dans un
+  schéma séparé ; retiré de l'état courant le 11.09.2026, conservé dans l'historique du dépôt ;
 - `etage2/sensibilite_profil.py` — mesure de sensibilité du profil métier (§ 11.8), exécutée une
   fois et dont le résultat est publié.

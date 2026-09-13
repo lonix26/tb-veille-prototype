@@ -6275,3 +6275,28 @@ conteneur Node depuis les seules sources de l'archive (599 modules, 5,7 s). L'es
 vierge, volumes détruits, reste celui du 05.09 ; l'instantané `db/03` de ce jour-là et la base
 vivante portent les mêmes 216 exécutions (dernière : 217) et 203 176 observations, le harnais
 `base.sh` est vert — l'instantané n'a pas eu à être refait.
+
+## 13.09.2026 (suite) — Windows pris en compte, `scenario_c/` retiré des documents
+
+**Le destinataire exécutera sous Windows**, presque sûrement. Trois pièges connus de Git Bash
+traités dans `demarrer.sh` : la réécriture par MSYS des chemins `/app` passés à docker
+(`MSYS_NO_PATHCONV=1` exporté en tête, sans effet ailleurs), le chemin hôte du montage de
+compilation (`cygpath -w` s'il existe), et le `docker cp` d'un fichier de `/tmp`, remplacé par
+une écriture dans `./data`, que le compose monte déjà dans l'orchestrateur sous `/data`. Un
+lanceur `demarrer.cmd` cherche Git Bash aux emplacements usuels, puis `bash`, puis WSL, et le dit
+si rien n'existe : Docker Desktop seul ne suffit pas. `.gitattributes` fige les fins de ligne
+(`*.sh` en LF, `*.cmd` en CRLF). Le LISEZ-MOI l'annonce en tête.
+
+**Éprouvé sous Linux seulement**, essai à froid depuis le zip refait après modification : 223 s,
+huit contrôles verts, 22 workflows, 216 exécutions et 203 176 observations chargées, fichier de
+justificatif bien retiré de `./data` après import. **Non éprouvé sous Windows** — aucun poste
+Windows disponible ; le lanceur et les trois corrections sont justes par lecture, pas par
+exécution. Le LISEZ-MOI nomme le prérequis (Git pour Windows) pour que l'échec, s'il survient,
+soit nommable.
+
+**`scenario_c/`** retiré de GitHub à la main le 11.09 (décision de N. Castillo, confirmée le
+13.09). Les trois fichiers restent dans l'historique (`55ec1ef^`). README, DEPLOIEMENT et
+`generer_annexe_2.py` le disent désormais retiré et conservé dans l'historique ; le générateur
+ne projette plus que les fichiers présents. Les documents livrés (rapport § 11.9, annexes 2
+et 4) décrivent l'expérience telle qu'elle a été menée et n'ont pas été modifiés : l'annexe 2
+porte le prompt de l'agent, ce qui en conserve la substance.
