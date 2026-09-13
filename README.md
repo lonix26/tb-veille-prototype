@@ -61,6 +61,7 @@ Les clés d'API des modèles vivent **hors du dossier** (chemin déclaré par `C
 | `demarrer.sh` | Mise en marche en une commande : compose, import des workflows, contrôle des points de lecture |
 | `regenerer_socle.sh` | Régénère `db/01_socle.sql` et `db/02_referentiel.sql` depuis l'instance en service |
 | `preparer_archive.sh` | Constitue l'archive de remise, clés et données exclues |
+| `preparer_archive_execution.sh` | Constitue l'archive d'exécution : le strict nécessaire pour faire tourner le prototype, journal et outillage exclus |
 | `DEPLOIEMENT.md` | Séquence complète de mise en service et d'exploitation |
 | `PASSATION_PROTOTYPE.md` | Journal d'état : ce qui est démontré, ce qui ne l'est pas, et les défauts trouvés |
 | `CONCEPTION_ETAGE2.md` | Conception de l'étage de flux : familles de sources, chaîne, schéma de données |

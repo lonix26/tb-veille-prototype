@@ -6260,3 +6260,18 @@ Avant : 311 fichiers, 27 Mo.
 
 **Reste à Nilo, inchangé** : supprimer `bancEssaiErreur01` dans l'interface n8n ; refaire
 l'archive au gel (procédure des notes de version, socle compris).
+
+## 13.09.2026 — L'archive d'exécution : soixante-sept fichiers, rien d'autre
+
+`preparer_archive_execution.sh` produit `tb-veille-prototype_execution_<date>.zip` (4,1 Mo) avec
+uniquement ce que le compose monte et ce que `demarrer.sh` lit : compose, script, `.env.example`,
+les trois fichiers de `db/`, les 22 workflows de la racine de `n8n_workflows/`, les sources de
+`dashboard-app/`, `data/.gitkeep`, les deux harnais, `DEPLOIEMENT.md` et `LISEZ-MOI.md` — ce
+dernier précédé d'un encadré qui renvoie au dépôt pour tout ce que l'archive ne porte pas.
+
+**Éprouvé depuis l'extraction, sans arrêter l'instance en service** : chemins lus par
+`demarrer.sh` tous présents, `docker compose config` valide, interface compilée dans le
+conteneur Node depuis les seules sources de l'archive (599 modules, 5,7 s). L'essai sur instance
+vierge, volumes détruits, reste celui du 05.09 ; l'instantané `db/03` de ce jour-là et la base
+vivante portent les mêmes 216 exécutions (dernière : 217) et 203 176 observations, le harnais
+`base.sh` est vert — l'instantané n'a pas eu à être refait.
